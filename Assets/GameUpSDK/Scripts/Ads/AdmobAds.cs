@@ -21,7 +21,6 @@ namespace GameUpSDK
         public int OrderExecute { get; set; }
 
         private bool _initialized;
-        private bool _afterGdprSet;
 
 #if UNITY_ANDROID || UNITY_IPHONE
         private BannerView _bannerView;
@@ -65,7 +64,6 @@ namespace GameUpSDK
 
         public void SetAfterCheckGDPR()
         {
-            _afterGdprSet = true;
 #if UNITY_ANDROID || UNITY_IPHONE
             // Consent is typically handled by UMP; SDK respects it after init.
             Debug.Log("[GameUp] AdmobAds SetAfterCheckGDPR called.");
