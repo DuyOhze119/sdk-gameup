@@ -20,6 +20,11 @@ namespace GameUpSDK
 
         public int OrderExecute { get; set; }
 
+        public event Action OnInterstitialLoaded;
+        public event Action<string> OnInterstitialLoadFailed;
+        public event Action OnRewardedLoaded;
+        public event Action<string> OnRewardedLoadFailed;
+
         private bool _initialized;
 
 #if UNITY_ANDROID || UNITY_IPHONE
@@ -95,12 +100,14 @@ namespace GameUpSDK
                 {
                     if (error != null || ad == null)
                     {
-                        Debug.Log("[GameUp] AdmobAds Interstitial load failed: " + (error?.GetMessage() ?? "null"));
+                        var source = error?.GetMessage() ?? (error != null ? error.GetCode().ToString() : "unknown");
+                        OnInterstitialLoadFailed?.Invoke(source);
                         return;
                     }
                     if (_interstitialAd != null) _interstitialAd.Destroy();
                     _interstitialAd = ad;
                     RegisterInterstitialEvents(ad);
+                    OnInterstitialLoaded?.Invoke();
                 });
             });
 #endif
@@ -117,11 +124,13 @@ namespace GameUpSDK
                 {
                     if (error != null || ad == null)
                     {
-                        Debug.Log("[GameUp] AdmobAds Rewarded load failed: " + (error?.GetMessage() ?? "null"));
+                        var source = error?.GetMessage() ?? (error != null ? error.GetCode().ToString() : "unknown");
+                        OnRewardedLoadFailed?.Invoke(source);
                         return;
                     }
                     if (_rewardedAd != null) _rewardedAd.Destroy();
                     _rewardedAd = ad;
+                    OnRewardedLoaded?.Invoke();
                 });
             });
 #endif

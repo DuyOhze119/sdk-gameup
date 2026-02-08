@@ -46,7 +46,7 @@ namespace GameUpSDK
         }
 
         /// <summary>
-        /// Initialize all networks in OrderExecute order.
+        /// Initialize all networks in OrderExecute order and subscribe to load events for logging.
         /// </summary>
         public void Initialize()
         {
@@ -60,6 +60,10 @@ namespace GameUpSDK
             {
                 try
                 {
+                    ad.OnInterstitialLoaded += () => LogAdsEvent(AdsEvent.InterCompleteLoad, null, null);
+                    ad.OnInterstitialLoadFailed += (error) => LogAdsEvent(AdsEvent.InterLoadFail, null, error ?? "unknown");
+                    ad.OnRewardedLoaded += () => LogAdsEvent(AdsEvent.RewardCompleteLoad, null, null);
+                    ad.OnRewardedLoadFailed += (error) => LogAdsEvent(AdsEvent.RewardLoadFail, null, error ?? "unknown");
                     ad.Initialize();
                 }
                 catch (Exception e)
@@ -97,12 +101,28 @@ namespace GameUpSDK
             return _initialized && _ads.Count > 0;
         }
 
-        private void LogAdsEvent(string eventName, string adType, string placement)
+        /// <summary>
+        /// Centralized logging: Firebase + AppsFlyer (when appsFlyerEventName is set). Maps 'where' to af_level for AppsFlyer.
+        /// </summary>
+        private void LogAdsEvent(string eventName, string paramWhere = null, string paramSource = null, string appsFlyerEventName = null)
+        {
+            if (!string.IsNullOrEmpty(paramWhere))
+                FirebaseUtils.LogEvent(eventName, AdsEvent.ParamWhere, paramWhere);
+            else if (!string.IsNullOrEmpty(paramSource))
+                FirebaseUtils.LogEvent(eventName, AdsEvent.ParamSource, paramSource);
+            else
+                FirebaseUtils.LogEvent(eventName, null, null);
+
+            if (!string.IsNullOrEmpty(appsFlyerEventName) && !string.IsNullOrEmpty(paramWhere))
+                AppsFlyerUtils.LogEvents(appsFlyerEventName, new Dictionary<string, string> { { AdsEvent.ParamAfLevel, paramWhere } });
+        }
+
+        private void LogAdsEventManager(string eventName, string adType, string placement)
         {
             var param = new Dictionary<object, object>
             {
-                { "ad_type", adType },
-                { "placement", placement ?? "" }
+                { AdsEvent.ParamAdType, adType },
+                { AdsEvent.ParamPlacement, placement ?? "" }
             };
             FirebaseUtils.LogEventsAPI(eventName, param);
         }
@@ -111,25 +131,24 @@ namespace GameUpSDK
 
         public void ShowBanner(string where)
         {
-            const string adType = "banner";
-            LogAdsEvent("ads_request", adType, where);
+            LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeBanner, where);
             var network = _ads.FirstOrDefault(a => a.IsBannerAvailable());
             if (network == null)
             {
                 Debug.Log("[GameUp] AdsManager ShowBanner: no network available.");
-                LogAdsEvent("ads_show_fail", adType, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where);
                 return;
             }
-            LogAdsEvent("ads_available", adType, where);
+            LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeBanner, where);
             try
             {
                 network.ShowBanner(where);
-                LogAdsEvent("ads_show_success", adType, where);
+                LogAdsEventManager(AdsEvent.AdsShowSuccess, AdsEvent.AdTypeBanner, where);
             }
             catch (Exception e)
             {
                 Debug.LogError("[GameUp] AdsManager ShowBanner: " + e);
-                LogAdsEvent("ads_show_fail", adType, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where);
             }
         }
 
@@ -141,111 +160,103 @@ namespace GameUpSDK
 
         public void ShowInterstitial(string where, Action onSuccess = null, Action onFail = null)
         {
-            const string adType = "interstitial";
-            LogAdsEvent("ads_request", adType, where);
+            LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeInterstitial, where);
             var network = _ads.FirstOrDefault(a => a.IsInterstitialAvailable());
             if (network == null)
             {
                 Debug.Log("[GameUp] AdsManager ShowInterstitial: no network available.");
-                LogAdsEvent("ads_show_fail", adType, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeInterstitial, where);
                 onFail?.Invoke();
                 return;
             }
-            LogAdsEvent("ads_available", adType, where);
+            LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeInterstitial, where);
             try
             {
-                network.ShowInterstitial(where,
-                    () =>
-                    {
-                        LogAdsEvent("ads_show_success", adType, where);
-                        onSuccess?.Invoke();
-                    },
-                    () =>
-                    {
-                        LogAdsEvent("ads_show_fail", adType, where);
-                        onFail?.Invoke();
-                    });
+                LogAdsEvent(AdsEvent.InterShow, where, null, AdsEvent.AfInterShow);
+                Action wrappedSuccess = () =>
+                {
+                    LogAdsEvent(AdsEvent.InterShowComplete, where, null, AdsEvent.AfInterDisplayed);
+                    onSuccess?.Invoke();
+                };
+                Action wrappedFail = () => onFail?.Invoke();
+                network.ShowInterstitial(where, wrappedSuccess, wrappedFail);
             }
             catch (Exception e)
             {
                 Debug.LogError("[GameUp] AdsManager ShowInterstitial: " + e);
-                LogAdsEvent("ads_show_fail", adType, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeInterstitial, where);
                 onFail?.Invoke();
             }
         }
 
         public void ShowRewardedVideo(string where, Action onSuccess = null, Action onFail = null)
         {
-            const string adType = "rewarded_video";
-            LogAdsEvent("ads_request", adType, where);
+            LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeRewardedVideo, where);
             var network = _ads.FirstOrDefault(a => a.IsRewardedVideoAvailable());
             if (network == null)
             {
                 Debug.Log("[GameUp] AdsManager ShowRewardedVideo: no network available.");
-                LogAdsEvent("ads_show_fail", adType, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeRewardedVideo, where);
                 onFail?.Invoke();
                 return;
             }
-            LogAdsEvent("ads_available", adType, where);
+            LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeRewardedVideo, where);
             try
             {
-                network.ShowRewardedVideo(where,
-                    () =>
-                    {
-                        LogAdsEvent("ads_show_success", adType, where);
-                        onSuccess?.Invoke();
-                    },
-                    () =>
-                    {
-                        LogAdsEvent("ads_show_fail", adType, where);
-                        onFail?.Invoke();
-                    });
+                LogAdsEvent(AdsEvent.RewardShow, where, null, AdsEvent.AfRewardShow);
+                Action wrappedSuccess = () =>
+                {
+                    LogAdsEvent(AdsEvent.RewardShowComplete, where, null, AdsEvent.AfRewardDisplayed);
+                    onSuccess?.Invoke();
+                };
+                Action wrappedFail = () => onFail?.Invoke();
+                network.ShowRewardedVideo(where, wrappedSuccess, wrappedFail);
             }
             catch (Exception e)
             {
                 Debug.LogError("[GameUp] AdsManager ShowRewardedVideo: " + e);
-                LogAdsEvent("ads_show_fail", adType, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeRewardedVideo, where);
                 onFail?.Invoke();
             }
         }
 
         public void ShowAppOpenAds(string where, Action onSuccess = null, Action onFail = null)
         {
-            const string adType = "app_open";
-            LogAdsEvent("ads_request", adType, where);
+            LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeAppOpen, where);
             var network = _ads.FirstOrDefault(a => a.IsAppOpenAdsAvailable());
             if (network == null)
             {
                 Debug.Log("[GameUp] AdsManager ShowAppOpenAds: no network available.");
-                LogAdsEvent("ads_show_fail", adType, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeAppOpen, where);
                 onFail?.Invoke();
                 return;
             }
-            LogAdsEvent("ads_available", adType, where);
+            LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeAppOpen, where);
             try
             {
                 network.ShowAppOpenAds(where,
                     () =>
                     {
-                        LogAdsEvent("ads_show_success", adType, where);
+                        LogAdsEventManager(AdsEvent.AdsShowSuccess, AdsEvent.AdTypeAppOpen, where);
                         onSuccess?.Invoke();
                     },
                     () =>
                     {
-                        LogAdsEvent("ads_show_fail", adType, where);
+                        LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeAppOpen, where);
                         onFail?.Invoke();
                     });
             }
             catch (Exception e)
             {
                 Debug.LogError("[GameUp] AdsManager ShowAppOpenAds: " + e);
-                LogAdsEvent("ads_show_fail", adType, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeAppOpen, where);
                 onFail?.Invoke();
             }
         }
 
         /// <summary>
         /// Request/load all ad formats on all networks (e.g. after init or after consent).
+        /// Logs InterStartLoad / RewardStartLoad before each request.
         /// </summary>
         public void RequestAll()
         {
@@ -254,7 +265,9 @@ namespace GameUpSDK
                 try
                 {
                     ad.RequestBanner();
+                    LogAdsEvent(AdsEvent.InterStartLoad, null, null);
                     ad.RequestInterstitial();
+                    LogAdsEvent(AdsEvent.RewardStartLoad, null, null);
                     ad.RequestRewardedVideo();
                     ad.RequestAppOpenAds();
                 }

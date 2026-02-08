@@ -67,6 +67,21 @@ namespace GameUpSDK
         {
                 Instance._LogEvents(eventId, param);
         }
+
+        /// <summary>
+        /// Logs a single-parameter event. Pass null or empty paramName/paramValue for no params.
+        /// </summary>
+        public static void LogEvent(string eventName, string paramName, string paramValue)
+        {
+            if (string.IsNullOrEmpty(paramName) || paramValue == null)
+            {
+                Instance._LogEvents(eventName, null);
+                return;
+            }
+            var param = new Dictionary<object, object> { { paramName, paramValue } };
+            Instance._LogEvents(eventName, param);
+        }
+
         #region Log Events
 
         private void _LogEvents(string eventId, Dictionary<object, object> param = null)

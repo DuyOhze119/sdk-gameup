@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 using Unity.Services.LevelPlay;
 
@@ -11,10 +10,6 @@ namespace GameUpSDK
     /// </summary>
     public class UnityAds : MonoBehaviour, IAds
     {
-        private const string FirebaseEventShowSuccess = "ads_unity_show_success";
-        private const string FirebaseEventShowFail = "ads_unity_show_fail";
-        private const string FirebaseEventRewarded = "ads_unity_rewarded";
-
         [Header("LevelPlay App Key (optional - set via code)")]
         [SerializeField] private string levelPlayAppKey;
 
@@ -24,6 +19,11 @@ namespace GameUpSDK
         [SerializeField] private string rewardedVideoAdUnitId;
 
         public int OrderExecute { get; set; }
+
+        public event Action OnInterstitialLoaded;
+        public event Action<string> OnInterstitialLoadFailed;
+        public event Action OnRewardedLoaded;
+        public event Action<string> OnRewardedLoadFailed;
 
         private bool _initialized;
         private bool _bannerLoaded;
@@ -109,31 +109,20 @@ namespace GameUpSDK
 
             if (_interstitialAd != null)
             {
-                _interstitialAd.OnAdDisplayed += (info) => MainThreadDispatcher.Enqueue(() =>
-                    LogUnityEvent(FirebaseEventShowSuccess, "interstitial", info?.PlacementName));
-                _interstitialAd.OnAdDisplayFailed += (info, error) => MainThreadDispatcher.Enqueue(() =>
-                    LogUnityEvent(FirebaseEventShowFail, "interstitial", info?.PlacementName));
+                _interstitialAd.OnAdLoaded += (info) => MainThreadDispatcher.Enqueue(() => OnInterstitialLoaded?.Invoke());
+                _interstitialAd.OnAdLoadFailed += (error) => MainThreadDispatcher.Enqueue(() =>
+                    OnInterstitialLoadFailed?.Invoke(error?.ErrorMessage ?? error?.ErrorCode.ToString() ?? "unknown"));
+                _interstitialAd.OnAdDisplayFailed += (info, error) => MainThreadDispatcher.Enqueue(() => { });
             }
 
             if (_rewardedAd != null)
             {
-                _rewardedAd.OnAdDisplayed += (info) => MainThreadDispatcher.Enqueue(() =>
-                    LogUnityEvent(FirebaseEventShowSuccess, "rewarded_video", info?.PlacementName));
-                _rewardedAd.OnAdDisplayFailed += (info, error) => MainThreadDispatcher.Enqueue(() =>
-                    LogUnityEvent(FirebaseEventShowFail, "rewarded_video", info?.PlacementName));
-                _rewardedAd.OnAdRewarded += (info, reward) => MainThreadDispatcher.Enqueue(() =>
-                    LogUnityEvent(FirebaseEventRewarded, "rewarded_video", info?.PlacementName));
+                _rewardedAd.OnAdLoaded += (info) => MainThreadDispatcher.Enqueue(() => OnRewardedLoaded?.Invoke());
+                _rewardedAd.OnAdLoadFailed += (error) => MainThreadDispatcher.Enqueue(() =>
+                    OnRewardedLoadFailed?.Invoke(error?.ErrorMessage ?? error?.ErrorCode.ToString() ?? "unknown"));
+                _rewardedAd.OnAdDisplayFailed += (info, error) => MainThreadDispatcher.Enqueue(() => { });
+                _rewardedAd.OnAdRewarded += (info, reward) => MainThreadDispatcher.Enqueue(() => { });
             }
-        }
-
-        private static void LogUnityEvent(string eventName, string adType, string placement)
-        {
-            var param = new Dictionary<object, object>
-            {
-                { "ad_type", adType ?? "" },
-                { "placement", placement ?? "" }
-            };
-            FirebaseUtils.LogEventsAPI(eventName, param);
         }
 
         public void SetAfterCheckGDPR()

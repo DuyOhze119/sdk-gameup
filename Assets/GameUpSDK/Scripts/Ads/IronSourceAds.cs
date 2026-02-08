@@ -20,6 +20,11 @@ namespace GameUpSDK
 
         public int OrderExecute { get; set; }
 
+        public event Action OnInterstitialLoaded;
+        public event Action<string> OnInterstitialLoadFailed;
+        public event Action OnRewardedLoaded;
+        public event Action<string> OnRewardedLoadFailed;
+
         private bool _initialized;
         private LevelPlayBannerAd _bannerAd;
         private LevelPlayInterstitialAd _interstitialAd;
@@ -61,8 +66,27 @@ namespace GameUpSDK
                 LevelPlay.OnInitSuccess -= OnLevelPlayInitSuccess;
                 LevelPlay.OnInitFailed -= OnLevelPlayInitFailed;
                 CreateAdUnits();
+                SubscribeToAdEvents();
                 Debug.Log("[CtySDK] IronSourceAds (LevelPlay) initialized.");
             });
+        }
+
+        private void SubscribeToAdEvents()
+        {
+            if (_interstitialAd != null)
+            {
+                _interstitialAd.OnAdLoaded += (info) => MainThreadDispatcher.Enqueue(() => OnInterstitialLoaded?.Invoke());
+                _interstitialAd.OnAdLoadFailed += (error) => MainThreadDispatcher.Enqueue(() =>
+                    OnInterstitialLoadFailed?.Invoke(error?.ErrorMessage ?? error?.ErrorCode.ToString() ?? "unknown"));
+                _interstitialAd.OnAdDisplayed += (info) => MainThreadDispatcher.Enqueue(() => { });
+            }
+            if (_rewardedAd != null)
+            {
+                _rewardedAd.OnAdLoaded += (info) => MainThreadDispatcher.Enqueue(() => OnRewardedLoaded?.Invoke());
+                _rewardedAd.OnAdLoadFailed += (error) => MainThreadDispatcher.Enqueue(() =>
+                    OnRewardedLoadFailed?.Invoke(error?.ErrorMessage ?? error?.ErrorCode.ToString() ?? "unknown"));
+                _rewardedAd.OnAdDisplayed += (info) => MainThreadDispatcher.Enqueue(() => { });
+            }
         }
 
         private void OnLevelPlayInitFailed(LevelPlayInitError error)
