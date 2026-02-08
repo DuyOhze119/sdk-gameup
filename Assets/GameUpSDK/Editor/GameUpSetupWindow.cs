@@ -1,13 +1,14 @@
 using System;
 using UnityEditor;
 using UnityEngine;
+using UnityEditor.SceneManagement;
 
 namespace GameUpSDK.Editor
 {
     public class GameUpSetupWindow : EditorWindow
     {
         private const string PathSDK = "Assets/GameUpSDK/Prefab/SDK.prefab";
-        private const string PathAppsFlyer = "Assets/AppsFlyer/AppsFlyerObject.prefab";
+        private const string PathAppsFlyer = "Assets/GameUpSDK/Prefab/AppsFlyerObject.prefab";
         private const string PathIronSource = "Assets/GameUpSDK/Prefab/IronSourceAds.prefab";
         private const string PathAdMob = "Assets/GameUpSDK/Prefab/AdmobAds.prefab";
         private const string PathUnityAds = "Assets/GameUpSDK/Prefab/UnityAds.prefab";
@@ -15,9 +16,14 @@ namespace GameUpSDK.Editor
         private int _activeTab;
         private readonly string[] _tabs = { "AppsFlyer", "IronSource", "AdMob", "UnityAds" };
 
-        // AppsFlyer (AppsFlyerObjectScript: devKey, appID)
+        // AppsFlyer (AppsFlyerObjectScript on AppsFlyerObject.prefab: devKey, appID)
         private string _appsFlyerDevKey = "";
         private string _appsFlyerAppId = "";
+
+        // AppsFlyerUtils on SDK.prefab (sdkKey, appId, isDevMode)
+        private string _appsFlyerUtilsSdkKey = "";
+        private string _appsFlyerUtilsAppId = "";
+        private bool _appsFlyerUtilsIsDevMode = false;
 
         // IronSource (IronSourceAds: levelPlayAppKey, bannerAdUnitId, interstitialAdUnitId, rewardedVideoAdUnitId)
         private string _ironSourceAppKey = "";
@@ -85,16 +91,49 @@ namespace GameUpSDK.Editor
             {
                 SaveToPrefabs();
             }
+            
+            EditorGUILayout.Space(8);
+            EditorGUILayout.HelpBox("Thêm SDK vào scene hiện tại (sẽ tạo instance từ prefab SDK).", MessageType.None);
+            if (GUILayout.Button("Tạo SDK trong Scene hiện tại", GUILayout.Height(28)))
+            {
+                CreateSDKInCurrentScene();
+            }
 
             EditorGUILayout.EndScrollView();
+        }
+
+        private void CreateSDKInCurrentScene()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PathSDK);
+            if (prefab == null)
+            {
+                _saveErrors = "Không tìm thấy prefab SDK tại: " + PathSDK;
+                return;
+            }
+            var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            if (instance != null)
+            {
+                Selection.activeGameObject = instance;
+                EditorGUIUtility.PingObject(instance);
+                EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+                Debug.Log("[GameUpSDK] Đã thêm SDK vào scene hiện tại.");
+            }
         }
 
         private void DrawAppsFlyerSection()
         {
             EditorGUILayout.LabelField("AppsFlyer Settings", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("Target: AppsFlyerObjectScript on " + PathAppsFlyer, MessageType.None);
+
+            EditorGUILayout.HelpBox("AppsFlyerObjectScript on " + PathAppsFlyer, MessageType.None);
             _appsFlyerDevKey = EditorGUILayout.TextField("Dev Key", _appsFlyerDevKey);
             _appsFlyerAppId = EditorGUILayout.TextField("App ID (iOS)", _appsFlyerAppId);
+
+            EditorGUILayout.Space(8);
+            EditorGUILayout.LabelField("AppsFlyerUtils (GameUpSDK)", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("AppsFlyerUtils on " + PathSDK + " – init SDK, log events, ad revenue.", MessageType.None);
+            _appsFlyerUtilsSdkKey = EditorGUILayout.TextField("SDK Key", _appsFlyerUtilsSdkKey);
+            _appsFlyerUtilsAppId = EditorGUILayout.TextField("App ID (iOS)", _appsFlyerUtilsAppId);
+            _appsFlyerUtilsIsDevMode = EditorGUILayout.Toggle("Dev Mode", _appsFlyerUtilsIsDevMode);
         }
 
         private void DrawIronSourceSection()
@@ -136,6 +175,7 @@ namespace GameUpSDK.Editor
         {
             var errors = new System.Collections.Generic.List<string>();
             if (!LoadAppsFlyer()) errors.Add("Prefab not found at: " + PathAppsFlyer);
+            LoadAppsFlyerUtils(); // AppsFlyerUtils on SDK.prefab (optional)
             if (!LoadIronSource()) errors.Add("Prefab not found at: " + PathIronSource);
             if (!LoadAdMob()) errors.Add("Prefab not found at: " + PathAdMob);
             if (!LoadUnityAds()) errors.Add("Prefab not found at: " + PathUnityAds);
@@ -156,6 +196,19 @@ namespace GameUpSDK.Editor
             if (devKey != null) _appsFlyerDevKey = devKey.stringValue ?? "";
             if (appID != null) _appsFlyerAppId = appID.stringValue ?? "";
             return true;
+        }
+
+        private void LoadAppsFlyerUtils()
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathSDK);
+            if (go == null) return;
+            var comp = go.GetComponent<GameUpSDK.AppsFlyerUtils>();
+            if (comp == null) return;
+            var so = new SerializedObject(comp);
+            Assign(so, "sdkKey", ref _appsFlyerUtilsSdkKey);
+            Assign(so, "appId", ref _appsFlyerUtilsAppId);
+            var isDev = so.FindProperty("isDevMode");
+            if (isDev != null) _appsFlyerUtilsIsDevMode = isDev.boolValue;
         }
 
         private bool LoadIronSource()
@@ -210,6 +263,7 @@ namespace GameUpSDK.Editor
         {
             var errors = new System.Collections.Generic.List<string>();
             if (!SaveAppsFlyer()) errors.Add(PathAppsFlyer);
+            if (!SaveAppsFlyerUtils()) errors.Add(PathSDK + " (AppsFlyerUtils)");
             if (!SaveIronSource()) errors.Add(PathIronSource);
             if (!SaveAdMob()) errors.Add(PathAdMob);
             if (!SaveUnityAds()) errors.Add(PathUnityAds);
@@ -231,6 +285,23 @@ namespace GameUpSDK.Editor
             var so = new SerializedObject(comp);
             Set(so, "devKey", _appsFlyerDevKey);
             Set(so, "appID", _appsFlyerAppId);
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(comp);
+            PrefabUtility.SavePrefabAsset(go);
+            return true;
+        }
+
+        private bool SaveAppsFlyerUtils()
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathSDK);
+            if (go == null) return false;
+            var comp = go.GetComponent<GameUpSDK.AppsFlyerUtils>();
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            Set(so, "sdkKey", _appsFlyerUtilsSdkKey);
+            Set(so, "appId", _appsFlyerUtilsAppId);
+            var isDev = so.FindProperty("isDevMode");
+            if (isDev != null) isDev.boolValue = _appsFlyerUtilsIsDevMode;
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(comp);
             PrefabUtility.SavePrefabAsset(go);
@@ -293,5 +364,7 @@ namespace GameUpSDK.Editor
             var p = so.FindProperty(propName);
             if (p != null) p.stringValue = value ?? "";
         }
+
+        
     }
 }
