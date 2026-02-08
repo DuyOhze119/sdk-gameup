@@ -1,0 +1,297 @@
+using System;
+using UnityEditor;
+using UnityEngine;
+
+namespace GameUpSDK.Editor
+{
+    public class GameUpSetupWindow : EditorWindow
+    {
+        private const string PathSDK = "Assets/GameUpSDK/Prefab/SDK.prefab";
+        private const string PathAppsFlyer = "Assets/AppsFlyer/AppsFlyerObject.prefab";
+        private const string PathIronSource = "Assets/GameUpSDK/Prefab/IronSourceAds.prefab";
+        private const string PathAdMob = "Assets/GameUpSDK/Prefab/AdmobAds.prefab";
+        private const string PathUnityAds = "Assets/GameUpSDK/Prefab/UnityAds.prefab";
+
+        private int _activeTab;
+        private readonly string[] _tabs = { "AppsFlyer", "IronSource", "AdMob", "UnityAds" };
+
+        // AppsFlyer (AppsFlyerObjectScript: devKey, appID)
+        private string _appsFlyerDevKey = "";
+        private string _appsFlyerAppId = "";
+
+        // IronSource (IronSourceAds: levelPlayAppKey, bannerAdUnitId, interstitialAdUnitId, rewardedVideoAdUnitId)
+        private string _ironSourceAppKey = "";
+        private string _ironSourceBannerId = "";
+        private string _ironSourceInterstitialId = "";
+        private string _ironSourceRewardedId = "";
+
+        // AdMob (AdmobAds: bannerAdUnitId, interstitialAdUnitId, rewardedAdUnitId, appOpenAdUnitId)
+        private string _admobBannerId = "";
+        private string _admobInterstitialId = "";
+        private string _admobRewardedId = "";
+        private string _admobAppOpenId = "";
+
+        // UnityAds (UnityAds: levelPlayAppKey, bannerAdUnitId, interstitialAdUnitId, rewardedVideoAdUnitId)
+        private string _unityAdsAppKey = "";
+        private string _unityAdsBannerId = "";
+        private string _unityAdsInterstitialId = "";
+        private string _unityAdsRewardedId = "";
+
+        private Vector2 _scrollPosition;
+        private string _loadErrors;
+        private string _saveErrors;
+
+        [MenuItem("GameUp SDK/Setup")]
+        public static void ShowWindow()
+        {
+            var window = GetWindow<GameUpSetupWindow>("GameUp SDK Setup");
+            window.minSize = new Vector2(400, 480);
+        }
+
+        private void OnEnable()
+        {
+            LoadFromPrefabs();
+        }
+
+        private void OnGUI()
+        {
+            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
+
+            if (!string.IsNullOrEmpty(_loadErrors))
+            {
+                EditorGUILayout.HelpBox(_loadErrors, MessageType.Warning);
+                EditorGUILayout.Space(4);
+            }
+            if (!string.IsNullOrEmpty(_saveErrors))
+            {
+                EditorGUILayout.HelpBox(_saveErrors, MessageType.Error);
+                _saveErrors = null;
+                EditorGUILayout.Space(4);
+            }
+
+            _activeTab = GUILayout.Toolbar(_activeTab, _tabs);
+            EditorGUILayout.Space(8);
+
+            switch (_activeTab)
+            {
+                case 0: DrawAppsFlyerSection(); break;
+                case 1: DrawIronSourceSection(); break;
+                case 2: DrawAdMobSection(); break;
+                case 3: DrawUnityAdsSection(); break;
+            }
+
+            EditorGUILayout.Space(16);
+            if (GUILayout.Button("Save Configuration", GUILayout.Height(32)))
+            {
+                SaveToPrefabs();
+            }
+
+            EditorGUILayout.EndScrollView();
+        }
+
+        private void DrawAppsFlyerSection()
+        {
+            EditorGUILayout.LabelField("AppsFlyer Settings", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("Target: AppsFlyerObjectScript on " + PathAppsFlyer, MessageType.None);
+            _appsFlyerDevKey = EditorGUILayout.TextField("Dev Key", _appsFlyerDevKey);
+            _appsFlyerAppId = EditorGUILayout.TextField("App ID (iOS)", _appsFlyerAppId);
+        }
+
+        private void DrawIronSourceSection()
+        {
+            EditorGUILayout.LabelField("IronSource (LevelPlay) Settings", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("Target: IronSourceAds on " + PathIronSource, MessageType.None);
+            _ironSourceAppKey = EditorGUILayout.TextField("App Key", _ironSourceAppKey);
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("Ad Unit IDs", EditorStyles.miniBoldLabel);
+            _ironSourceBannerId = EditorGUILayout.TextField("Banner ID", _ironSourceBannerId);
+            _ironSourceInterstitialId = EditorGUILayout.TextField("Interstitial ID", _ironSourceInterstitialId);
+            _ironSourceRewardedId = EditorGUILayout.TextField("Rewarded ID", _ironSourceRewardedId);
+        }
+
+        private void DrawAdMobSection()
+        {
+            EditorGUILayout.LabelField("AdMob Settings", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("Target: AdmobAds on " + PathAdMob + ". App IDs are configured in Google Mobile Ads settings.", MessageType.None);
+            EditorGUILayout.LabelField("Ad Unit IDs", EditorStyles.miniBoldLabel);
+            _admobBannerId = EditorGUILayout.TextField("Banner ID", _admobBannerId);
+            _admobInterstitialId = EditorGUILayout.TextField("Interstitial ID", _admobInterstitialId);
+            _admobRewardedId = EditorGUILayout.TextField("Rewarded ID", _admobRewardedId);
+            _admobAppOpenId = EditorGUILayout.TextField("App Open ID", _admobAppOpenId);
+        }
+
+        private void DrawUnityAdsSection()
+        {
+            EditorGUILayout.LabelField("UnityAds (Mediation Wrapper) Settings", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("Target: UnityAds on " + PathUnityAds, MessageType.None);
+            _unityAdsAppKey = EditorGUILayout.TextField("App Key", _unityAdsAppKey);
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("Ad Unit IDs", EditorStyles.miniBoldLabel);
+            _unityAdsBannerId = EditorGUILayout.TextField("Banner ID", _unityAdsBannerId);
+            _unityAdsInterstitialId = EditorGUILayout.TextField("Interstitial ID", _unityAdsInterstitialId);
+            _unityAdsRewardedId = EditorGUILayout.TextField("Rewarded ID", _unityAdsRewardedId);
+        }
+
+        private void LoadFromPrefabs()
+        {
+            var errors = new System.Collections.Generic.List<string>();
+            if (!LoadAppsFlyer()) errors.Add("Prefab not found at: " + PathAppsFlyer);
+            if (!LoadIronSource()) errors.Add("Prefab not found at: " + PathIronSource);
+            if (!LoadAdMob()) errors.Add("Prefab not found at: " + PathAdMob);
+            if (!LoadUnityAds()) errors.Add("Prefab not found at: " + PathUnityAds);
+            _loadErrors = errors.Count > 0 ? string.Join("\n", errors) : null;
+        }
+
+        private bool LoadAppsFlyer()
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathAppsFlyer);
+            if (go == null) return false;
+            var type = Type.GetType("AppsFlyerObjectScript, AppsFlyer");
+            if (type == null) return false;
+            var comp = go.GetComponent(type);
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            var devKey = so.FindProperty("devKey");
+            var appID = so.FindProperty("appID");
+            if (devKey != null) _appsFlyerDevKey = devKey.stringValue ?? "";
+            if (appID != null) _appsFlyerAppId = appID.stringValue ?? "";
+            return true;
+        }
+
+        private bool LoadIronSource()
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathIronSource);
+            if (go == null) return false;
+            var comp = go.GetComponent<GameUpSDK.IronSourceAds>();
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            Assign(so, "levelPlayAppKey", ref _ironSourceAppKey);
+            Assign(so, "bannerAdUnitId", ref _ironSourceBannerId);
+            Assign(so, "interstitialAdUnitId", ref _ironSourceInterstitialId);
+            Assign(so, "rewardedVideoAdUnitId", ref _ironSourceRewardedId);
+            return true;
+        }
+
+        private bool LoadAdMob()
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathAdMob);
+            if (go == null) return false;
+            var comp = go.GetComponent<GameUpSDK.AdmobAds>();
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            Assign(so, "bannerAdUnitId", ref _admobBannerId);
+            Assign(so, "interstitialAdUnitId", ref _admobInterstitialId);
+            Assign(so, "rewardedAdUnitId", ref _admobRewardedId);
+            Assign(so, "appOpenAdUnitId", ref _admobAppOpenId);
+            return true;
+        }
+
+        private bool LoadUnityAds()
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathUnityAds);
+            if (go == null) return false;
+            var comp = go.GetComponent<GameUpSDK.UnityAds>();
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            Assign(so, "levelPlayAppKey", ref _unityAdsAppKey);
+            Assign(so, "bannerAdUnitId", ref _unityAdsBannerId);
+            Assign(so, "interstitialAdUnitId", ref _unityAdsInterstitialId);
+            Assign(so, "rewardedVideoAdUnitId", ref _unityAdsRewardedId);
+            return true;
+        }
+
+        private static void Assign(SerializedObject so, string propName, ref string target)
+        {
+            var p = so.FindProperty(propName);
+            if (p != null) target = p.stringValue ?? "";
+        }
+
+        private void SaveToPrefabs()
+        {
+            var errors = new System.Collections.Generic.List<string>();
+            if (!SaveAppsFlyer()) errors.Add(PathAppsFlyer);
+            if (!SaveIronSource()) errors.Add(PathIronSource);
+            if (!SaveAdMob()) errors.Add(PathAdMob);
+            if (!SaveUnityAds()) errors.Add(PathUnityAds);
+
+            if (errors.Count > 0)
+                _saveErrors = "Prefab not found at:\n" + string.Join("\n", errors);
+            else
+                Debug.Log("[GameUpSDK] Configuration Saved!");
+        }
+
+        private bool SaveAppsFlyer()
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathAppsFlyer);
+            if (go == null) return false;
+            var type = Type.GetType("AppsFlyerObjectScript, AppsFlyer");
+            if (type == null) return false;
+            var comp = go.GetComponent(type);
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            Set(so, "devKey", _appsFlyerDevKey);
+            Set(so, "appID", _appsFlyerAppId);
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(comp);
+            PrefabUtility.SavePrefabAsset(go);
+            return true;
+        }
+
+        private bool SaveIronSource()
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathIronSource);
+            if (go == null) return false;
+            var comp = go.GetComponent<GameUpSDK.IronSourceAds>();
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            Set(so, "levelPlayAppKey", _ironSourceAppKey);
+            Set(so, "bannerAdUnitId", _ironSourceBannerId);
+            Set(so, "interstitialAdUnitId", _ironSourceInterstitialId);
+            Set(so, "rewardedVideoAdUnitId", _ironSourceRewardedId);
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(comp);
+            PrefabUtility.SavePrefabAsset(go);
+            return true;
+        }
+
+        private bool SaveAdMob()
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathAdMob);
+            if (go == null) return false;
+            var comp = go.GetComponent<GameUpSDK.AdmobAds>();
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            Set(so, "bannerAdUnitId", _admobBannerId);
+            Set(so, "interstitialAdUnitId", _admobInterstitialId);
+            Set(so, "rewardedAdUnitId", _admobRewardedId);
+            Set(so, "appOpenAdUnitId", _admobAppOpenId);
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(comp);
+            PrefabUtility.SavePrefabAsset(go);
+            return true;
+        }
+
+        private bool SaveUnityAds()
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathUnityAds);
+            if (go == null) return false;
+            var comp = go.GetComponent<GameUpSDK.UnityAds>();
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            Set(so, "levelPlayAppKey", _unityAdsAppKey);
+            Set(so, "bannerAdUnitId", _unityAdsBannerId);
+            Set(so, "interstitialAdUnitId", _unityAdsInterstitialId);
+            Set(so, "rewardedVideoAdUnitId", _unityAdsRewardedId);
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(comp);
+            PrefabUtility.SavePrefabAsset(go);
+            return true;
+        }
+
+        private static void Set(SerializedObject so, string propName, string value)
+        {
+            var p = so.FindProperty(propName);
+            if (p != null) p.stringValue = value ?? "";
+        }
+    }
+}
