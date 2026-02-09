@@ -81,7 +81,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e0e7ad790b9a64b4489c896ea6615dfa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  sdkKey: 
+  sdkKey: 5VBeZLdGAnC9LnzK2WebNh
   appId: 
   isDevMode: 0
 --- !u!114 &3023022297655963174
@@ -97,9 +97,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   adsBehaviours:
-  - {fileID: 3564421296294206596}
   - {fileID: 4916787099274234970}
-  - {fileID: 7194672420980044603}
 --- !u!1001 &6106133546150576619
 PrefabInstance:
   m_ObjectHideFlags: 0

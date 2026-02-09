@@ -59,6 +59,11 @@ namespace GameUpSDK
                 {
                     _initialized = true;
                     Debug.Log("[GameUp] AdmobAds initialized.");
+                    // Request ads ngay khi SDK sẵn sàng (tránh gọi RequestAll() trước khi init xong).
+                    RequestBanner();
+                    RequestInterstitial();
+                    RequestRewardedVideo();
+                    RequestAppOpenAds();
                 });
             });
 #else
@@ -78,10 +83,11 @@ namespace GameUpSDK
         public void RequestBanner()
         {
 #if UNITY_ANDROID || UNITY_IPHONE
-            if (string.IsNullOrEmpty(bannerAdUnitId)) return;
+            if (!_initialized || string.IsNullOrEmpty(bannerAdUnitId)) return;
             MainThreadDispatcher.Enqueue(() =>
             {
                 if (_bannerView != null) { _bannerView.Destroy(); _bannerView = null; }
+                // Dùng size chuẩn để có fill. Custom (full width x 150) dễ bị "request doesn't meet size requirements".
                 _bannerView = new BannerView(bannerAdUnitId, AdSize.Banner, AdPosition.Bottom);
                 var request = new AdRequest();
                 _bannerView.LoadAd(request);
@@ -92,7 +98,7 @@ namespace GameUpSDK
         public void RequestInterstitial()
         {
 #if UNITY_ANDROID || UNITY_IPHONE
-            if (string.IsNullOrEmpty(interstitialAdUnitId)) return;
+            if (!_initialized || string.IsNullOrEmpty(interstitialAdUnitId)) return;
             var request = new AdRequest();
             InterstitialAd.Load(interstitialAdUnitId, request, (ad, error) =>
             {
@@ -116,7 +122,7 @@ namespace GameUpSDK
         public void RequestRewardedVideo()
         {
 #if UNITY_ANDROID || UNITY_IPHONE
-            if (string.IsNullOrEmpty(rewardedAdUnitId)) return;
+            if (!_initialized || string.IsNullOrEmpty(rewardedAdUnitId)) return;
             var request = new AdRequest();
             RewardedAd.Load(rewardedAdUnitId, request, (ad, error) =>
             {
@@ -139,7 +145,7 @@ namespace GameUpSDK
         public void RequestAppOpenAds()
         {
 #if UNITY_ANDROID || UNITY_IPHONE
-            if (string.IsNullOrEmpty(appOpenAdUnitId)) return;
+            if (!_initialized || string.IsNullOrEmpty(appOpenAdUnitId)) return;
             if (_appOpenAd != null) { _appOpenAd.Destroy(); _appOpenAd = null; }
             var request = new AdRequest();
             AppOpenAd.Load(appOpenAdUnitId, request, (ad, error) =>

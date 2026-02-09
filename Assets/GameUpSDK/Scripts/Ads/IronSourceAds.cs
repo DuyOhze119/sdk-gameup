@@ -5,15 +5,21 @@ using Unity.Services.LevelPlay;
 namespace GameUpSDK
 {
     /// <summary>
-    /// IronSource (LevelPlay) implementation of IAds. Request methods bridge to LevelPlay's loading flow.
-    /// LevelPlay does not support App Open; those methods no-op / return false.
+    /// IronSource (LevelPlay) Mediation implementation of IAds.
+    /// Chỉ cần App Key để lấy quảng cáo; AdMob và Unity Ads chạy qua mediation.
+    /// Nếu không nhập Ad Unit ID, dùng placement mặc định (DefaultBanner, DefaultInterstitial, DefaultRewardedVideo).
+    /// LevelPlay không hỗ trợ App Open; các method App Open no-op / return false.
     /// </summary>
     public class IronSourceAds : MonoBehaviour, IAds
     {
-        [Header("LevelPlay App Key (optional - set via code)")]
+        private const string DefaultBannerId = "DefaultBanner";
+        private const string DefaultInterstitialId = "DefaultInterstitial";
+        private const string DefaultRewardedId = "DefaultRewardedVideo";
+
+        [Header("LevelPlay App Key (bắt buộc - lấy từ LevelPlay dashboard)")]
         [SerializeField] private string levelPlayAppKey;
 
-        [Header("Ad Unit IDs")]
+        [Header("Ad Unit / Placement IDs (để trống = dùng placement mặc định)")]
         [SerializeField] private string bannerAdUnitId;
         [SerializeField] private string interstitialAdUnitId;
         [SerializeField] private string rewardedVideoAdUnitId;
@@ -67,6 +73,10 @@ namespace GameUpSDK
                 LevelPlay.OnInitFailed -= OnLevelPlayInitFailed;
                 CreateAdUnits();
                 SubscribeToAdEvents();
+                // Request ads ngay khi LevelPlay sẵn sàng (tránh RequestAll() gọi trước khi init xong).
+                RequestBanner();
+                RequestInterstitial();
+                RequestRewardedVideo();
                 Debug.Log("[CtySDK] IronSourceAds (LevelPlay) initialized.");
             });
         }
@@ -75,17 +85,15 @@ namespace GameUpSDK
         {
             if (_interstitialAd != null)
             {
-                _interstitialAd.OnAdLoaded += (info) => MainThreadDispatcher.Enqueue(() => OnInterstitialLoaded?.Invoke());
+                _interstitialAd.OnAdLoaded += _ => MainThreadDispatcher.Enqueue(() => OnInterstitialLoaded?.Invoke());
                 _interstitialAd.OnAdLoadFailed += (error) => MainThreadDispatcher.Enqueue(() =>
                     OnInterstitialLoadFailed?.Invoke(error?.ErrorMessage ?? error?.ErrorCode.ToString() ?? "unknown"));
-                _interstitialAd.OnAdDisplayed += (info) => MainThreadDispatcher.Enqueue(() => { });
             }
             if (_rewardedAd != null)
             {
-                _rewardedAd.OnAdLoaded += (info) => MainThreadDispatcher.Enqueue(() => OnRewardedLoaded?.Invoke());
+                _rewardedAd.OnAdLoaded += _ => MainThreadDispatcher.Enqueue(() => OnRewardedLoaded?.Invoke());
                 _rewardedAd.OnAdLoadFailed += (error) => MainThreadDispatcher.Enqueue(() =>
                     OnRewardedLoadFailed?.Invoke(error?.ErrorMessage ?? error?.ErrorCode.ToString() ?? "unknown"));
-                _rewardedAd.OnAdDisplayed += (info) => MainThreadDispatcher.Enqueue(() => { });
             }
         }
 
@@ -102,18 +110,18 @@ namespace GameUpSDK
 
         private void CreateAdUnits()
         {
-            if (!string.IsNullOrEmpty(bannerAdUnitId))
-            {
-                _bannerAd = new LevelPlayBannerAd(bannerAdUnitId);
-            }
-            if (!string.IsNullOrEmpty(interstitialAdUnitId))
-            {
-                _interstitialAd = new LevelPlayInterstitialAd(interstitialAdUnitId);
-            }
-            if (!string.IsNullOrEmpty(rewardedVideoAdUnitId))
-            {
-                _rewardedAd = new LevelPlayRewardedAd(rewardedVideoAdUnitId);
-            }
+            var bannerId = string.IsNullOrEmpty(bannerAdUnitId) ? DefaultBannerId : bannerAdUnitId;
+            var interId = string.IsNullOrEmpty(interstitialAdUnitId) ? DefaultInterstitialId : interstitialAdUnitId;
+            var rewardId = string.IsNullOrEmpty(rewardedVideoAdUnitId) ? DefaultRewardedId : rewardedVideoAdUnitId;
+
+            // Dùng size chuẩn để banner có fill. Custom (width x 150) dễ bị network từ chối.
+            var bannerConfig = new LevelPlayBannerAd.Config.Builder()
+                .SetSize(LevelPlayAdSize.LARGE) // 320x90 dp, chuẩn và cao hơn BANNER (320x50)
+                .SetPosition(LevelPlayBannerPosition.BottomCenter)
+                .Build();
+            _bannerAd = new LevelPlayBannerAd(bannerId, bannerConfig);
+            _interstitialAd = new LevelPlayInterstitialAd(interId);
+            _rewardedAd = new LevelPlayRewardedAd(rewardId);
         }
 
         public void SetAfterCheckGDPR()

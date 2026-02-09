@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -13,12 +14,19 @@ namespace GameUpSDK
     {
         [SerializeField] private List<MonoBehaviour> adsBehaviours = new List<MonoBehaviour>();
 
+        [Header("Banner sau Initialize")]
+        [SerializeField] private bool showBannerAfterInit = true;
+        [SerializeField] private string showBannerPlacementAfterInit = "main";
+        [Tooltip("Thời gian chờ (giây) sau Initialize rồi mới ShowBanner, để network kịp request/load.")]
+        [SerializeField] private float showBannerDelaySeconds = 2f;
+
         private List<IAds> _ads = new List<IAds>();
         private bool _initialized;
 
         private void Awake()
         {
             BuildAdsList();
+            Initialize();
         }
 
         private void Update()
@@ -73,6 +81,19 @@ namespace GameUpSDK
             }
             _initialized = true;
             Debug.Log("[GameUp] AdsManager Initialize called for " + _ads.Count + " networks.");
+
+            if (showBannerAfterInit)
+            {
+                RequestAll();
+                StartCoroutine(ShowBannerAfterInitCoroutine());
+            }
+        }
+
+        private IEnumerator ShowBannerAfterInitCoroutine()
+        {
+            if (showBannerDelaySeconds > 0f)
+                yield return new WaitForSeconds(showBannerDelaySeconds);
+            ShowBanner(showBannerPlacementAfterInit);
         }
 
         /// <summary>
