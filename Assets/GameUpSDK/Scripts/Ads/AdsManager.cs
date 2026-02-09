@@ -131,6 +131,11 @@ namespace GameUpSDK
 
         public void ShowBanner(string where)
         {
+            if (!AdsRules.IsBannerEnabled())
+            {
+                Debug.Log("[GameUp] AdsManager ShowBanner: disabled by Remote Config (enable_banner).");
+                return;
+            }
             LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeBanner, where);
             var network = _ads.FirstOrDefault(a => a.IsBannerAvailable());
             if (network == null)
@@ -158,8 +163,21 @@ namespace GameUpSDK
             network?.HideBanner(where);
         }
 
+        /// <summary>Show Interstitial (no level check: only time capping from AdsRules).</summary>
         public void ShowInterstitial(string where, Action onSuccess = null, Action onFail = null)
         {
+            ShowInterstitial(where, int.MaxValue, onSuccess, onFail);
+        }
+
+        /// <summary>Show Interstitial với level hiện tại: kiểm tra inter_start_level và inter_capping_time qua AdsRules.</summary>
+        public void ShowInterstitial(string where, int currentLevel, Action onSuccess = null, Action onFail = null)
+        {
+            if (!AdsRules.CanShowInterstitial(currentLevel))
+            {
+                Debug.Log("[GameUp] AdsManager ShowInterstitial: blocked by AdsRules (level or capping).");
+                onFail?.Invoke();
+                return;
+            }
             LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeInterstitial, where);
             var network = _ads.FirstOrDefault(a => a.IsInterstitialAvailable());
             if (network == null)
@@ -175,6 +193,7 @@ namespace GameUpSDK
                 LogAdsEvent(AdsEvent.InterShow, where, null, AdsEvent.AfInterShow);
                 Action wrappedSuccess = () =>
                 {
+                    AdsRules.RecordInterstitialShown();
                     LogAdsEvent(AdsEvent.InterShowComplete, where, null, AdsEvent.AfInterDisplayed);
                     onSuccess?.Invoke();
                 };
