@@ -14,7 +14,7 @@ namespace GameUpSDK.Editor
         private const string PathUnityAds = "Assets/GameUpSDK/Prefab/UnityAds.prefab";
 
         private int _activeTab;
-        private readonly string[] _tabs = { "AppsFlyer", "IronSource", "AdMob", "UnityAds" };
+        private readonly string[] _tabs = { "AppsFlyer", "IronSource", "AdMob", "UnityAds", "Firebase RC" };
 
         // AppsFlyer (AppsFlyerObjectScript on AppsFlyerObject.prefab: devKey, appID)
         private string _appsFlyerDevKey = "";
@@ -42,6 +42,14 @@ namespace GameUpSDK.Editor
         private string _unityAdsBannerId = "";
         private string _unityAdsInterstitialId = "";
         private string _unityAdsRewardedId = "";
+
+        // FirebaseRemoteConfigUtils on SDK.prefab (default values, sync from Remote at runtime)
+        private int _rcInterCappingTime = 120;
+        private int _rcInterStartLevel = 3;
+        private bool _rcEnableRateApp = false;
+        private int _rcLevelStartShowRateApp = 5;
+        private bool _rcNoInternetPopupEnable = true;
+        private bool _rcEnableBanner = true;
 
         private Vector2 _scrollPosition;
         private string _loadErrors;
@@ -84,6 +92,7 @@ namespace GameUpSDK.Editor
                 case 1: DrawIronSourceSection(); break;
                 case 2: DrawAdMobSection(); break;
                 case 3: DrawUnityAdsSection(); break;
+                case 4: DrawFirebaseRemoteConfigSection(); break;
             }
 
             EditorGUILayout.Space(16);
@@ -171,11 +180,24 @@ namespace GameUpSDK.Editor
             _unityAdsRewardedId = EditorGUILayout.TextField("Rewarded ID", _unityAdsRewardedId);
         }
 
+        private void DrawFirebaseRemoteConfigSection()
+        {
+            EditorGUILayout.LabelField("Firebase Remote Config (defaults)", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("FirebaseRemoteConfigUtils on " + PathSDK + ". Giá trị mặc định khi chưa fetch hoặc key không có trên Remote.", MessageType.None);
+            _rcInterCappingTime = EditorGUILayout.IntField("inter_capping_time (giây)", _rcInterCappingTime);
+            _rcInterStartLevel = EditorGUILayout.IntField("inter_start_level", _rcInterStartLevel);
+            _rcEnableRateApp = EditorGUILayout.Toggle("enable_rate_app", _rcEnableRateApp);
+            _rcLevelStartShowRateApp = EditorGUILayout.IntField("level_start_show_rate_app", _rcLevelStartShowRateApp);
+            _rcNoInternetPopupEnable = EditorGUILayout.Toggle("no_internet_popup_enable", _rcNoInternetPopupEnable);
+            _rcEnableBanner = EditorGUILayout.Toggle("enable_banner", _rcEnableBanner);
+        }
+
         private void LoadFromPrefabs()
         {
             var errors = new System.Collections.Generic.List<string>();
             if (!LoadAppsFlyer()) errors.Add("Prefab not found at: " + PathAppsFlyer);
             LoadAppsFlyerUtils(); // AppsFlyerUtils on SDK.prefab (optional)
+            LoadFirebaseRemoteConfigUtils(); // FirebaseRemoteConfigUtils on SDK.prefab (optional)
             if (!LoadIronSource()) errors.Add("Prefab not found at: " + PathIronSource);
             if (!LoadAdMob()) errors.Add("Prefab not found at: " + PathAdMob);
             if (!LoadUnityAds()) errors.Add("Prefab not found at: " + PathUnityAds);
@@ -209,6 +231,21 @@ namespace GameUpSDK.Editor
             Assign(so, "appId", ref _appsFlyerUtilsAppId);
             var isDev = so.FindProperty("isDevMode");
             if (isDev != null) _appsFlyerUtilsIsDevMode = isDev.boolValue;
+        }
+
+        private void LoadFirebaseRemoteConfigUtils()
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathSDK);
+            if (go == null) return;
+            var comp = go.GetComponent<GameUpSDK.FirebaseRemoteConfigUtils>();
+            if (comp == null) return;
+            var so = new SerializedObject(comp);
+            AssignInt(so, "inter_capping_time", ref _rcInterCappingTime);
+            AssignInt(so, "inter_start_level", ref _rcInterStartLevel);
+            AssignBool(so, "enable_rate_app", ref _rcEnableRateApp);
+            AssignInt(so, "level_start_show_rate_app", ref _rcLevelStartShowRateApp);
+            AssignBool(so, "no_internet_popup_enable", ref _rcNoInternetPopupEnable);
+            AssignBool(so, "enable_banner", ref _rcEnableBanner);
         }
 
         private bool LoadIronSource()
@@ -259,11 +296,24 @@ namespace GameUpSDK.Editor
             if (p != null) target = p.stringValue ?? "";
         }
 
+        private static void AssignInt(SerializedObject so, string propName, ref int target)
+        {
+            var p = so.FindProperty(propName);
+            if (p != null) target = p.intValue;
+        }
+
+        private static void AssignBool(SerializedObject so, string propName, ref bool target)
+        {
+            var p = so.FindProperty(propName);
+            if (p != null) target = p.boolValue;
+        }
+
         private void SaveToPrefabs()
         {
             var errors = new System.Collections.Generic.List<string>();
             if (!SaveAppsFlyer()) errors.Add(PathAppsFlyer);
             if (!SaveAppsFlyerUtils()) errors.Add(PathSDK + " (AppsFlyerUtils)");
+            if (!SaveFirebaseRemoteConfigUtils()) errors.Add(PathSDK + " (FirebaseRemoteConfigUtils)");
             if (!SaveIronSource()) errors.Add(PathIronSource);
             if (!SaveAdMob()) errors.Add(PathAdMob);
             if (!SaveUnityAds()) errors.Add(PathUnityAds);
@@ -302,6 +352,25 @@ namespace GameUpSDK.Editor
             Set(so, "appId", _appsFlyerUtilsAppId);
             var isDev = so.FindProperty("isDevMode");
             if (isDev != null) isDev.boolValue = _appsFlyerUtilsIsDevMode;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(comp);
+            PrefabUtility.SavePrefabAsset(go);
+            return true;
+        }
+
+        private bool SaveFirebaseRemoteConfigUtils()
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathSDK);
+            if (go == null) return false;
+            var comp = go.GetComponent<GameUpSDK.FirebaseRemoteConfigUtils>();
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            SetInt(so, "inter_capping_time", _rcInterCappingTime);
+            SetInt(so, "inter_start_level", _rcInterStartLevel);
+            SetBool(so, "enable_rate_app", _rcEnableRateApp);
+            SetInt(so, "level_start_show_rate_app", _rcLevelStartShowRateApp);
+            SetBool(so, "no_internet_popup_enable", _rcNoInternetPopupEnable);
+            SetBool(so, "enable_banner", _rcEnableBanner);
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(comp);
             PrefabUtility.SavePrefabAsset(go);
@@ -365,6 +434,16 @@ namespace GameUpSDK.Editor
             if (p != null) p.stringValue = value ?? "";
         }
 
-        
+        private static void SetInt(SerializedObject so, string propName, int value)
+        {
+            var p = so.FindProperty(propName);
+            if (p != null) p.intValue = value;
+        }
+
+        private static void SetBool(SerializedObject so, string propName, bool value)
+        {
+            var p = so.FindProperty(propName);
+            if (p != null) p.boolValue = value;
+        }
     }
 }
