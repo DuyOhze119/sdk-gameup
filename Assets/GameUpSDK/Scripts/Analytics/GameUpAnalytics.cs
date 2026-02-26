@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using Firebase.Analytics;
+using AppsFlyerSDK;
 
 namespace GameUpSDK
 {
@@ -14,7 +16,7 @@ namespace GameUpSDK
             FirebaseUtils.LogEvent(eventName, paramName, paramValue);
         }
 
-        private static void LogFirebaseParams(string eventName, Dictionary<string, string> param)
+        public static void LogFirebaseParams(string eventName, Dictionary<string, string> param)
         {
             if (string.IsNullOrEmpty(eventName)) return;
             if (param == null || param.Count == 0)
@@ -36,6 +38,17 @@ namespace GameUpSDK
         }
 
         // ---------- Firebase: Virtual currency ----------
+
+        /// <summary> start_level_1 - khi bắt đầu level 1 </summary>
+        public static void LogStartLevel1()
+        {
+            LogFirebase(AnalyticsEvent.StartLevel1, null, null);
+        }
+
+        public static void LogCompleteLevel1()
+        {
+            LogFirebase(AnalyticsEvent.CompleteLevel1, null, null);
+        }
 
         /// <summary> earn_virtual_currency: virtual_currency_name, value, source </summary>
         public static void LogEarnVirtualCurrency(string virtualCurrencyName, string value, string source)
@@ -206,6 +219,60 @@ namespace GameUpSDK
             if (level.HasValue)
                 p[AnalyticsEvent.ParamAfLevel] = level.Value.ToString();
             LogAppsFlyer(AnalyticsEvent.AfAchievementUnlocked, p);
+        }
+
+        // ---------- Firebase: Ad Revenue Measurement (ARM) ----------
+
+        /// <summary>
+        /// Maps ad network name (from LevelPlay/IronSource) to AppsFlyer MediationNetwork for LogAdRevenue.
+        /// </summary>
+        private static MediationNetwork GetMediationNetworkFromAdNetwork(string adNetwork)
+        {
+            if (string.IsNullOrEmpty(adNetwork)) return MediationNetwork.Custom;
+            var n = adNetwork.Trim().ToLowerInvariant();
+            if (n.Contains("admob") || n.Contains("google")) return MediationNetwork.GoogleAdMob;
+            if (n.Contains("unity")) return MediationNetwork.Unity;
+            if (n.Contains("applovin") || n.Contains("max")) return MediationNetwork.ApplovinMax;
+            if (n.Contains("meta") || n.Contains("facebook")) return MediationNetwork.Custom;
+            if (n.Contains("chartboost")) return MediationNetwork.ChartBoost;
+            if (n.Contains("fyber")) return MediationNetwork.Fyber;
+            if (n.Contains("appodeal")) return MediationNetwork.Appodeal;
+            if (n.Contains("admost")) return MediationNetwork.Admost;
+            if (n.Contains("topon")) return MediationNetwork.Topon;
+            if (n.Contains("tradplus")) return MediationNetwork.Tradplus;
+            if (n.Contains("yandex")) return MediationNetwork.Yandex;
+            if (n.Contains("ironsource")) return MediationNetwork.IronSource;
+            return MediationNetwork.Custom;
+        }
+
+        /// <summary>
+        /// Logs ad_impression to Firebase for Ad Revenue Measurement (ARM). Call when an ad impression with revenue is ready (e.g. IronSource/LevelPlay).
+        /// Also logs ad revenue to AppsFlyer via LogAdRevenue so you can see which ad networks (AdNetwork) drive revenue.
+        /// </summary>
+        public static void LogAdImpression(AdImpressionData data)
+        {
+            if (data == null)
+                return;
+            if (!data.Revenue.HasValue)
+                return;
+
+            double revenue = data.Revenue.Value;
+            string adNetwork = data.AdNetwork ?? "unknown";
+
+            var parameters = new List<Parameter>
+            {
+                new Parameter(FirebaseAnalytics.ParameterAdPlatform, "ironSource"),
+                new Parameter(FirebaseAnalytics.ParameterAdSource, adNetwork),
+                new Parameter(FirebaseAnalytics.ParameterAdUnitName, data.AdUnit ?? ""),
+                new Parameter(FirebaseAnalytics.ParameterAdFormat, data.InstanceName ?? data.AdFormat ?? ""),
+                new Parameter(FirebaseAnalytics.ParameterCurrency, "USD"),
+                new Parameter(FirebaseAnalytics.ParameterValue, revenue)
+            };
+
+            FirebaseUtils.LogEvent(FirebaseAnalytics.EventAdImpression, parameters.ToArray());
+            var mediationNetwork = GetMediationNetworkFromAdNetwork(adNetwork);
+            AppsFlyerUtils.LogAdRevenue(adNetwork, mediationNetwork, revenue, "USD");
+            UnityEngine.Debug.Log($"[GameUpAnalytics] Logged Ad Revenue: {revenue} USD, network: {adNetwork}");
         }
     }
 }

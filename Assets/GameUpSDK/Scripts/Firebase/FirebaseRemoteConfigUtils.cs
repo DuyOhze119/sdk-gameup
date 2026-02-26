@@ -26,7 +26,7 @@ namespace GameUpSDK
         public int level_start_show_rate_app = 5;
         /// <summary>Tắt/Bật hiển thị Popup yêu cầu Internet.</summary>
         public bool no_internet_popup_enable = true;
-        /// <summary>Tắt/Bật hiển thị Banner trong Game.</summary>
+        /// <summary>Tắt/Bật hiển thị Banner trong Game. Ưu tiên cao hơn AdsManager.showBannerAfterInit: nếu false thì không show banner (kể cả khi showBannerAfterInit = true).</summary>
         public bool enable_banner = true;
 
         private bool _remoteConfigReady;
@@ -35,54 +35,71 @@ namespace GameUpSDK
         public bool IsRemoteConfigReady => _remoteConfigReady;
         public Action<bool> OnFetchCompleted;
 
-        private void Start()
+        private static bool IsEditor()
         {
-            InitRemoteConfig();
+            return Application.platform == RuntimePlatform.OSXEditor ||
+                   Application.platform == RuntimePlatform.WindowsEditor;
         }
 
-        private async void InitRemoteConfig()
+        private void Start()
         {
-            if (Application.platform == RuntimePlatform.OSXEditor || Application.platform == RuntimePlatform.WindowsEditor)
+            if (IsEditor())
             {
+                ApplyDefaultValues();
                 _remoteConfigReady = true;
                 OnFetchCompleted?.Invoke(true);
+                Debug.Log("[GameUp] FirebaseRemoteConfig: Editor mode - using default values for testing.");
                 return;
             }
 
-            try
+            if (FirebaseUtils.Instance.IsInitialized)
             {
-                var app = FirebaseApp.DefaultInstance;
-                if (app == null)
-                {
-                    Debug.LogWarning("[GameUp] FirebaseRemoteConfig: FirebaseApp not ready, will retry after Firebase init.");
-                    FirebaseUtils.Instance.onInitialized += OnFirebaseInitialized;
-                    return;
-                }
+                InitRemoteConfig();
+                return;
+            }
 
-                await SetupAndFetchAsync(app);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("[GameUp] FirebaseRemoteConfig init error: " + e);
-                _remoteConfigReady = true;
-                OnFetchCompleted?.Invoke(false);
-            }
+            FirebaseUtils.Instance.onInitialized += OnFirebaseInitialized;
         }
 
         private void OnFirebaseInitialized(bool success)
         {
             FirebaseUtils.Instance.onInitialized -= OnFirebaseInitialized;
-            if (!success) return;
-            var app = FirebaseApp.DefaultInstance;
-            if (app != null)
-                _ = SetupAndFetchAsync(app);
+            if (!success)
+            {
+                Debug.LogWarning("[GameUp] FirebaseRemoteConfig: Firebase init failed, using defaults.");
+                ApplyDefaultValues();
+                _remoteConfigReady = true;
+                OnFetchCompleted?.Invoke(false);
+                return;
+            }
+            InitRemoteConfig();
         }
 
-        private async Task SetupAndFetchAsync(FirebaseApp app)
+        /// <summary>Áp dụng giá trị mặc định lên các field (dùng trong Editor và khi Firebase lỗi).</summary>
+        private void ApplyDefaultValues()
         {
-            _remoteConfig = FirebaseRemoteConfig.GetInstance(app);
+            var defaults = GetDefaultValues();
+            foreach (var kv in defaults)
+            {
+                try
+                {
+                    var field = GetType().GetField(kv.Key, BindingFlags.Public | BindingFlags.Instance);
+                    if (field == null) continue;
+                    if (field.FieldType == typeof(int) && kv.Value is int i)
+                        field.SetValue(this, i);
+                    else if (field.FieldType == typeof(bool) && kv.Value is bool b)
+                        field.SetValue(this, b);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("[GameUp] RemoteConfig ApplyDefault " + kv.Key + ": " + ex.Message);
+                }
+            }
+        }
 
-            var defaults = new Dictionary<string, object>
+        private static Dictionary<string, object> GetDefaultValues()
+        {
+            return new Dictionary<string, object>
             {
                 { "inter_capping_time", 120 },
                 { "inter_start_level", 3 },
@@ -91,7 +108,37 @@ namespace GameUpSDK
                 { "no_internet_popup_enable", true },
                 { "enable_banner", true }
             };
-            await _remoteConfig.SetDefaultsAsync(defaults);
+        }
+
+        private async void InitRemoteConfig()
+        {
+            try
+            {
+                var app = FirebaseApp.DefaultInstance;
+                if (app == null)
+                {
+                    Debug.LogWarning("[GameUp] FirebaseRemoteConfig: FirebaseApp null, using defaults.");
+                    ApplyDefaultValues();
+                    _remoteConfigReady = true;
+                    OnFetchCompleted?.Invoke(false);
+                    return;
+                }
+
+                await SetupAndFetchAsync(app);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[GameUp] FirebaseRemoteConfig init error: " + e);
+                ApplyDefaultValues();
+                _remoteConfigReady = true;
+                OnFetchCompleted?.Invoke(false);
+            }
+        }
+
+        private async Task SetupAndFetchAsync(FirebaseApp app)
+        {
+            _remoteConfig = FirebaseRemoteConfig.GetInstance(app);
+            await _remoteConfig.SetDefaultsAsync(GetDefaultValues());
             await _remoteConfig.EnsureInitializedAsync();
 
             bool activated = (await _remoteConfig.FetchAndActivateAsync());

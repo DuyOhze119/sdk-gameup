@@ -15,6 +15,7 @@ namespace GameUpSDK
         [SerializeField] private List<MonoBehaviour> adsBehaviours = new List<MonoBehaviour>();
 
         [Header("Banner sau Initialize")]
+        [Tooltip("Chỉ có hiệu lực khi enable_banner (Remote Config) = true. enable_banner ưu tiên cao hơn.")]
         [SerializeField] private bool showBannerAfterInit = true;
         [SerializeField] private string showBannerPlacementAfterInit = "main";
         [Tooltip("Thời gian chờ (giây) sau Initialize rồi mới ShowBanner, để network kịp request/load.")]
@@ -64,6 +65,8 @@ namespace GameUpSDK
                 return;
             }
 
+            AdsEvent.OnImpressionDataReady += GameUpAnalytics.LogAdImpression;
+
             foreach (var ad in _ads)
             {
                 try
@@ -82,11 +85,11 @@ namespace GameUpSDK
             _initialized = true;
             Debug.Log("[GameUp] AdsManager Initialize called for " + _ads.Count + " networks.");
 
-            if (showBannerAfterInit)
-            {
-                RequestAll();
+            // Luôn RequestAll để preload (banner chỉ hiện khi gọi ShowBanner, không tự hiện nhờ SetDisplayOnLoad(false) ở LevelPlay).
+            RequestAll();
+            // enable_banner (Remote Config) ưu tiên cao hơn showBannerAfterInit: chỉ auto-show khi cả hai cho phép.
+            if (showBannerAfterInit && AdsRules.IsBannerEnabled())
                 StartCoroutine(ShowBannerAfterInitCoroutine());
-            }
         }
 
         private IEnumerator ShowBannerAfterInitCoroutine()
@@ -136,6 +139,21 @@ namespace GameUpSDK
 
             if (!string.IsNullOrEmpty(appsFlyerEventName) && !string.IsNullOrEmpty(paramWhere))
                 AppsFlyerUtils.LogEvents(appsFlyerEventName, new Dictionary<string, string> { { AdsEvent.ParamAfLevel, paramWhere } });
+        }
+
+        /// <summary>
+        /// Log ad show_complete với where + level (ad_inter_show_complete, ad_rewarded_show_complete).
+        /// </summary>
+        private void LogAdsEventWithLevel(string eventName, string where, int level, string appsFlyerEventName = null)
+        {
+            var param = new Dictionary<object, object>
+            {
+                { AdsEvent.ParamWhere, where ?? "" },
+                { AdsEvent.ParamLevel, level.ToString() }
+            };
+            FirebaseUtils.LogEventsAPI(eventName, param);
+            if (!string.IsNullOrEmpty(appsFlyerEventName))
+                AppsFlyerUtils.LogEvents(appsFlyerEventName, new Dictionary<string, string> { { AdsEvent.ParamAfLevel, level.ToString() } });
         }
 
         private void LogAdsEventManager(string eventName, string adType, string placement)
@@ -215,7 +233,7 @@ namespace GameUpSDK
                 Action wrappedSuccess = () =>
                 {
                     AdsRules.RecordInterstitialShown();
-                    LogAdsEvent(AdsEvent.InterShowComplete, where, null, AdsEvent.AfInterDisplayed);
+                    LogAdsEventWithLevel(AdsEvent.InterShowComplete, where, currentLevel, AdsEvent.AfInterDisplayed);
                     onSuccess?.Invoke();
                 };
                 Action wrappedFail = () => onFail?.Invoke();
@@ -229,7 +247,14 @@ namespace GameUpSDK
             }
         }
 
+        /// <summary>Show Rewarded Video (level = 0 nếu không truyền).</summary>
         public void ShowRewardedVideo(string where, Action onSuccess = null, Action onFail = null)
+        {
+            ShowRewardedVideo(where, 0, onSuccess, onFail);
+        }
+
+        /// <summary>Show Rewarded Video với level hiện tại (log ad_rewarded_show_complete kèm param level).</summary>
+        public void ShowRewardedVideo(string where, int currentLevel, Action onSuccess = null, Action onFail = null)
         {
             LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeRewardedVideo, where);
             var network = _ads.FirstOrDefault(a => a.IsRewardedVideoAvailable());
@@ -246,10 +271,15 @@ namespace GameUpSDK
                 LogAdsEvent(AdsEvent.RewardShow, where, null, AdsEvent.AfRewardShow);
                 Action wrappedSuccess = () =>
                 {
-                    LogAdsEvent(AdsEvent.RewardShowComplete, where, null, AdsEvent.AfRewardDisplayed);
+                    LogAdsEventWithLevel(AdsEvent.RewardShowComplete, where, currentLevel, AdsEvent.AfRewardDisplayed);
                     onSuccess?.Invoke();
                 };
-                Action wrappedFail = () => onFail?.Invoke();
+                // onFail khi không có network, display failed, hoặc user thoát quảng cáo không xem hết (không nhận reward)
+                Action wrappedFail = () =>
+                {
+                    LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeRewardedVideo, where);
+                    onFail?.Invoke();
+                };
                 network.ShowRewardedVideo(where, wrappedSuccess, wrappedFail);
             }
             catch (Exception e)

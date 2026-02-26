@@ -10,8 +10,10 @@ namespace GameUpSDK
 {       
     public class FirebaseUtils : MonoSingleton<FirebaseUtils>
     {
-        private bool initialize = false;
+        private bool _initialized;
         public Action<bool> onInitialized;
+        /// <summary>True khi Firebase đã init xong (dùng để RemoteConfig init sau).</summary>
+        public bool IsInitialized => _initialized;
 
         private void Awake()
         {
@@ -51,7 +53,7 @@ namespace GameUpSDK
 
         private void Initialized()
         {
-            initialize = true;
+            _initialized = true;
             FirebaseAnalytics.SetAnalyticsCollectionEnabled(true);
             Crashlytics.IsCrashlyticsCollectionEnabled = true;
             onInitialized?.Invoke(true);
@@ -82,11 +84,31 @@ namespace GameUpSDK
             Instance._LogEvents(eventName, param);
         }
 
+        public static void LogEvent(string eventName, Parameter[] parameters)
+        {
+            Instance._LogEventWithParameters(eventName, parameters);
+        }
+
+
+        private void _LogEventWithParameters(string eventId, Parameter[] parameters)
+        {
+            if (!_initialized) return;
+            if (IsEditor())
+            {
+                Debug.Log("[Firebase] " + eventId);
+                return;
+            }
+            if (parameters == null || parameters.Length == 0)
+                FirebaseAnalytics.LogEvent(eventId);
+            else
+                FirebaseAnalytics.LogEvent(eventId, parameters);
+        }
+
         #region Log Events
 
         private void _LogEvents(string eventId, Dictionary<object, object> param = null)
         {
-            if (!initialize)
+            if (!_initialized)
             {
                 return;
             }
@@ -117,7 +139,7 @@ namespace GameUpSDK
 
         public void LogError(string error)
         {
-            if (!initialize) return;
+            if (!_initialized) return;
             if (IsEditor())
             {
                 Debug.Log("[Firebase] " + error);
@@ -129,7 +151,7 @@ namespace GameUpSDK
 
         public void LogException(Exception e)
         {
-            if (!initialize) return;
+            if (!_initialized) return;
             if (IsEditor())
             {
                 Debug.Log("[Firebase] " + e.Message);

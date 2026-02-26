@@ -73,12 +73,37 @@ namespace GameUpSDK
                 LevelPlay.OnInitFailed -= OnLevelPlayInitFailed;
                 CreateAdUnits();
                 SubscribeToAdEvents();
+                SubscribeToImpressionData();
                 // Request ads ngay khi LevelPlay sẵn sàng (tránh RequestAll() gọi trước khi init xong).
                 RequestBanner();
                 RequestInterstitial();
                 RequestRewardedVideo();
                 Debug.Log("[CtySDK] IronSourceAds (LevelPlay) initialized.");
             });
+        }
+
+        /// <summary>
+        /// Subscribe to LevelPlay impression data (fired after ad is shown with revenue). Forward to AdsEvent for GameUpAnalytics.LogAdImpression.
+        /// OnImpressionDataReady runs on background thread → dispatch to main thread then raise.
+        /// </summary>
+        private void SubscribeToImpressionData()
+        {
+            LevelPlay.OnImpressionDataReady += OnLevelPlayImpressionDataReady;
+        }
+
+        private void OnLevelPlayImpressionDataReady(LevelPlayImpressionData levelPlayData)
+        {
+            if (levelPlayData == null || !levelPlayData.Revenue.HasValue)
+                return;
+            var data = new AdImpressionData
+            {
+                AdNetwork = levelPlayData.AdNetwork,
+                AdUnit = levelPlayData.MediationAdUnitName ?? levelPlayData.MediationAdUnitId,
+                InstanceName = levelPlayData.InstanceName,
+                AdFormat = levelPlayData.AdFormat,
+                Revenue = levelPlayData.Revenue
+            };
+            MainThreadDispatcher.Enqueue(() => AdsEvent.RaiseImpressionDataReady(data));
         }
 
         private void SubscribeToAdEvents()
@@ -115,9 +140,11 @@ namespace GameUpSDK
             var rewardId = string.IsNullOrEmpty(rewardedVideoAdUnitId) ? DefaultRewardedId : rewardedVideoAdUnitId;
 
             // Dùng size chuẩn để banner có fill. Custom (width x 150) dễ bị network từ chối.
+            // SetDisplayOnLoad(false): chỉ load khi RequestBanner/LoadAd, không tự hiện; chỉ hiện khi AdsManager gọi ShowBanner -> ShowAd().
             var bannerConfig = new LevelPlayBannerAd.Config.Builder()
                 .SetSize(LevelPlayAdSize.LARGE) // 320x90 dp, chuẩn và cao hơn BANNER (320x50)
                 .SetPosition(LevelPlayBannerPosition.BottomCenter)
+                .SetDisplayOnLoad(false)
                 .Build();
             _bannerAd = new LevelPlayBannerAd(bannerId, bannerConfig);
             _interstitialAd = new LevelPlayInterstitialAd(interId);
@@ -255,6 +282,7 @@ namespace GameUpSDK
 
         private void OnDestroy()
         {
+            LevelPlay.OnImpressionDataReady -= OnLevelPlayImpressionDataReady;
             _bannerAd?.DestroyAd();
             _bannerAd = null;
             _interstitialAd?.DestroyAd();

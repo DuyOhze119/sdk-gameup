@@ -1,11 +1,31 @@
+using System;
+
 namespace GameUpSDK
 {
+    /// <summary>
+    /// DTO for ad impression data (ARM). Used when forwarding IronSource/LevelPlay impression data to GameUpAnalytics.
+    /// </summary>
+    public class AdImpressionData
+    {
+        public string AdNetwork { get; set; }
+        public string AdUnit { get; set; }
+        public string InstanceName { get; set; }
+        public string AdFormat { get; set; }
+        public double? Revenue { get; set; }
+    }
+
     /// <summary>
     /// Centralized Firebase event names and parameter names for ads logging.
     /// PascalCase for identifiers, snake_case for values.
     /// </summary>
     public static class AdsEvent
     {
+        /// <summary>
+        /// Fired when an ad impression with revenue is ready (e.g. IronSource/LevelPlay OnAdInfoChanged with revenue).
+        /// Subscribe in AdsManager and pass to GameUpAnalytics.LogAdImpression.
+        /// </summary>
+        public static event Action<AdImpressionData> OnImpressionDataReady;
+        internal static void RaiseImpressionDataReady(AdImpressionData data) => OnImpressionDataReady?.Invoke(data);
         // Interstitial Events
         public const string InterStartLoad = "ad_inter_start_load";
         public const string InterCompleteLoad = "ad_inter_complete_load";
@@ -34,6 +54,7 @@ namespace GameUpSDK
 
         // Parameters
         public const string ParamWhere = "where";
+        public const string ParamLevel = "level";
         public const string ParamSource = "source";
         public const string ParamAdType = "ad_type";
         public const string ParamPlacement = "placement";

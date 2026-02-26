@@ -19,6 +19,8 @@ namespace GameUpSDK
         public const string WaveStart = "wave_start";
         public const string WaveFail = "wave_fail";
         public const string WaveComplete = "wave_complete";
+        public const string StartLevel1 = "start_level_1";
+        public const string CompleteLevel1 = "complete_level_1";
 
         // ---------- AppsFlyer Events ----------
 
