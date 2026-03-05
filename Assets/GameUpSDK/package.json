@@ -6,7 +6,7 @@
   "description": "GameUp SDK – Ads (IronSource/LevelPlay + AdMob App Open), Analytics (Firebase + AppsFlyer).\n\nSau khi cài đặt, cửa sổ Setup Dependencies sẽ tự động mở để hướng dẫn cài đặt các package phụ thuộc.",
   "author": {
     "name": "Ohze GameUp",
-    "url": "https://github.com/ohze/sdk-gameup"
+    "url": "https://github.com/DuyOhze119/sdk-gameup"
   },
   "keywords": [
     "gameup",

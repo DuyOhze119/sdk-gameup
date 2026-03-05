@@ -29,7 +29,7 @@ SDK tích hợp Quảng cáo (Ads) và Analytics cho game Unity, hỗ trợ:
 Mở **Package Manager** → **Add package from git URL**:
 
 ```
-https://github.com/ohze/sdk-gameup.git?path=Assets/GameUpSDK
+https://github.com/DuyOhze119/sdk-gameup.git?path=Assets/GameUpSDK#main
 ```
 
 ### Cài thủ công
