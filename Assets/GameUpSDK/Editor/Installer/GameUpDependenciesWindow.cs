@@ -163,13 +163,26 @@ namespace GameUpSDK.Installer
         private AddRequest _currentAddRequest;
         private PackageDef _currentInstallingPackage;
 
-        // Download state (UnityPackage từ HostedUrls)
-        private UnityWebRequest               _activeDownload;
-        private PackageDef                    _downloadingPkg;
-        private Queue<(string url, string name)> _downloadQueue = new Queue<(string, string)>();
-        private List<string>                  _downloadedTempPaths = new List<string>();
-        private float                         _downloadProgress;
-        private string                        _downloadStatus;
+        // ── Parallel download state ──
+        private class DownloadTask
+        {
+            public PackageDef      Pkg;
+            public string          FileName;
+            public string          TempPath;
+            public UnityWebRequest Request;
+            public bool            IsDone;
+            public bool            HasError;
+            public string          ErrorMessage;
+        }
+
+        private List<DownloadTask> _parallelTasks;
+        private Action             _parallelDoneCallback;
+        private float              _downloadProgress;
+        private string             _downloadStatus;
+
+        // Kept for backward compat with OnDisable / PollDownloadQueue references — sẽ không dùng nữa
+        private UnityWebRequest    _activeDownload;
+        private PackageDef         _downloadingPkg;
 
         // ─── Static helpers ───────────────────────────────────────────────────────
 
@@ -205,7 +218,13 @@ namespace GameUpSDK.Installer
         private void OnDisable()
         {
             EditorApplication.update -= PollInstallQueue;
-            EditorApplication.update -= PollDownloadQueue;
+            EditorApplication.update -= PollParallelDownloads;
+            if (_parallelTasks != null)
+            {
+                foreach (var t in _parallelTasks)
+                    t.Request?.Dispose();
+                _parallelTasks = null;
+            }
             _activeDownload?.Dispose();
             _activeDownload = null;
         }
@@ -277,7 +296,7 @@ namespace GameUpSDK.Installer
 
         private void DrawPackageRow(PackageDef pkg)
         {
-            bool isDownloading = _downloadingPkg == pkg;
+            bool isDownloading = _parallelTasks?.Any(t => t.Pkg == pkg && !t.IsDone) == true;
             bool isInstalling  = pkg.IsInstalling
                 || (_isBatchInstalling && _installQueue.Contains(pkg))
                 || isDownloading;
@@ -324,10 +343,19 @@ namespace GameUpSDK.Installer
             }
             else if (isDownloading)
             {
-                EditorGUILayout.BeginVertical(GUILayout.Width(180));
-                EditorGUILayout.LabelField(_downloadStatus ?? "Đang tải...", EditorStyles.miniLabel, GUILayout.Width(180));
-                var barRect = EditorGUILayout.GetControlRect(GUILayout.Width(180), GUILayout.Height(6));
-                EditorGUI.ProgressBar(barRect, _downloadProgress, "");
+                var pkgTasks = _parallelTasks?.Where(t => t.Pkg == pkg).ToList();
+                int total    = pkgTasks?.Count ?? 0;
+                int done     = pkgTasks?.Count(t => t.IsDone) ?? 0;
+                float prog   = total > 0
+                    ? pkgTasks.Average(t => t.IsDone ? 1f : t.Request?.downloadProgress ?? 0f)
+                    : 0f;
+
+                EditorGUILayout.BeginVertical(GUILayout.Width(190));
+                EditorGUILayout.LabelField(
+                    total > 1 ? $"Đang tải... {done}/{total} files" : "Đang tải...",
+                    EditorStyles.miniLabel, GUILayout.Width(190));
+                var barRect = EditorGUILayout.GetControlRect(GUILayout.Width(190), GUILayout.Height(6));
+                EditorGUI.ProgressBar(barRect, prog, "");
                 EditorGUILayout.EndVertical();
             }
             else if (isInstalling)
@@ -499,8 +527,7 @@ namespace GameUpSDK.Installer
                 _installQueue.Enqueue(pkg);
             }
 
-            // 3) Download + import các UnityPackage chưa có file local nhưng có HostedUrls
-            //    (chạy sau GitUrl để tránh block UI, nhưng vẫn xếp hàng)
+            // 3) Download + import song song các UnityPackage chưa có file local nhưng có HostedUrls
             var downloadPkgs = s_packages
                 .Where(p => !p.IsInstalled
                     && p.Method == InstallMethod.UnityPackage
@@ -508,36 +535,31 @@ namespace GameUpSDK.Installer
                     && p.HostedUrls?.Length > 0)
                 .ToList();
 
+            void FinishBatch()
+            {
+                _isBatchInstalling = false;
+                RefreshStatus();
+            }
+
             if (_installQueue.Count > 0)
             {
-                // GitUrl chạy trước, download sau khi xong
+                // GitUrl chạy trước (bất đồng bộ), download song song sau khi xong
                 ProcessNextInQueueThen(() =>
                 {
                     if (downloadPkgs.Count > 0)
-                        StartDownloadQueue(downloadPkgs, onAllDone: () =>
-                        {
-                            _isBatchInstalling = false;
-                            RefreshStatus();
-                        });
+                        StartParallelDownloadAndImport(downloadPkgs, onAllDone: FinishBatch);
                     else
-                    {
-                        _isBatchInstalling = false;
-                        RefreshStatus();
-                    }
+                        FinishBatch();
                 });
             }
             else if (downloadPkgs.Count > 0)
             {
-                StartDownloadQueue(downloadPkgs, onAllDone: () =>
-                {
-                    _isBatchInstalling = false;
-                    RefreshStatus();
-                });
+                // Chỉ có download → chạy ngay song song
+                StartParallelDownloadAndImport(downloadPkgs, onAllDone: FinishBatch);
             }
             else
             {
-                _isBatchInstalling = false;
-                RefreshStatus();
+                FinishBatch();
             }
         }
 
@@ -721,142 +743,132 @@ namespace GameUpSDK.Installer
             Repaint();
         }
 
-        // ─── Download & Import (khi không có file local) ─────────────────────────
+        // ─── Parallel Download & Import ───────────────────────────────────────────
 
-        private List<PackageDef> _downloadBatchQueue;
-        private Action           _downloadBatchDoneCallback;
-
-        /// <summary>Bắt đầu download + import một package đơn lẻ.</summary>
+        /// <summary>Bắt đầu download song song + import một package đơn lẻ.</summary>
         private void StartDownloadAndImport(PackageDef pkg)
         {
-            StartDownloadQueue(new List<PackageDef> { pkg }, onAllDone: null);
+            StartParallelDownloadAndImport(new List<PackageDef> { pkg }, onAllDone: null);
         }
 
-        /// <summary>Download + import tuần tự nhiều packages.</summary>
-        private void StartDownloadQueue(List<PackageDef> pkgs, Action onAllDone)
+        /// <summary>
+        /// Tải tất cả file của tất cả packages cùng lúc (parallel).
+        /// Khi toàn bộ download xong → import từng package theo nhóm → gọi onAllDone.
+        /// </summary>
+        private void StartParallelDownloadAndImport(List<PackageDef> pkgs, Action onAllDone)
         {
-            _downloadBatchQueue        = new List<PackageDef>(pkgs);
-            _downloadBatchDoneCallback = onAllDone;
-            ProcessNextDownloadBatch();
-        }
-
-        private void ProcessNextDownloadBatch()
-        {
-            if (_downloadBatchQueue == null || _downloadBatchQueue.Count == 0)
+            if (_parallelTasks != null)
             {
-                _downloadBatchQueue = null;
-                var cb = _downloadBatchDoneCallback;
-                _downloadBatchDoneCallback = null;
-                cb?.Invoke();
-                return;
+                // Đang có download chạy, dừng lại
+                foreach (var old in _parallelTasks) old.Request?.Dispose();
+                EditorApplication.update -= PollParallelDownloads;
             }
 
-            var pkg = _downloadBatchQueue[0];
-            _downloadBatchQueue.RemoveAt(0);
-            StartDownloadPkg(pkg);
-        }
+            _parallelTasks        = new List<DownloadTask>();
+            _parallelDoneCallback = onAllDone;
 
-        private void StartDownloadPkg(PackageDef pkg)
-        {
-            _downloadingPkg       = pkg;
-            _downloadQueue.Clear();
-            _downloadedTempPaths.Clear();
-
-            for (int i = 0; i < pkg.HostedUrls.Length; i++)
+            foreach (var pkg in pkgs)
             {
-                string url      = pkg.HostedUrls[i];
-                string fileName = pkg.BundledFileNames != null && i < pkg.BundledFileNames.Length
-                    ? Path.GetFileName(pkg.BundledFileNames[i])
-                    : $"pkg_{i}.unitypackage";
-                _downloadQueue.Enqueue((url, fileName));
-            }
+                if (pkg.HostedUrls == null || pkg.HostedUrls.Length == 0) continue;
 
-            pkg.InstallError = null;
-            EditorApplication.update += PollDownloadQueue;
-            DownloadNextFile();
-        }
+                pkg.IsInstalling = true;
+                pkg.InstallError = null;
 
-        private void DownloadNextFile()
-        {
-            if (_downloadQueue.Count == 0)
-            {
-                // Tất cả file đã tải xong → import
-                EditorApplication.update -= PollDownloadQueue;
-                if (_downloadedTempPaths.Count > 0)
-                    ImportUnityPackage(_downloadingPkg, _downloadedTempPaths);
-
-                var pkg = _downloadingPkg;
-                _downloadingPkg = null;
-                _downloadProgress = 0;
-                _downloadStatus   = null;
-
-                // Tiếp tục batch tiếp theo
-                if (_downloadBatchQueue != null && _downloadBatchQueue.Count > 0)
-                    ProcessNextDownloadBatch();
-                else
+                for (int i = 0; i < pkg.HostedUrls.Length; i++)
                 {
-                    var cb = _downloadBatchDoneCallback;
-                    _downloadBatchDoneCallback = null;
-                    cb?.Invoke();
+                    string url      = pkg.HostedUrls[i];
+                    string fileName = pkg.BundledFileNames != null && i < pkg.BundledFileNames.Length
+                        ? Path.GetFileName(pkg.BundledFileNames[i])
+                        : $"{i}.unitypackage";
+                    string tempPath = Path.Combine(Application.temporaryCachePath, fileName);
+
+                    var req                = new UnityWebRequest(url, UnityWebRequest.kHttpVerbGET);
+                    req.downloadHandler    = new DownloadHandlerFile(tempPath) { removeFileOnAbort = true };
+                    req.SendWebRequest();
+
+                    _parallelTasks.Add(new DownloadTask
+                    {
+                        Pkg      = pkg,
+                        FileName = fileName,
+                        TempPath = tempPath,
+                        Request  = req,
+                    });
                 }
-                Repaint();
+            }
+
+            if (_parallelTasks.Count == 0)
+            {
+                _parallelTasks = null;
+                onAllDone?.Invoke();
                 return;
             }
 
-            var (url, name) = _downloadQueue.Dequeue();
-            string tempPath = Path.Combine(Application.temporaryCachePath, name);
+            EditorApplication.update += PollParallelDownloads;
+            Repaint();
+        }
 
-            _downloadStatus   = $"Đang tải {name}...";
+        private void PollParallelDownloads()
+        {
+            if (_parallelTasks == null) return;
+
+            bool anyRunning = false;
+            foreach (var task in _parallelTasks)
+            {
+                if (task.IsDone) continue;
+                if (!task.Request.isDone) { anyRunning = true; continue; }
+
+                // Request hoàn thành
+                task.IsDone = true;
+                if (task.Request.result != UnityWebRequest.Result.Success)
+                {
+                    task.HasError     = true;
+                    task.ErrorMessage = task.Request.error;
+                }
+                task.Request.Dispose();
+                task.Request = null;
+            }
+
+            // Cập nhật overall progress
+            float totalProgress = _parallelTasks.Sum(t =>
+                t.IsDone ? 1f : t.Request?.downloadProgress ?? 0f);
+            _downloadProgress = totalProgress / _parallelTasks.Count;
+            int doneCount     = _parallelTasks.Count(t => t.IsDone);
+            _downloadStatus   = $"Đang tải: {doneCount}/{_parallelTasks.Count} files";
+            Repaint();
+
+            if (anyRunning) return;
+
+            // ─── Tất cả done → import theo nhóm package ───────────────────────
+            EditorApplication.update -= PollParallelDownloads;
+
+            // Group tasks by package
+            var byPkg = _parallelTasks
+                .GroupBy(t => t.Pkg)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            foreach (var kv in byPkg)
+            {
+                PackageDef         pkg      = kv.Key;
+                List<DownloadTask> tasks    = kv.Value;
+                var successPaths = tasks.Where(t => !t.HasError).Select(t => t.TempPath).ToList();
+                var errorMsgs    = tasks.Where(t => t.HasError)
+                                        .Select(t => $"{t.FileName}: {t.ErrorMessage}").ToList();
+
+                pkg.IsInstalling = false;
+                if (errorMsgs.Count > 0)
+                    pkg.InstallError = "Download thất bại:\n" + string.Join("\n", errorMsgs);
+
+                if (successPaths.Count > 0)
+                    ImportUnityPackage(pkg, successPaths);
+            }
+
+            _parallelTasks    = null;
             _downloadProgress = 0;
-            _activeDownload?.Dispose();
+            _downloadStatus   = null;
 
-            _activeDownload = new UnityWebRequest(url, UnityWebRequest.kHttpVerbGET);
-            _activeDownload.downloadHandler = new DownloadHandlerFile(tempPath)
-            {
-                removeFileOnAbort = true
-            };
-            _activeDownload.SendWebRequest();
-            _downloadedTempPaths.Add(tempPath);
-
-            Repaint();
-        }
-
-        private void PollDownloadQueue()
-        {
-            if (_activeDownload == null) return;
-
-            _downloadProgress = _activeDownload.downloadProgress;
-            Repaint();
-
-            if (!_activeDownload.isDone) return;
-
-            EditorApplication.update -= PollDownloadQueue;
-
-            if (_activeDownload.result != UnityWebRequest.Result.Success)
-            {
-                string err = _activeDownload.error;
-                _activeDownload.Dispose();
-                _activeDownload = null;
-
-                if (_downloadingPkg != null)
-                {
-                    _downloadingPkg.IsInstalling = false;
-                    _downloadingPkg.InstallError = $"Download thất bại: {err}";
-                    _downloadingPkg              = null;
-                }
-                _downloadStatus   = null;
-                _downloadProgress = 0;
-                _isBatchInstalling = false;
-                RefreshStatus();
-                return;
-            }
-
-            _activeDownload.Dispose();
-            _activeDownload = null;
-
-            // Tải file tiếp theo trong queue (hoặc import nếu xong)
-            EditorApplication.update += PollDownloadQueue;
-            DownloadNextFile();
+            var cb = _parallelDoneCallback;
+            _parallelDoneCallback = null;
+            cb?.Invoke();
         }
 
         private void AddScopedRegistryAndPackage(PackageDef pkg)
