@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.PackageManager;
 using UnityEditor.PackageManager.Requests;
@@ -16,7 +18,17 @@ namespace GameUpSDK.Installer
     {
         // ─── Định nghĩa các package phụ thuộc ────────────────────────────────────
 
-        private enum InstallMethod { GitUrl, ScopedRegistry, OpenUrl }
+        private enum InstallMethod
+        {
+            /// <summary>Cài qua Unity Package Manager bằng Git URL</summary>
+            GitUrl,
+            /// <summary>Cài qua scoped registry trong manifest.json</summary>
+            ScopedRegistry,
+            /// <summary>Import .unitypackage đã được bundle trong thư mục Packages~</summary>
+            UnityPackage,
+            /// <summary>Chỉ mở trang web — cài thủ công</summary>
+            OpenUrl,
+        }
 
         private class PackageDef
         {
@@ -24,7 +36,7 @@ namespace GameUpSDK.Installer
             public string Description;
             public bool Required;
 
-            // Tên assembly để detect xem package đã cài chưa
+            /// <summary>Tên assembly để detect xem package đã cài chưa</summary>
             public string AssemblyName;
 
             public InstallMethod Method;
@@ -36,9 +48,16 @@ namespace GameUpSDK.Installer
             public string RegistryName;
             public string RegistryUrl;
             public string[] RegistryScopes;
-            public string PackageId;    // VD: "com.google.firebase.analytics"
+            public string PackageId;
 
-            // URL tải thủ công (dùng khi Method == OpenUrl)
+            /// <summary>
+            /// Danh sách file .unitypackage trong thư mục Packages~.
+            /// Hỗ trợ subfolder: vd "Firebase/FirebaseAnalytics.unitypackage".
+            /// Tất cả file sẽ được import theo thứ tự.
+            /// </summary>
+            public string[] BundledFileNames;
+
+            // URL tải thủ công (fallback khi file không có trong Packages~)
             public string DownloadUrl;
             public string DownloadLabel;
 
@@ -52,51 +71,54 @@ namespace GameUpSDK.Installer
         {
             new PackageDef
             {
-                DisplayName   = "EDM4U — External Dependency Manager",
-                Description   = "Bắt buộc. Giải quyết native dependency Android/iOS cho Firebase & AdMob.",
-                Required      = true,
-                AssemblyName  = "Google.VersionHandler",
-                Method        = InstallMethod.GitUrl,
-                GitUrl        = "https://github.com/googlesamples/unity-jar-resolver.git?path=upm",
+                DisplayName     = "IronSource LevelPlay SDK",
+                Description     = "Bắt buộc. Mediation chính: Banner, Interstitial, Rewarded.",
+                Required        = true,
+                AssemblyName    = "Unity.LevelPlay",
+                Method          = InstallMethod.UnityPackage,
+                BundledFileNames = new[] { "UnityLevelPlay_v9.2.0.unitypackage" },
+                DownloadUrl     = "https://developers.is.com/ironsource-mobile/unity/unity-plugin/",
+                DownloadLabel   = "Tải IronSource SDK →",
             },
             new PackageDef
             {
-                DisplayName   = "IronSource LevelPlay SDK",
-                Description   = "Bắt buộc. Mediation chính: Banner, Interstitial, Rewarded.",
-                Required      = true,
-                AssemblyName  = "Unity.LevelPlay",
-                Method        = InstallMethod.OpenUrl,
-                DownloadUrl   = "https://developers.is.com/ironsource-mobile/unity/unity-plugin/",
-                DownloadLabel = "Mở trang tải IronSource SDK →",
+                // Firebase gồm 3 file riêng trong subfolder Firebase/
+                // EDM4U (Google.VersionHandler) được bundle kèm trong FirebaseAnalytics
+                DisplayName     = "Firebase SDK  (Analytics + Crashlytics + Remote Config)",
+                Description     = "Bắt buộc. Analytics, crash reporting, remote configuration. Bao gồm EDM4U.",
+                Required        = true,
+                AssemblyName    = "Firebase.App",
+                Method          = InstallMethod.UnityPackage,
+                BundledFileNames = new[]
+                {
+                    "Firebase/FirebaseAnalytics.unitypackage",
+                    "Firebase/FirebaseCrashlytics.unitypackage",
+                    "Firebase/FirebaseRemoteConfig.unitypackage",
+                },
+                DownloadUrl     = "https://firebase.google.com/docs/unity/setup",
+                DownloadLabel   = "Tải Firebase Unity SDK →",
             },
             new PackageDef
             {
-                DisplayName   = "Firebase SDK  (Analytics + Crashlytics + Remote Config)",
-                Description   = "Bắt buộc. Analytics, crash reporting, remote configuration.",
-                Required      = true,
-                AssemblyName  = "Firebase.App",
-                Method        = InstallMethod.OpenUrl,
-                DownloadUrl   = "https://firebase.google.com/docs/unity/setup",
-                DownloadLabel = "Mở trang tải Firebase Unity SDK →",
+                DisplayName     = "Google Mobile Ads — AdMob",
+                Description     = "Tùy chọn. Dùng cho App Open Ads (ngoài mediation IronSource).",
+                Required        = false,
+                AssemblyName    = "GoogleMobileAds",
+                Method          = InstallMethod.UnityPackage,
+                BundledFileNames = new[] { "GoogleMobileAds-v10.7.0.unitypackage" },
+                DownloadUrl     = "https://github.com/googlesamples/unity-admob-sdk/releases",
+                DownloadLabel   = "Tải AdMob Plugin →",
             },
             new PackageDef
             {
-                DisplayName   = "Google Mobile Ads — AdMob",
-                Description   = "Tùy chọn. Dùng cho App Open Ads (ngoài mediation IronSource).",
-                Required      = false,
-                AssemblyName  = "GoogleMobileAds",
-                Method        = InstallMethod.OpenUrl,
-                DownloadUrl   = "https://github.com/googlesamples/unity-admob-sdk/releases",
-                DownloadLabel = "Mở trang tải AdMob Unity Plugin →",
-            },
-            new PackageDef
-            {
-                DisplayName   = "AppsFlyer Attribution SDK",
-                Description   = "Tùy chọn. Mobile measurement & attribution.",
-                Required      = false,
-                AssemblyName  = "AppsFlyer",
-                Method        = InstallMethod.GitUrl,
-                GitUrl        = "https://github.com/AppsFlyerSDK/appsflyer-unity-plugin.git#upm",
+                DisplayName     = "AppsFlyer Attribution SDK",
+                Description     = "Tùy chọn. Mobile measurement & attribution.",
+                Required        = false,
+                AssemblyName    = "AppsFlyer",
+                Method          = InstallMethod.UnityPackage,
+                BundledFileNames = new[] { "appsflyer-unity-plugin-6.17.81.unitypackage" },
+                DownloadUrl     = "https://github.com/AppsFlyerSDK/appsflyer-unity-plugin/releases",
+                DownloadLabel   = "Tải AppsFlyer SDK →",
             },
         };
 
@@ -266,12 +288,41 @@ namespace GameUpSDK.Installer
                 {
                     case InstallMethod.GitUrl:
                     case InstallMethod.ScopedRegistry:
-                        if (GUILayout.Button("Cài tự động", GUILayout.Width(100)))
+                        if (GUILayout.Button("Cài tự động", GUILayout.Width(110)))
                             StartInstall(pkg);
                         break;
 
+                    case InstallMethod.UnityPackage:
+                    {
+                        var filePaths = GetBundledPackagePaths(pkg.BundledFileNames);
+                        if (filePaths != null)
+                        {
+                            int total  = pkg.BundledFileNames?.Length ?? 0;
+                            int found  = filePaths.Count;
+                            string lbl = total > 1
+                                ? $"⬇ Import ({found}/{total} files)"
+                                : "⬇ Import package";
+
+                            if (GUILayout.Button(lbl, GUILayout.Width(150)))
+                                ImportUnityPackage(pkg, filePaths);
+                        }
+                        else
+                        {
+                            // File chưa được đặt vào Packages~ → fallback mở URL
+                            EditorGUILayout.BeginVertical();
+                            EditorGUILayout.LabelField(
+                                "Chưa có file trong Packages~",
+                                new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = Color.yellow } },
+                                GUILayout.Width(190));
+                            if (GUILayout.Button(pkg.DownloadLabel ?? "Tải về →", GUILayout.Width(150)))
+                                Application.OpenURL(pkg.DownloadUrl);
+                            EditorGUILayout.EndVertical();
+                        }
+                        break;
+                    }
+
                     case InstallMethod.OpenUrl:
-                        if (GUILayout.Button(pkg.DownloadLabel ?? "Tải thủ công →", GUILayout.Width(200)))
+                        if (GUILayout.Button(pkg.DownloadLabel ?? "Tải thủ công →", GUILayout.Width(180)))
                             Application.OpenURL(pkg.DownloadUrl);
                         break;
                 }
@@ -299,9 +350,7 @@ namespace GameUpSDK.Installer
                 RefreshStatus();
 
             // Install All Auto button
-            bool hasAutoUninstalled = s_packages.Any(
-                p => !p.IsInstalled &&
-                     (p.Method == InstallMethod.GitUrl || p.Method == InstallMethod.ScopedRegistry));
+            bool hasAutoUninstalled = s_packages.Any(p => !p.IsInstalled && CanAutoInstall(p));
 
             if (hasAutoUninstalled)
             {
@@ -373,6 +422,20 @@ namespace GameUpSDK.Installer
             _isBatchInstalling = true;
             _installQueue.Clear();
 
+            // 1) Import tất cả UnityPackage có file trước (đồng bộ)
+            foreach (var pkg in s_packages)
+            {
+                if (pkg.IsInstalled) continue;
+                if (pkg.Method != InstallMethod.UnityPackage) continue;
+
+                var filePaths = GetBundledPackagePaths(pkg.BundledFileNames);
+                if (filePaths == null) continue;
+
+                pkg.InstallError = null;
+                ImportUnityPackage(pkg, filePaths);
+            }
+
+            // 2) Cài các GitUrl / ScopedRegistry (bất đồng bộ, xếp hàng)
             foreach (var pkg in s_packages)
             {
                 if (pkg.IsInstalled) continue;
@@ -382,7 +445,13 @@ namespace GameUpSDK.Installer
                 _installQueue.Enqueue(pkg);
             }
 
-            ProcessNextInQueue();
+            if (_installQueue.Count > 0)
+                ProcessNextInQueue();
+            else
+            {
+                _isBatchInstalling = false;
+                RefreshStatus();
+            }
         }
 
         private void EnqueueGitInstall(PackageDef pkg)
@@ -440,6 +509,113 @@ namespace GameUpSDK.Installer
             _currentInstallingPackage = null;
 
             ProcessNextInQueue();
+            Repaint();
+        }
+
+        // ─── UnityPackage install ─────────────────────────────────────────────────
+
+        /// <summary>
+        /// Trả về danh sách đường dẫn tuyệt đối cho các file .unitypackage trong Packages~.
+        /// Chỉ trả về file thực sự tồn tại. Trả về null nếu KHÔNG CÓ file nào.
+        /// </summary>
+        private static List<string> GetBundledPackagePaths(string[] fileNames)
+        {
+            if (fileNames == null || fileNames.Length == 0) return null;
+
+            string folder = GetPackagesFolder();
+            if (string.IsNullOrEmpty(folder)) return null;
+
+            var found = new List<string>();
+            foreach (string name in fileNames)
+            {
+                string full = Path.Combine(folder, name.Replace('/', Path.DirectorySeparatorChar));
+                if (File.Exists(full))
+                    found.Add(full);
+            }
+
+            return found.Count > 0 ? found : null;
+        }
+
+        // Backward compat helper dùng nội bộ để check có ít nhất 1 file
+        private static string GetBundledPackagePath(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return null;
+            string folder = GetPackagesFolder();
+            if (string.IsNullOrEmpty(folder)) return null;
+            string full = Path.Combine(folder, fileName.Replace('/', Path.DirectorySeparatorChar));
+            return File.Exists(full) ? full : null;
+        }
+
+        /// <summary>
+        /// Tìm thư mục Packages~ của package này.
+        /// Hỗ trợ cả cài via UPM Git URL (resolvedPath) và .unitypackage (Assets/GameUpSDK).
+        /// </summary>
+        private static string GetPackagesFolder()
+        {
+            // Thử tìm qua PackageInfo khi cài via UPM
+            try
+            {
+                Assembly asm         = Assembly.GetExecutingAssembly();
+                Type     pkgInfoType = Type.GetType("UnityEditor.PackageManager.PackageInfo, UnityEditor");
+                if (pkgInfoType != null)
+                {
+                    MethodInfo findMethod = pkgInfoType.GetMethod(
+                        "FindForAssembly",
+                        BindingFlags.Static | BindingFlags.Public,
+                        null, new[] { typeof(Assembly) }, null);
+
+                    object info = findMethod?.Invoke(null, new object[] { asm });
+                    if (info != null)
+                    {
+                        string resolved = pkgInfoType.GetProperty("resolvedPath")
+                                                      ?.GetValue(info) as string;
+                        if (!string.IsNullOrEmpty(resolved))
+                            return Path.Combine(resolved, "Packages~");
+                    }
+                }
+            }
+            catch { }
+
+            // Fallback: cài via .unitypackage → scripts nằm ở Assets/GameUpSDK
+            return Path.Combine(Application.dataPath, "GameUpSDK", "Packages~");
+        }
+
+        /// <summary>
+        /// Import tất cả file .unitypackage của một package.
+        /// interactive=false để không hiện dialog xác nhận cho từng file.
+        /// </summary>
+        private void ImportUnityPackage(PackageDef pkg, List<string> filePaths)
+        {
+            pkg.IsInstalling = true;
+            pkg.InstallError = null;
+            Repaint();
+
+            var errors = new List<string>();
+            foreach (string path in filePaths)
+            {
+                try
+                {
+                    AssetDatabase.ImportPackage(path, interactive: false);
+                    Debug.Log($"[GameUpSDK] Imported: {Path.GetFileName(path)}");
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"{Path.GetFileName(path)}: {ex.Message}");
+                    Debug.LogError($"[GameUpSDK] Import {Path.GetFileName(path)} thất bại: {ex.Message}");
+                }
+            }
+
+            pkg.IsInstalling = false;
+            if (errors.Count == 0)
+            {
+                pkg.IsInstalled  = true;
+                pkg.InstallError = null;
+            }
+            else
+            {
+                pkg.InstallError = "Một số file import thất bại:\n" + string.Join("\n", errors);
+            }
+
             Repaint();
         }
 
@@ -571,6 +747,15 @@ namespace GameUpSDK.Installer
             }
 
             Repaint();
+        }
+
+        private static bool CanAutoInstall(PackageDef p)
+        {
+            if (p.Method == InstallMethod.GitUrl || p.Method == InstallMethod.ScopedRegistry)
+                return true;
+            if (p.Method == InstallMethod.UnityPackage)
+                return GetBundledPackagePaths(p.BundledFileNames) != null;
+            return false;
         }
 
         private static bool IsAssemblyLoaded(string assemblyName)
