@@ -1,13 +1,15 @@
 using System;
 using UnityEngine;
+using System.Collections.Generic;
+#if GAMEUP_SDK_DEPS_READY
 using Firebase;
 using Firebase.Analytics;
 using Firebase.Crashlytics;
 using Firebase.Extensions;
-using System.Collections.Generic;
+#endif
 
 namespace GameUpSDK
-{       
+{
     public class FirebaseUtils : MonoSingleton<FirebaseUtils>
     {
         private bool _initialized;
@@ -15,6 +17,7 @@ namespace GameUpSDK
         /// <summary>True khi Firebase đã init xong (dùng để RemoteConfig init sau).</summary>
         public bool IsInitialized => _initialized;
 
+#if GAMEUP_SDK_DEPS_READY
         private void Awake()
         {
             FirebaseInit();
@@ -67,7 +70,7 @@ namespace GameUpSDK
 
         public static void LogEventsAPI(string eventId, Dictionary<object, object> param = null)
         {
-                Instance._LogEvents(eventId, param);
+            Instance._LogEvents(eventId, param);
         }
 
         /// <summary>
@@ -89,7 +92,6 @@ namespace GameUpSDK
             Instance._LogEventWithParameters(eventName, parameters);
         }
 
-
         private void _LogEventWithParameters(string eventId, Parameter[] parameters)
         {
             if (!_initialized) return;
@@ -108,10 +110,7 @@ namespace GameUpSDK
 
         private void _LogEvents(string eventId, Dictionary<object, object> param = null)
         {
-            if (!_initialized)
-            {
-                return;
-            }
+            if (!_initialized) return;
             if (IsEditor())
             {
                 Debug.Log("[Firebase] " + eventId);
@@ -128,11 +127,8 @@ namespace GameUpSDK
                 foreach (var p in param)
                 {
                     if (p.Value != null)
-                    {
                         parameters.Add(new Parameter(p.Key.ToString(), p.Value.ToString()));
-                    }
                 }
-
                 FirebaseAnalytics.LogEvent(eventId.ToString(), parameters.ToArray());
             }
         }
@@ -140,27 +136,29 @@ namespace GameUpSDK
         public void LogError(string error)
         {
             if (!_initialized) return;
-            if (IsEditor())
-            {
-                Debug.Log("[Firebase] " + error);
-                return;
-            }
-
+            if (IsEditor()) { Debug.Log("[Firebase] " + error); return; }
             Crashlytics.Log(error);
         }
 
         public void LogException(Exception e)
         {
             if (!_initialized) return;
-            if (IsEditor())
-            {
-                Debug.Log("[Firebase] " + e.Message);
-                return;
-            }
-
+            if (IsEditor()) { Debug.Log("[Firebase] " + e.Message); return; }
             Crashlytics.LogException(e);
         }
 
         #endregion
+#else
+        private void Awake()
+        {
+            _initialized = true;
+            onInitialized?.Invoke(true);
+        }
+
+        public static void LogEventsAPI(string eventId, Dictionary<object, object> param = null) { }
+        public static void LogEvent(string eventName, string paramName, string paramValue) { }
+        public void LogError(string error) { }
+        public void LogException(Exception e) { }
+#endif
     }
 }

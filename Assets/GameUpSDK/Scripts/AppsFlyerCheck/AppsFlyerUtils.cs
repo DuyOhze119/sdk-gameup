@@ -1,14 +1,18 @@
 using UnityEngine;
 using System.Collections.Generic;
+#if GAMEUP_SDK_DEPS_READY
 using AppsFlyerSDK;
+#endif
 
 namespace GameUpSDK
 {
     public class AppsFlyerUtils : MonoSingleton<AppsFlyerUtils>
     {
+#if GAMEUP_SDK_DEPS_READY
         [SerializeField] private string sdkKey;
         [SerializeField] private string appId;
         [SerializeField] private bool isDevMode = false;
+
         private void Awake()
         {
             AppsFlyer.setIsDebug(isDevMode);
@@ -30,5 +34,15 @@ namespace GameUpSDK
         {
             AppsFlyer.sendEvent(eventName, eventValues);
         }
+#else
+        [SerializeField] private string sdkKey;
+        [SerializeField] private string appId;
+        [SerializeField] private bool isDevMode = false;
+
+        public static void LogAdRevenue(string monetizationNetwork, string mediationNetwork,
+            double eventRevenue, string revenueCurrency, Dictionary<string, string> additionalParameters = null) { }
+
+        public static void LogEvents(string eventName, Dictionary<string, string> eventValues = null) { }
+#endif
     }
 }

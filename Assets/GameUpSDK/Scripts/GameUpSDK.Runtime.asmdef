@@ -1,45 +1,14 @@
 {
     "name": "GameUpSDK.Runtime",
     "rootNamespace": "GameUpSDK",
-    "references": [
-        "Unity.LevelPlay",
-        "Firebase.App",
-        "Firebase.Analytics",
-        "Firebase.Crashlytics",
-        "Firebase.RemoteConfig",
-        "GoogleMobileAds",
-        "AppsFlyer"
-    ],
+    "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [
-        "GAMEUP_SDK_DEPS_READY"
-    ],
-    "versionDefines": [
-        {
-            "name": "Unity.LevelPlay",
-            "expression": "",
-            "define": "GAMEUP_LEVPLAY"
-        },
-        {
-            "name": "Firebase.App",
-            "expression": "",
-            "define": "GAMEUP_FIREBASE"
-        },
-        {
-            "name": "GoogleMobileAds",
-            "expression": "",
-            "define": "GAMEUP_ADMOB"
-        },
-        {
-            "name": "AppsFlyer",
-            "expression": "",
-            "define": "GAMEUP_APPSFLYER"
-        }
-    ],
+    "defineConstraints": [],
+    "versionDefines": [],
     "noEngineReferences": false
 }

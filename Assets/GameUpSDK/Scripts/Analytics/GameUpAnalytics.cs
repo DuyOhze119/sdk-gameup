@@ -1,6 +1,9 @@
 using System.Collections.Generic;
+using UnityEngine;
+#if GAMEUP_SDK_DEPS_READY
 using Firebase.Analytics;
 using AppsFlyerSDK;
+#endif
 
 namespace GameUpSDK
 {
@@ -10,6 +13,7 @@ namespace GameUpSDK
     /// </summary>
     public static class GameUpAnalytics
     {
+#if GAMEUP_SDK_DEPS_READY
         private static void LogFirebase(string eventName, string paramName = null, string paramValue = null)
         {
             if (string.IsNullOrEmpty(eventName)) return;
@@ -19,15 +23,10 @@ namespace GameUpSDK
         public static void LogFirebaseParams(string eventName, Dictionary<string, string> param)
         {
             if (string.IsNullOrEmpty(eventName)) return;
-            if (param == null || param.Count == 0)
-            {
-                FirebaseUtils.LogEventsAPI(eventName, null);
-                return;
-            }
+            if (param == null || param.Count == 0) { FirebaseUtils.LogEventsAPI(eventName, null); return; }
             var fbParam = new Dictionary<object, object>();
             foreach (var p in param)
-                if (p.Value != null)
-                    fbParam[p.Key] = p.Value;
+                if (p.Value != null) fbParam[p.Key] = p.Value;
             FirebaseUtils.LogEventsAPI(eventName, fbParam);
         }
 
@@ -40,142 +39,117 @@ namespace GameUpSDK
         // ---------- Firebase: Virtual currency ----------
 
         /// <summary> start_level_1 - khi bắt đầu level 1 </summary>
-        public static void LogStartLevel1()
-        {
-            LogFirebase(AnalyticsEvent.StartLevel1, null, null);
-        }
-
-        public static void LogCompleteLevel1()
-        {
-            LogFirebase(AnalyticsEvent.CompleteLevel1, null, null);
-        }
+        public static void LogStartLevel1() => LogFirebase(AnalyticsEvent.StartLevel1);
+        public static void LogCompleteLevel1() => LogFirebase(AnalyticsEvent.CompleteLevel1);
 
         /// <summary> earn_virtual_currency: virtual_currency_name, value, source </summary>
         public static void LogEarnVirtualCurrency(string virtualCurrencyName, string value, string source)
         {
-            var p = new Dictionary<string, string>
+            LogFirebaseParams(AnalyticsEvent.EarnVirtualCurrency, new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamVirtualCurrencyName] = virtualCurrencyName ?? "",
                 [AnalyticsEvent.ParamValue] = value ?? "",
                 [AnalyticsEvent.ParamSource] = source ?? ""
-            };
-            LogFirebaseParams(AnalyticsEvent.EarnVirtualCurrency, p);
+            });
         }
 
         /// <summary> spend_virtual_currency: virtual_currency_name, value, source </summary>
         public static void LogSpendVirtualCurrency(string virtualCurrencyName, string value, string source)
         {
-            var p = new Dictionary<string, string>
+            LogFirebaseParams(AnalyticsEvent.SpendVirtualCurrency, new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamVirtualCurrencyName] = virtualCurrencyName ?? "",
                 [AnalyticsEvent.ParamValue] = value ?? "",
                 [AnalyticsEvent.ParamSource] = source ?? ""
-            };
-            LogFirebaseParams(AnalyticsEvent.SpendVirtualCurrency, p);
+            });
         }
 
         // ---------- Firebase: Loading ----------
 
         /// <summary> start_loading - khi bắt đầu loading </summary>
-        public static void LogStartLoading()
-        {
-            LogFirebase(AnalyticsEvent.StartLoading, null, null);
-        }
+        public static void LogStartLoading() => LogFirebase(AnalyticsEvent.StartLoading);
 
         /// <summary> complete_loading - khi hoàn thành loading, vào màn hình home </summary>
-        public static void LogCompleteLoading()
-        {
-            LogFirebase(AnalyticsEvent.CompleteLoading, null, null);
-        }
+        public static void LogCompleteLoading() => LogFirebase(AnalyticsEvent.CompleteLoading);
 
         // ---------- Level (Firebase + AppsFlyer af_level_achieved - chung mục đích) ----------
 
         /// <summary> level_start: level (từ 1), index (lần bắt đầu thứ bao nhiêu) </summary>
         public static void LogLevelStart(int level, int index)
         {
-            var p = new Dictionary<string, string>
+            LogFirebaseParams(AnalyticsEvent.LevelStart, new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamLevel] = level.ToString(),
                 [AnalyticsEvent.ParamIndex] = index.ToString()
-            };
-            LogFirebaseParams(AnalyticsEvent.LevelStart, p);
+            });
         }
 
-        /// <summary> level_fail: level, index (số lần thua ở level này), time (giây từ lúc bắt đầu đến lúc thua) </summary>
+        /// <summary> level_fail: level, index, time </summary>
         public static void LogLevelFail(int level, int index, float timeSeconds)
         {
-            var p = new Dictionary<string, string>
+            LogFirebaseParams(AnalyticsEvent.LevelFail, new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamLevel] = level.ToString(),
                 [AnalyticsEvent.ParamIndex] = index.ToString(),
                 [AnalyticsEvent.ParamTime] = timeSeconds.ToString("F0")
-            };
-            LogFirebaseParams(AnalyticsEvent.LevelFail, p);
+            });
         }
 
         /// <summary> level_complete (Firebase) + af_level_achieved (AppsFlyer): level, index, time; optional af_score. </summary>
         public static void LogLevelComplete(int level, int index, float timeSeconds, int? score = null)
         {
-            var fb = new Dictionary<string, string>
+            LogFirebaseParams(AnalyticsEvent.LevelComplete, new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamLevel] = level.ToString(),
                 [AnalyticsEvent.ParamIndex] = index.ToString(),
                 [AnalyticsEvent.ParamTime] = timeSeconds.ToString("F0")
-            };
-            LogFirebaseParams(AnalyticsEvent.LevelComplete, fb);
+            });
 
             var af = new Dictionary<string, string> { [AnalyticsEvent.ParamAfLevel] = level.ToString() };
-            if (score.HasValue)
-                af[AnalyticsEvent.ParamAfScore] = score.Value.ToString();
+            if (score.HasValue) af[AnalyticsEvent.ParamAfScore] = score.Value.ToString();
             LogAppsFlyer(AnalyticsEvent.AfLevelAchieved, af);
         }
 
         // ---------- Firebase: Button ----------
 
         /// <summary> button_click: source (tên button, bao gồm vị trí) </summary>
-        public static void LogButtonClick(string source)
-        {
-            LogFirebase(AnalyticsEvent.ButtonClick, AnalyticsEvent.ParamSource, source ?? "");
-        }
+        public static void LogButtonClick(string source) => LogFirebase(AnalyticsEvent.ButtonClick, AnalyticsEvent.ParamSource, source ?? "");
 
-        // ---------- Firebase: Wave (game có chia wave) ----------
+        // ---------- Firebase: Wave ----------
 
         /// <summary> wave_start: level, wave </summary>
         public static void LogWaveStart(int level, int wave)
         {
-            var p = new Dictionary<string, string>
+            LogFirebaseParams(AnalyticsEvent.WaveStart, new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamLevel] = level.ToString(),
                 [AnalyticsEvent.ParamWave] = wave.ToString()
-            };
-            LogFirebaseParams(AnalyticsEvent.WaveStart, p);
+            });
         }
 
         /// <summary> wave_fail: level, wave </summary>
         public static void LogWaveFail(int level, int wave)
         {
-            var p = new Dictionary<string, string>
+            LogFirebaseParams(AnalyticsEvent.WaveFail, new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamLevel] = level.ToString(),
                 [AnalyticsEvent.ParamWave] = wave.ToString()
-            };
-            LogFirebaseParams(AnalyticsEvent.WaveFail, p);
+            });
         }
 
         /// <summary> wave_complete: level, wave </summary>
         public static void LogWaveComplete(int level, int wave)
         {
-            var p = new Dictionary<string, string>
+            LogFirebaseParams(AnalyticsEvent.WaveComplete, new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamLevel] = level.ToString(),
                 [AnalyticsEvent.ParamWave] = wave.ToString()
-            };
-            LogFirebaseParams(AnalyticsEvent.WaveComplete, p);
+            });
         }
 
         // ---------- AppsFlyer only ----------
 
-        /// <summary> af_complete_registration: af_registration_method (e.g. Facebook) </summary>
+        /// <summary> af_complete_registration: af_registration_method </summary>
         public static void LogCompleteRegistration(string registrationMethod)
         {
             var p = new Dictionary<string, string>();
@@ -184,7 +158,7 @@ namespace GameUpSDK
             LogAppsFlyer(AnalyticsEvent.AfCompleteRegistration, p.Count > 0 ? p : null);
         }
 
-        /// <summary> af_purchase: currency, quantity, contentId, price (localized*0.63), orderId; optional af_registration_method, af_customer_user_id </summary>
+        /// <summary> af_purchase </summary>
         public static void LogPurchase(string currencyCode, int quantity, string contentId, string purchasePrice, string orderId,
             string registrationMethod = null, string customerUserId = null)
         {
@@ -196,36 +170,29 @@ namespace GameUpSDK
                 [AnalyticsEvent.ParamAfPurchasePrice] = purchasePrice ?? "",
                 [AnalyticsEvent.ParamAfOrderId] = orderId ?? ""
             };
-            if (!string.IsNullOrEmpty(registrationMethod))
-                p[AnalyticsEvent.ParamAfRegistrationMethod] = registrationMethod;
-            if (!string.IsNullOrEmpty(customerUserId))
-                p[AnalyticsEvent.ParamAfCustomerUserId] = customerUserId;
+            if (!string.IsNullOrEmpty(registrationMethod)) p[AnalyticsEvent.ParamAfRegistrationMethod] = registrationMethod;
+            if (!string.IsNullOrEmpty(customerUserId)) p[AnalyticsEvent.ParamAfCustomerUserId] = customerUserId;
             LogAppsFlyer(AnalyticsEvent.AfPurchase, p);
         }
 
-        /// <summary> af_tutorial_completion: af_success (bắt buộc), af_tutorial_id (optional) </summary>
+        /// <summary> af_tutorial_completion </summary>
         public static void LogTutorialCompletion(bool success, string tutorialId = null)
         {
             var p = new Dictionary<string, string> { [AnalyticsEvent.ParamAfSuccess] = success.ToString().ToLowerInvariant() };
-            if (!string.IsNullOrEmpty(tutorialId))
-                p[AnalyticsEvent.ParamAfTutorialId] = tutorialId;
+            if (!string.IsNullOrEmpty(tutorialId)) p[AnalyticsEvent.ParamAfTutorialId] = tutorialId;
             LogAppsFlyer(AnalyticsEvent.AfTutorialCompletion, p);
         }
 
-        /// <summary> af_achievement_unlocked: content_id, af_level (optional) </summary>
+        /// <summary> af_achievement_unlocked </summary>
         public static void LogAchievementUnlocked(string contentId, int? level = null)
         {
             var p = new Dictionary<string, string> { [AnalyticsEvent.ParamContentId] = contentId ?? "" };
-            if (level.HasValue)
-                p[AnalyticsEvent.ParamAfLevel] = level.Value.ToString();
+            if (level.HasValue) p[AnalyticsEvent.ParamAfLevel] = level.Value.ToString();
             LogAppsFlyer(AnalyticsEvent.AfAchievementUnlocked, p);
         }
 
         // ---------- Firebase: Ad Revenue Measurement (ARM) ----------
 
-        /// <summary>
-        /// Maps ad network name (from LevelPlay/IronSource) to AppsFlyer MediationNetwork for LogAdRevenue.
-        /// </summary>
         private static MediationNetwork GetMediationNetworkFromAdNetwork(string adNetwork)
         {
             if (string.IsNullOrEmpty(adNetwork)) return MediationNetwork.Custom;
@@ -246,20 +213,17 @@ namespace GameUpSDK
         }
 
         /// <summary>
-        /// Logs ad_impression to Firebase for Ad Revenue Measurement (ARM). Call when an ad impression with revenue is ready (e.g. IronSource/LevelPlay).
-        /// Also logs ad revenue to AppsFlyer via LogAdRevenue so you can see which ad networks (AdNetwork) drive revenue.
+        /// Logs ad_impression to Firebase for Ad Revenue Measurement (ARM).
+        /// Also logs ad revenue to AppsFlyer via LogAdRevenue.
         /// </summary>
         public static void LogAdImpression(AdImpressionData data)
         {
-            if (data == null)
-                return;
-            if (!data.Revenue.HasValue)
-                return;
+            if (data == null || !data.Revenue.HasValue) return;
 
             double revenue = data.Revenue.Value;
             string adNetwork = data.AdNetwork ?? "unknown";
 
-            var parameters = new List<Parameter>
+            var parameters = new Parameter[]
             {
                 new Parameter(FirebaseAnalytics.ParameterAdPlatform, "ironSource"),
                 new Parameter(FirebaseAnalytics.ParameterAdSource, adNetwork),
@@ -269,10 +233,31 @@ namespace GameUpSDK
                 new Parameter(FirebaseAnalytics.ParameterValue, revenue)
             };
 
-            FirebaseUtils.LogEvent(FirebaseAnalytics.EventAdImpression, parameters.ToArray());
-            var mediationNetwork = GetMediationNetworkFromAdNetwork(adNetwork);
-            AppsFlyerUtils.LogAdRevenue(adNetwork, mediationNetwork, revenue, "USD");
-            UnityEngine.Debug.Log($"[GameUpAnalytics] Logged Ad Revenue: {revenue} USD, network: {adNetwork}");
+            FirebaseUtils.LogEvent(FirebaseAnalytics.EventAdImpression, parameters);
+            AppsFlyerUtils.LogAdRevenue(adNetwork, GetMediationNetworkFromAdNetwork(adNetwork), revenue, "USD");
+            Debug.Log($"[GameUpAnalytics] Logged Ad Revenue: {revenue} USD, network: {adNetwork}");
         }
+#else
+        public static void LogFirebaseParams(string eventName, Dictionary<string, string> param) { }
+        public static void LogStartLevel1() { }
+        public static void LogCompleteLevel1() { }
+        public static void LogEarnVirtualCurrency(string virtualCurrencyName, string value, string source) { }
+        public static void LogSpendVirtualCurrency(string virtualCurrencyName, string value, string source) { }
+        public static void LogStartLoading() { }
+        public static void LogCompleteLoading() { }
+        public static void LogLevelStart(int level, int index) { }
+        public static void LogLevelFail(int level, int index, float timeSeconds) { }
+        public static void LogLevelComplete(int level, int index, float timeSeconds, int? score = null) { }
+        public static void LogButtonClick(string source) { }
+        public static void LogWaveStart(int level, int wave) { }
+        public static void LogWaveFail(int level, int wave) { }
+        public static void LogWaveComplete(int level, int wave) { }
+        public static void LogCompleteRegistration(string registrationMethod) { }
+        public static void LogPurchase(string currencyCode, int quantity, string contentId, string purchasePrice, string orderId,
+            string registrationMethod = null, string customerUserId = null) { }
+        public static void LogTutorialCompletion(bool success, string tutorialId = null) { }
+        public static void LogAchievementUnlocked(string contentId, int? level = null) { }
+        public static void LogAdImpression(AdImpressionData data) { }
+#endif
     }
 }

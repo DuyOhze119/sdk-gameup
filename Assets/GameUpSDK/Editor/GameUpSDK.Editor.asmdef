@@ -3,12 +3,7 @@
     "rootNamespace": "GameUpSDK.Editor",
     "references": [
         "GameUpSDK.Runtime",
-        "GameUpSDK.Installer",
-        "Unity.LevelPlay",
-        "Firebase.App",
-        "Firebase.RemoteConfig",
-        "GoogleMobileAds",
-        "AppsFlyer"
+        "GameUpSDK.Installer"
     ],
     "includePlatforms": [
         "Editor"
@@ -18,9 +13,7 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [
-        "GAMEUP_SDK_DEPS_READY"
-    ],
+    "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false
 }

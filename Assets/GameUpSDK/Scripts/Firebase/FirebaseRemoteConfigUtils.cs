@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
+#if GAMEUP_SDK_DEPS_READY
 using Firebase;
 using Firebase.Extensions;
 using Firebase.RemoteConfig;
+#endif
 
 namespace GameUpSDK
 {
@@ -30,8 +32,6 @@ namespace GameUpSDK
         public bool enable_banner = true;
 
         private bool _remoteConfigReady;
-        private FirebaseRemoteConfig _remoteConfig;
-
         public bool IsRemoteConfigReady => _remoteConfigReady;
         public Action<bool> OnFetchCompleted;
 
@@ -39,40 +39,6 @@ namespace GameUpSDK
         {
             return Application.platform == RuntimePlatform.OSXEditor ||
                    Application.platform == RuntimePlatform.WindowsEditor;
-        }
-
-        private void Start()
-        {
-            if (IsEditor())
-            {
-                ApplyDefaultValues();
-                _remoteConfigReady = true;
-                OnFetchCompleted?.Invoke(true);
-                Debug.Log("[GameUp] FirebaseRemoteConfig: Editor mode - using default values for testing.");
-                return;
-            }
-
-            if (FirebaseUtils.Instance.IsInitialized)
-            {
-                InitRemoteConfig();
-                return;
-            }
-
-            FirebaseUtils.Instance.onInitialized += OnFirebaseInitialized;
-        }
-
-        private void OnFirebaseInitialized(bool success)
-        {
-            FirebaseUtils.Instance.onInitialized -= OnFirebaseInitialized;
-            if (!success)
-            {
-                Debug.LogWarning("[GameUp] FirebaseRemoteConfig: Firebase init failed, using defaults.");
-                ApplyDefaultValues();
-                _remoteConfigReady = true;
-                OnFetchCompleted?.Invoke(false);
-                return;
-            }
-            InitRemoteConfig();
         }
 
         /// <summary>Áp dụng giá trị mặc định lên các field (dùng trong Editor và khi Firebase lỗi).</summary>
@@ -108,6 +74,43 @@ namespace GameUpSDK
                 { "no_internet_popup_enable", true },
                 { "enable_banner", true }
             };
+        }
+
+#if GAMEUP_SDK_DEPS_READY
+        private FirebaseRemoteConfig _remoteConfig;
+
+        private void Start()
+        {
+            if (IsEditor())
+            {
+                ApplyDefaultValues();
+                _remoteConfigReady = true;
+                OnFetchCompleted?.Invoke(true);
+                Debug.Log("[GameUp] FirebaseRemoteConfig: Editor mode - using default values for testing.");
+                return;
+            }
+
+            if (FirebaseUtils.Instance.IsInitialized)
+            {
+                InitRemoteConfig();
+                return;
+            }
+
+            FirebaseUtils.Instance.onInitialized += OnFirebaseInitialized;
+        }
+
+        private void OnFirebaseInitialized(bool success)
+        {
+            FirebaseUtils.Instance.onInitialized -= OnFirebaseInitialized;
+            if (!success)
+            {
+                Debug.LogWarning("[GameUp] FirebaseRemoteConfig: Firebase init failed, using defaults.");
+                ApplyDefaultValues();
+                _remoteConfigReady = true;
+                OnFetchCompleted?.Invoke(false);
+                return;
+            }
+            InitRemoteConfig();
         }
 
         private async void InitRemoteConfig()
@@ -160,13 +163,9 @@ namespace GameUpSDK
                     if (field == null) continue;
 
                     if (field.FieldType == typeof(int))
-                    {
                         field.SetValue(this, (int)_remoteConfig.GetValue(k).LongValue);
-                    }
                     else if (field.FieldType == typeof(bool))
-                    {
                         field.SetValue(this, _remoteConfig.GetValue(k).BooleanValue);
-                    }
                 }
                 catch (Exception ex)
                 {
@@ -178,11 +177,7 @@ namespace GameUpSDK
         /// <summary>Fetch và activate config (gọi lại khi cần refresh).</summary>
         public void FetchAndActivate(Action<bool> onDone = null)
         {
-            if (_remoteConfig == null)
-            {
-                onDone?.Invoke(false);
-                return;
-            }
+            if (_remoteConfig == null) { onDone?.Invoke(false); return; }
             _remoteConfig.FetchAndActivateAsync().ContinueWithOnMainThread(task =>
             {
                 bool ok = task.IsCompletedSuccessfully && task.Result;
@@ -192,5 +187,15 @@ namespace GameUpSDK
                 onDone?.Invoke(ok);
             });
         }
+#else
+        private void Start()
+        {
+            ApplyDefaultValues();
+            _remoteConfigReady = true;
+            OnFetchCompleted?.Invoke(true);
+        }
+
+        public void FetchAndActivate(Action<bool> onDone = null) => onDone?.Invoke(false);
+#endif
     }
 }

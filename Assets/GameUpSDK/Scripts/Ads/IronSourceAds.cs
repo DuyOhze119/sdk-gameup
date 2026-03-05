@@ -1,6 +1,8 @@
 using System;
 using UnityEngine;
+#if GAMEUP_SDK_DEPS_READY
 using Unity.Services.LevelPlay;
+#endif
 
 namespace GameUpSDK
 {
@@ -12,10 +14,6 @@ namespace GameUpSDK
     /// </summary>
     public class IronSourceAds : MonoBehaviour, IAds
     {
-        private const string DefaultBannerId = "DefaultBanner";
-        private const string DefaultInterstitialId = "DefaultInterstitial";
-        private const string DefaultRewardedId = "DefaultRewardedVideo";
-
         [Header("LevelPlay App Key (bắt buộc - lấy từ LevelPlay dashboard)")]
         [SerializeField] private string levelPlayAppKey;
 
@@ -31,11 +29,6 @@ namespace GameUpSDK
         public event Action OnRewardedLoaded;
         public event Action<string> OnRewardedLoadFailed;
 
-        private bool _initialized;
-        private LevelPlayBannerAd _bannerAd;
-        private LevelPlayInterstitialAd _interstitialAd;
-        private LevelPlayRewardedAd _rewardedAd;
-
         public void SetLevelPlayConfig(string appKey, string bannerId, string interstitialId, string rewardedId)
         {
             levelPlayAppKey = appKey;
@@ -43,6 +36,16 @@ namespace GameUpSDK
             interstitialAdUnitId = interstitialId;
             rewardedVideoAdUnitId = rewardedId;
         }
+
+#if GAMEUP_SDK_DEPS_READY
+        private const string DefaultBannerId = "DefaultBanner";
+        private const string DefaultInterstitialId = "DefaultInterstitial";
+        private const string DefaultRewardedId = "DefaultRewardedVideo";
+
+        private bool _initialized;
+        private LevelPlayBannerAd _bannerAd;
+        private LevelPlayInterstitialAd _interstitialAd;
+        private LevelPlayRewardedAd _rewardedAd;
 
         public void Initialize()
         {
@@ -74,7 +77,6 @@ namespace GameUpSDK
                 CreateAdUnits();
                 SubscribeToAdEvents();
                 SubscribeToImpressionData();
-                // Request ads ngay khi LevelPlay sẵn sàng (tránh RequestAll() gọi trước khi init xong).
                 RequestBanner();
                 RequestInterstitial();
                 RequestRewardedVideo();
@@ -142,7 +144,7 @@ namespace GameUpSDK
             // Dùng size chuẩn để banner có fill. Custom (width x 150) dễ bị network từ chối.
             // SetDisplayOnLoad(false): chỉ load khi RequestBanner/LoadAd, không tự hiện; chỉ hiện khi AdsManager gọi ShowBanner -> ShowAd().
             var bannerConfig = new LevelPlayBannerAd.Config.Builder()
-                .SetSize(LevelPlayAdSize.LARGE) // 320x90 dp, chuẩn và cao hơn BANNER (320x50)
+                .SetSize(LevelPlayAdSize.LARGE)
                 .SetPosition(LevelPlayBannerPosition.BottomCenter)
                 .SetDisplayOnLoad(false)
                 .Build();
@@ -157,62 +159,22 @@ namespace GameUpSDK
             Debug.Log("[CtySDK] IronSourceAds SetAfterCheckGDPR (consent set).");
         }
 
-        /// <summary>Bridges to LevelPlay's loading: triggers LoadAd on the banner.</summary>
-        public void RequestBanner()
-        {
-            _bannerAd?.LoadAd();
-        }
-
-        public void RequestInterstitial()
-        {
-            _interstitialAd?.LoadAd();
-        }
-
-        public void RequestRewardedVideo()
-        {
-            _rewardedAd?.LoadAd();
-        }
-
-        /// <summary>LevelPlay does not support App Open; no-op.</summary>
+        public void RequestBanner() { _bannerAd?.LoadAd(); }
+        public void RequestInterstitial() { _interstitialAd?.LoadAd(); }
+        public void RequestRewardedVideo() { _rewardedAd?.LoadAd(); }
         public void RequestAppOpenAds() { }
 
-        public bool IsBannerAvailable()
-        {
-            return _bannerAd != null;
-        }
+        public bool IsBannerAvailable() => _bannerAd != null;
+        public bool IsInterstitialAvailable() => _interstitialAd != null && _interstitialAd.IsAdReady();
+        public bool IsRewardedVideoAvailable() => _rewardedAd != null && _rewardedAd.IsAdReady();
+        public bool IsAppOpenAdsAvailable() => false;
 
-        public bool IsInterstitialAvailable()
-        {
-            return _interstitialAd != null && _interstitialAd.IsAdReady();
-        }
-
-        public bool IsRewardedVideoAvailable()
-        {
-            return _rewardedAd != null && _rewardedAd.IsAdReady();
-        }
-
-        public bool IsAppOpenAdsAvailable()
-        {
-            return false;
-        }
-
-        public void ShowBanner(string where)
-        {
-            _bannerAd?.ShowAd();
-        }
-
-        public void HideBanner(string where)
-        {
-            _bannerAd?.HideAd();
-        }
+        public void ShowBanner(string where) { _bannerAd?.ShowAd(); }
+        public void HideBanner(string where) { _bannerAd?.HideAd(); }
 
         public void ShowInterstitial(string where, Action onSuccess, Action onFail)
         {
-            if (_interstitialAd == null || !_interstitialAd.IsAdReady())
-            {
-                onFail?.Invoke();
-                return;
-            }
+            if (_interstitialAd == null || !_interstitialAd.IsAdReady()) { onFail?.Invoke(); return; }
             _interstitialAd.OnAdClosed += OnInterstitialClosed;
             _interstitialAd.OnAdDisplayFailed += OnInterstitialDisplayFailed;
 
@@ -237,11 +199,7 @@ namespace GameUpSDK
 
         public void ShowRewardedVideo(string where, Action onSuccess, Action onFail)
         {
-            if (_rewardedAd == null || !_rewardedAd.IsAdReady())
-            {
-                onFail?.Invoke();
-                return;
-            }
+            if (_rewardedAd == null || !_rewardedAd.IsAdReady()) { onFail?.Invoke(); return; }
             var rewardGranted = false;
             _rewardedAd.OnAdClosed += OnRewardedClosed;
             _rewardedAd.OnAdRewarded += OnRewardedEarned;
@@ -252,8 +210,7 @@ namespace GameUpSDK
                 _rewardedAd.OnAdClosed -= OnRewardedClosed;
                 _rewardedAd.OnAdRewarded -= OnRewardedEarned;
                 _rewardedAd.OnAdDisplayFailed -= OnRewardedDisplayFailed;
-                if (!rewardGranted)
-                    MainThreadDispatcher.Enqueue(() => onFail?.Invoke());
+                if (!rewardGranted) MainThreadDispatcher.Enqueue(() => onFail?.Invoke());
                 RequestRewardedVideo();
             }
 
@@ -275,20 +232,31 @@ namespace GameUpSDK
             _rewardedAd.ShowAd(where);
         }
 
-        public void ShowAppOpenAds(string where, Action onSuccess, Action onFail)
-        {
-            onFail?.Invoke();
-        }
+        public void ShowAppOpenAds(string where, Action onSuccess, Action onFail) { onFail?.Invoke(); }
 
         private void OnDestroy()
         {
             LevelPlay.OnImpressionDataReady -= OnLevelPlayImpressionDataReady;
-            _bannerAd?.DestroyAd();
-            _bannerAd = null;
-            _interstitialAd?.DestroyAd();
-            _interstitialAd = null;
-            _rewardedAd?.Dispose();
-            _rewardedAd = null;
+            _bannerAd?.DestroyAd(); _bannerAd = null;
+            _interstitialAd?.DestroyAd(); _interstitialAd = null;
+            _rewardedAd?.Dispose(); _rewardedAd = null;
         }
+#else
+        public void Initialize() { }
+        public void SetAfterCheckGDPR() { }
+        public void RequestBanner() { }
+        public void RequestInterstitial() { }
+        public void RequestRewardedVideo() { }
+        public void RequestAppOpenAds() { }
+        public bool IsBannerAvailable() => false;
+        public bool IsInterstitialAvailable() => false;
+        public bool IsRewardedVideoAvailable() => false;
+        public bool IsAppOpenAdsAvailable() => false;
+        public void ShowBanner(string where) { }
+        public void HideBanner(string where) { }
+        public void ShowInterstitial(string where, Action onSuccess, Action onFail) => onFail?.Invoke();
+        public void ShowRewardedVideo(string where, Action onSuccess, Action onFail) => onFail?.Invoke();
+        public void ShowAppOpenAds(string where, Action onSuccess, Action onFail) => onFail?.Invoke();
+#endif
     }
 }
