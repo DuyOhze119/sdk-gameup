@@ -108,6 +108,11 @@ namespace GameUpSDK.Editor
         [MenuItem("GameUp SDK/Setup")]
         public static void ShowWindow()
         {
+            if (!GameUpSDK.Installer.GameUpDependenciesWindow.AreAllRequiredPackagesInstalled())
+            {
+                GameUpSDK.Installer.GameUpDependenciesWindow.ShowWindow();
+                return;
+            }
             var window = GetWindow<GameUpSetupWindow>("GameUp SDK Setup");
             window.minSize = new Vector2(400, 480);
         }
