@@ -1,0 +1,24 @@
+{
+  "name": "com.ohze.gameup.sdk",
+  "displayName": "GameUp SDK",
+  "version": "1.0.0",
+  "unity": "2022.3",
+  "description": "GameUp SDK – Ads (IronSource/LevelPlay + AdMob App Open), Analytics (Firebase + AppsFlyer).\n\nSau khi cài đặt, cửa sổ Setup Dependencies sẽ tự động mở để hướng dẫn cài đặt các package phụ thuộc.",
+  "author": {
+    "name": "Ohze GameUp",
+    "url": "https://github.com/ohze/sdk-gameup"
+  },
+  "keywords": [
+    "gameup",
+    "ads",
+    "analytics",
+    "ironsource",
+    "levplay",
+    "firebase",
+    "appsflyer",
+    "admob"
+  ],
+  "dependencies": {
+    "com.unity.services.core": "1.12.0"
+  }
+}

@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 using UnityEditor.SceneManagement;
@@ -7,10 +8,55 @@ namespace GameUpSDK.Editor
 {
     public class GameUpSetupWindow : EditorWindow
     {
-        private const string PathSDK = "Assets/GameUpSDK/Prefab/SDK.prefab";
-        private const string PathAppsFlyer = "Assets/GameUpSDK/Prefab/AppsFlyerObject.prefab";
-        private const string PathIronSource = "Assets/GameUpSDK/Prefab/IronSourceAds.prefab";
-        private const string PathAdMob = "Assets/GameUpSDK/Prefab/AdmobAds.prefab";
+        // Đường dẫn được resolve động: hỗ trợ cả Assets/ (dev project) và Packages/ (UPM Git install)
+        private static string _packageRoot;
+
+        private static string PackageRoot
+        {
+            get
+            {
+                if (_packageRoot != null) return _packageRoot;
+
+                // Thử dùng PackageInfo để tìm đường dẫn chính xác khi cài qua UPM
+                try
+                {
+                    var assembly = Assembly.GetExecutingAssembly();
+                    var pkgInfoType = Type.GetType(
+                        "UnityEditor.PackageManager.PackageInfo, UnityEditor");
+                    if (pkgInfoType != null)
+                    {
+                        var method = pkgInfoType.GetMethod(
+                            "FindForAssembly",
+                            BindingFlags.Static | BindingFlags.Public,
+                            null, new[] { typeof(Assembly) }, null);
+                        if (method != null)
+                        {
+                            var info = method.Invoke(null, new object[] { assembly });
+                            if (info != null)
+                            {
+                                var assetPathProp = pkgInfoType.GetProperty("assetPath");
+                                var path = assetPathProp?.GetValue(info) as string;
+                                if (!string.IsNullOrEmpty(path))
+                                {
+                                    _packageRoot = path;
+                                    return _packageRoot;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { /* fallback below */ }
+
+                // Fallback: project gốc
+                _packageRoot = "Assets/GameUpSDK";
+                return _packageRoot;
+            }
+        }
+
+        private static string PathSDK        => PackageRoot + "/Prefab/SDK.prefab";
+        private static string PathAppsFlyer  => PackageRoot + "/Prefab/AppsFlyerObject.prefab";
+        private static string PathIronSource => PackageRoot + "/Prefab/IronSourceAds.prefab";
+        private static string PathAdMob      => PackageRoot + "/Prefab/AdmobAds.prefab";
 
         private int _activeTab;
         private readonly string[] _tabs = { "AppsFlyer", "IronSource Mediation", "AdMob (App Open)", "Firebase RC" };
