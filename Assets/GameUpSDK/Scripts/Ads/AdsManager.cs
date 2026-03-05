@@ -7,6 +7,35 @@ using UnityEngine;
 namespace GameUpSDK
 {
     /// <summary>
+    /// Kích thước Banner tiêu chuẩn. Áp dụng lúc Initialize; không thay đổi được sau init.
+    /// </summary>
+    public enum BannerSize
+    {
+        /// <summary>320 × 50 – kích thước nhỏ nhất, phổ biến nhất.</summary>
+        Banner,
+        /// <summary>320 × 90 – lớn hơn BANNER, fill rate tốt. Mặc định.</summary>
+        Large,
+        /// <summary>
+        /// Chiều rộng toàn màn hình, chiều cao tự điều chỉnh theo màn hình.
+        /// Fill rate cao nhất – được IronSource/LevelPlay khuyến nghị.
+        /// </summary>
+        Adaptive,
+        /// <summary>300 × 250 – Medium Rectangle (MREC), thường dùng trong content.</summary>
+        MediumRectangle,
+        /// <summary>728 × 90 – chỉ phù hợp trên iPad / tablet.</summary>
+        Leaderboard,
+    }
+
+    /// <summary>
+    /// Interface cho các ad network hỗ trợ cấu hình kích thước Banner.
+    /// AdsManager gọi SetBannerSize trước Initialize để truyền lựa chọn từ Inspector.
+    /// </summary>
+    public interface IBannerSizeConfig
+    {
+        void SetBannerSize(BannerSize size);
+    }
+
+    /// <summary>
     /// Mediator for all ad networks. Initializes networks by OrderExecute, uses waterfall for show (first available wins).
     /// Logs ads_request, ads_available, ads_show_success, ads_show_fail to Firebase with ad_type and placement.
     /// </summary>
@@ -20,6 +49,8 @@ namespace GameUpSDK
         [SerializeField] private string showBannerPlacementAfterInit = "main";
         [Tooltip("Thời gian chờ (giây) sau Initialize rồi mới ShowBanner, để network kịp request/load.")]
         [SerializeField] private float showBannerDelaySeconds = 2f;
+        [Tooltip("Kích thước Banner. Áp dụng khi Initialize – không thay đổi được sau init.")]
+        [SerializeField] private BannerSize bannerSize = BannerSize.Large;
 
         private List<IAds> _ads = new List<IAds>();
         private bool _initialized;
@@ -78,6 +109,8 @@ namespace GameUpSDK
             {
                 try
                 {
+                    if (ad is IBannerSizeConfig sizeConfig)
+                        sizeConfig.SetBannerSize(bannerSize);
                     ad.OnInterstitialLoaded += () => LogAdsEvent(AdsEvent.InterCompleteLoad, null, null);
                     ad.OnInterstitialLoadFailed += (error) => LogAdsEvent(AdsEvent.InterLoadFail, null, error ?? "unknown");
                     ad.OnRewardedLoaded += () => LogAdsEvent(AdsEvent.RewardCompleteLoad, null, null);

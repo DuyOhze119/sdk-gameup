@@ -13,12 +13,13 @@ SDK tích hợp Quảng cáo (Ads) và Analytics cho game Unity, hỗ trợ:
 ## Mục lục
 
 1. [Cài đặt](#1-cài-đặt)
-2. [Cấu hình qua Setup Window](#2-cấu-hình-qua-setup-window)
-3. [Thêm SDK vào Scene](#3-thêm-sdk-vào-scene)
-4. [AdsManager – Quảng cáo](#4-adsmanager--quảng-cáo)
-5. [GameUpAnalytics – Analytics](#5-gameupanalytics--analytics)
-6. [FirebaseRemoteConfigUtils – Remote Config](#6-firebaseremoteconfigutils--remote-config)
-7. [Remote Config Keys Reference](#7-remote-config-keys-reference)
+2. [Cài đặt Dependencies](#2-cài-đặt-dependencies)
+3. [Cấu hình qua Setup Window](#3-cấu-hình-qua-setup-window)
+4. [Thêm SDK vào Scene](#4-thêm-sdk-vào-scene)
+5. [AdsManager – Quảng cáo](#5-adsmanager--quảng-cáo)
+6. [GameUpAnalytics – Analytics](#6-gameupanalytics--analytics)
+7. [FirebaseRemoteConfigUtils – Remote Config](#7-firebaseremoteconfigutils--remote-config)
+8. [Remote Config Keys Reference](#8-remote-config-keys-reference)
 
 ---
 
@@ -32,28 +33,54 @@ Mở **Package Manager** → **Add package from git URL**:
 https://github.com/DuyOhze119/sdk-gameup.git?path=Assets/GameUpSDK#main
 ```
 
+Sau khi import xong, Unity sẽ tự động mở cửa sổ **"GameUp SDK — Setup Dependencies"** để hướng dẫn cài các package phụ thuộc → xem [Bước 2](#2-cài-đặt-dependencies).
+
 ### Cài thủ công
 
-Copy thư mục `Assets/GameUpSDK` vào project.
-
-### Dependencies cần cài thêm
-
-SDK yêu cầu các package sau (cài thủ công hoặc theo hướng dẫn từ nhà cung cấp):
-
-| Package | Ghi chú |
-|---|---|
-| Firebase SDK (Analytics, Remote Config) | Tải từ [Firebase Unity SDK](https://firebase.google.com/docs/unity/setup) |
-| IronSource / LevelPlay | Tải từ Unity Asset Store hoặc dashboard LevelPlay |
-| Google Mobile Ads (AdMob) | Cài qua UPM hoặc `.unitypackage` |
-| AppsFlyer SDK | Tải từ [AppsFlyer Unity SDK](https://dev.appsflyer.com/hc/docs/unity-sdk-overview) |
+Copy thư mục `Assets/GameUpSDK` vào project, sau đó mở thủ công: **GameUp SDK → Setup Dependencies**.
 
 ---
 
-## 2. Cấu hình qua Setup Window
+## 2. Cài đặt Dependencies
 
-Mở **GameUp SDK → Setup** trên thanh menu để cấu hình toàn bộ SDK trong một cửa sổ duy nhất.
+Mở **GameUp SDK → Setup Dependencies** trên thanh menu (hoặc để cửa sổ tự động mở khi cài lần đầu).
 
-Window có 4 tab:
+### Packages bắt buộc
+
+| Package | Version | Ghi chú |
+|---|---|---|
+| IronSource LevelPlay SDK | 9.2.0 | Mediation chính: Banner, Interstitial, Rewarded |
+| Firebase SDK (Analytics + Crashlytics + Remote Config) | — | Bao gồm EDM4U |
+
+### Packages tùy chọn
+
+| Package | Version | Ghi chú |
+|---|---|---|
+| Google Mobile Ads (AdMob) | 10.7.0 | Chỉ cần nếu dùng App Open Ads |
+| AppsFlyer Attribution SDK | 6.17.81 | Attribution & MMP |
+
+### Cách cài trong cửa sổ Setup Dependencies
+
+- Nhấn **"⬇ Download & Import"** bên cạnh mỗi package để tự động tải và import.
+- Hoặc nhấn **"⬇ Cài tất cả (tự động)"** ở footer để cài tất cả cùng lúc.
+- Sau khi tất cả package **bắt buộc** đã cài xong, Unity tự động thêm define symbol `GAMEUP_SDK_DEPS_READY` vào Player Settings.
+- Khi đó nút **"→ Mở cấu hình SDK"** xuất hiện → nhấn để chuyển sang bước cấu hình.
+
+> **Quan trọng**: `GAMEUP_SDK_DEPS_READY` là define symbol bảo vệ toàn bộ code của SDK. Nếu chưa có define này (chưa cài đủ deps bắt buộc), tất cả các tính năng Ads sẽ là no-op (không hoạt động).
+
+### Menu items liên quan
+
+| Menu | Chức năng |
+|---|---|
+| **GameUp SDK → Setup Dependencies** | Mở cửa sổ cài đặt package phụ thuộc |
+| **GameUp SDK → Setup** | Mở cửa sổ cấu hình keys |
+| **GameUp SDK → Reset Setup Status** | Reset trạng thái để mở lại installer vào lần load tiếp theo |
+
+---
+
+## 3. Cấu hình qua Setup Window
+
+Mở **GameUp SDK → Setup** để cấu hình toàn bộ SDK trong một cửa sổ duy nhất. Window có 4 tab:
 
 ### Tab: AppsFlyer
 
@@ -69,7 +96,7 @@ Window có 4 tab:
 | Trường | Mô tả |
 |---|---|
 | App Key (bắt buộc) | App Key từ LevelPlay/IronSource dashboard |
-| Banner / Interstitial / Rewarded ID | Ad Unit ID (để trống = dùng Default Placement) |
+| Banner / Interstitial / Rewarded ID | Ad Unit ID (để trống = dùng `DefaultBanner`, `DefaultInterstitial`, `DefaultRewardedVideo`) |
 | Android/iOS App Key | App Key điền vào `LevelPlayMediationSettings` |
 
 ### Tab: AdMob (App Open)
@@ -79,7 +106,7 @@ AdMob chỉ dùng cho **App Open Ads**. Banner/Interstitial/Rewarded đi qua Iro
 | Trường | Mô tả |
 |---|---|
 | App Open ID | Ad Unit ID cho App Open |
-| Android/iOS App ID | Google Mobile Ads App ID |
+| Android/iOS App ID | Google Mobile Ads App ID (điền vào `GoogleMobileAdsSettings`) |
 
 ### Tab: Firebase Remote Config
 
@@ -98,40 +125,53 @@ Sau khi chỉnh sửa, bấm **Save Configuration** để lưu vào prefab.
 
 ---
 
-## 3. Thêm SDK vào Scene
+## 4. Thêm SDK vào Scene
 
 Sau khi Save Configuration, bấm **"Tạo SDK trong Scene hiện tại"** trong Setup Window.
 
-SDK sẽ được khởi tạo tự động từ prefab `SDK.prefab` (Singleton, không bị destroy khi chuyển scene).
+SDK sẽ được khởi tạo tự động từ prefab `SDK.prefab` (Singleton, `DontDestroyOnLoad`).
 
-> **Lưu ý**: Chỉ cần thêm `SDK.prefab` vào scene đầu tiên (Splash/Loading). Không thêm lại ở các scene khác.
+> **Lưu ý**: Chỉ cần thêm vào scene **đầu tiên** (Splash/Loading). Không thêm lại ở các scene khác.
 
 ---
 
-## 4. AdsManager – Quảng cáo
+## 5. AdsManager – Quảng cáo
 
-`AdsManager` là điểm trung tâm để hiển thị tất cả loại quảng cáo. Dùng waterfall: network đầu tiên available sẽ được dùng.
+`AdsManager` là điểm trung tâm để hiển thị tất cả loại quảng cáo. Dùng **waterfall**: network có độ ưu tiên cao nhất (`OrderExecute` nhỏ nhất) và đang available sẽ được dùng.
 
 ### Banner
 
 ```csharp
-// Hiện Banner tại vị trí "main" (tự động hiện sau init nếu showBannerAfterInit = true)
+// Hiện Banner
 AdsManager.Instance.ShowBanner("main");
 
 // Ẩn Banner
 AdsManager.Instance.HideBanner("main");
 ```
 
-> Banner chỉ hiện khi `enable_banner = true` trên Firebase Remote Config.
+**Kích thước Banner** được chọn qua field `Banner Size` trên component `AdsManager` trong Inspector:
+
+| Giá trị | Kích thước | Ghi chú |
+|---|---|---|
+| `Banner` | 320 × 50 | Nhỏ, phổ biến nhất |
+| `Large` | 320 × 90 | **Mặc định** – fill rate tốt |
+| `Adaptive` | Full width × auto | Fill rate cao nhất – **IronSource khuyến nghị** |
+| `Medium Rectangle` | 300 × 250 | MREC, thường dùng trong content |
+| `Leaderboard` | 728 × 90 | Chỉ phù hợp iPad / tablet |
+
+> Kích thước được áp dụng khi `Initialize()` – **không thay đổi được sau khi init**.  
+> Banner luôn hiện ở vị trí **BottomCenter**.  
+> Banner chỉ hiện khi `enable_banner = true` trên Firebase Remote Config.  
+> `enable_banner` có ưu tiên cao hơn `showBannerAfterInit`: nếu Remote Config = `false` thì Banner không hiện dù Inspector = `true`.
 
 ### Interstitial
 
 ```csharp
-// Hiện Interstitial (không kiểm tra level, chỉ kiểm tra capping time)
+// Hiện Interstitial (chỉ kiểm tra capping time, không kiểm tra level)
 AdsManager.Instance.ShowInterstitial(
     where: "level_complete",
-    onSuccess: () => Debug.Log("Interstitial hiện thành công"),
-    onFail: () => Debug.Log("Interstitial không hiện được")
+    onSuccess: () => { /* tiếp tục flow game */ },
+    onFail: () => { /* tiếp tục flow game */ }
 );
 
 // Hiện Interstitial với kiểm tra level (khuyến nghị)
@@ -144,8 +184,10 @@ AdsManager.Instance.ShowInterstitial(
 );
 ```
 
-> SDK tự động kiểm tra `inter_start_level` và `inter_capping_time` từ Remote Config thông qua `AdsRules`.  
-> `onFail` được gọi cả khi bị block bởi rule và khi không có quảng cáo.
+> SDK tự động kiểm tra `inter_start_level` và `inter_capping_time` qua `AdsRules`.  
+> `onSuccess` được gọi khi quảng cáo **đóng lại** bình thường.  
+> `onFail` được gọi khi bị block bởi rule, không có quảng cáo, hoặc hiển thị lỗi.  
+> **Luôn xử lý cả `onSuccess` và `onFail`** để tiếp tục flow game.
 
 ### Rewarded Video
 
@@ -154,10 +196,10 @@ AdsManager.Instance.ShowInterstitial(
 AdsManager.Instance.ShowRewardedVideo(
     where: "revive",
     onSuccess: () => { /* trao thưởng cho người chơi */ },
-    onFail: () => { /* người chơi bỏ qua hoặc không có ads */ }
+    onFail: () => { /* không trao thưởng, người chơi bỏ qua */ }
 );
 
-// Truyền thêm currentLevel để log analytics
+// Truyền thêm currentLevel để log analytics đầy đủ hơn
 AdsManager.Instance.ShowRewardedVideo(
     where: "revive",
     currentLevel: currentLevel,
@@ -166,8 +208,8 @@ AdsManager.Instance.ShowRewardedVideo(
 );
 ```
 
-> `onSuccess` chỉ được gọi khi người chơi **xem hết** video.  
-> `onFail` được gọi khi không có quảng cáo hoặc người chơi **bỏ qua** giữa chừng.
+> `onSuccess` chỉ được gọi khi người chơi **xem đủ** để nhận reward (sự kiện `OnAdRewarded`).  
+> `onFail` được gọi khi không có quảng cáo, lỗi hiển thị, hoặc người chơi **đóng sớm** trước khi nhận reward.
 
 ### App Open Ads
 
@@ -179,13 +221,22 @@ AdsManager.Instance.ShowAppOpenAds(
 );
 ```
 
+> App Open Ads chỉ khả dụng khi đã cài và cấu hình **AdMob**. IronSource/LevelPlay không hỗ trợ loại quảng cáo này.
+
 ### Tham số `where`
 
-`where` là chuỗi mô tả vị trí/ngữ cảnh hiển thị quảng cáo, dùng để tracking analytics. Ví dụ: `"main_menu"`, `"level_complete"`, `"revive"`, `"settings"`.
+Chuỗi mô tả vị trí/ngữ cảnh hiển thị quảng cáo, dùng để tracking analytics (Firebase + AppsFlyer). Ví dụ: `"main_menu"`, `"level_complete"`, `"revive"`, `"settings"`.
+
+### GDPR / Consent
+
+```csharp
+// Gọi sau khi người dùng hoàn tất consent flow
+AdsManager.Instance.SetAfterCheckGDPR();
+```
 
 ---
 
-## 5. GameUpAnalytics – Analytics
+## 6. GameUpAnalytics – Analytics
 
 `GameUpAnalytics` là static class, log event đến Firebase và/hoặc AppsFlyer.
 
@@ -205,13 +256,13 @@ GameUpAnalytics.LogCompleteLoading();
 // Bắt đầu level (level tính từ 1, index = số lần bắt đầu level này)
 GameUpAnalytics.LogLevelStart(level: 1, index: 1);
 
-// Thua level (index = số lần thua ở level này, time = giây từ lúc bắt đầu)
+// Thua level (index = số lần thua ở level này, timeSeconds = giây từ lúc bắt đầu đến khi thua)
 GameUpAnalytics.LogLevelFail(level: 1, index: 1, timeSeconds: 45.5f);
 
-// Thắng level (log Firebase + AppsFlyer af_level_achieved)
+// Thắng level → log Firebase (level_complete) + AppsFlyer (af_level_achieved)
 GameUpAnalytics.LogLevelComplete(level: 1, index: 1, timeSeconds: 120f);
 
-// Thắng level kèm điểm
+// Thắng level kèm điểm (score dùng cho AppsFlyer af_score)
 GameUpAnalytics.LogLevelComplete(level: 1, index: 1, timeSeconds: 120f, score: 5000);
 ```
 
@@ -223,10 +274,10 @@ GameUpAnalytics.LogWaveFail(level: 3, wave: 1);
 GameUpAnalytics.LogWaveComplete(level: 3, wave: 1);
 ```
 
-### Tutorial
+### Tutorial (Level 1)
 
 ```csharp
-// Level 1 – dùng khi game coi level 1 là tutorial
+// Dùng khi game coi level 1 là tutorial
 GameUpAnalytics.LogStartLevel1();
 GameUpAnalytics.LogCompleteLevel1();
 ```
@@ -234,14 +285,14 @@ GameUpAnalytics.LogCompleteLevel1();
 ### Virtual Currency
 
 ```csharp
-// Nhận tiền ảo
+// Nhận tiền ảo (earn_virtual_currency)
 GameUpAnalytics.LogEarnVirtualCurrency(
     virtualCurrencyName: "coin",
     value: "100",
     source: "level_complete"
 );
 
-// Tiêu tiền ảo
+// Tiêu tiền ảo (spend_virtual_currency)
 GameUpAnalytics.LogSpendVirtualCurrency(
     virtualCurrencyName: "coin",
     value: "50",
@@ -252,55 +303,54 @@ GameUpAnalytics.LogSpendVirtualCurrency(
 ### Button Click
 
 ```csharp
-// Tracking button click (source = tên button kèm vị trí)
+// source = tên button kèm vị trí để phân biệt
 GameUpAnalytics.LogButtonClick("btn_play_home");
 GameUpAnalytics.LogButtonClick("btn_revive_popup");
 ```
 
-### AppsFlyer – Registration & Purchase
+### AppsFlyer – Registration, Purchase, Achievement
 
 ```csharp
-// Đăng ký tài khoản (AppsFlyer af_complete_registration)
+// Đăng ký tài khoản (af_complete_registration)
 GameUpAnalytics.LogCompleteRegistration("Facebook");
 
-// Tutorial (AppsFlyer af_tutorial_completion)
+// Hoàn thành tutorial (af_tutorial_completion)
 GameUpAnalytics.LogTutorialCompletion(success: true, tutorialId: "intro");
 
-// Mua hàng trong app (AppsFlyer af_purchase)
+// Mua hàng trong app (af_purchase)
 GameUpAnalytics.LogPurchase(
     currencyCode: "USD",
     quantity: 1,
     contentId: "no_ads_pack",
-    purchasePrice: "1.99",   // giá đã quy đổi (localized * 0.63)
+    purchasePrice: "1.99",   // giá USD quy đổi (localized price * 0.63)
     orderId: "order_123"
 );
 
-// Mở khóa thành tích (AppsFlyer af_achievement_unlocked)
+// Mở khóa thành tích (af_achievement_unlocked)
 GameUpAnalytics.LogAchievementUnlocked("first_win", level: 1);
 ```
 
 ### Ad Revenue (tự động)
 
-Ad Revenue được log tự động thông qua `AdsEvent.OnImpressionDataReady`. **Không cần gọi thủ công** `LogAdImpression` – `AdsManager` đã subscribe event này khi khởi tạo.
+Ad Revenue được log tự động đến cả Firebase và AppsFlyer thông qua `AdsEvent.OnImpressionDataReady`. **Không cần gọi thủ công** — `AdsManager` đã subscribe event này khi khởi tạo.
 
 ---
 
-## 6. FirebaseRemoteConfigUtils – Remote Config
+## 7. FirebaseRemoteConfigUtils – Remote Config
 
-`FirebaseRemoteConfigUtils` tự động fetch và sync giá trị từ Firebase Remote Config vào các public field cùng tên. Không cần gọi thủ công trong luồng bình thường.
+`FirebaseRemoteConfigUtils` tự động fetch và sync giá trị từ Firebase Remote Config vào các public field cùng tên (via reflection). Không cần gọi thủ công trong luồng bình thường.
 
-### Đọc giá trị Remote Config
+### Đọc giá trị
 
 ```csharp
-// Truy cập trực tiếp qua Instance
 var rc = FirebaseRemoteConfigUtils.Instance;
 
-int cappingTime = rc.inter_capping_time;      // thời gian capping Interstitial (giây)
-int startLevel  = rc.inter_start_level;       // level bắt đầu hiện Interstitial
-bool bannerOn   = rc.enable_banner;           // Banner có được bật không
-bool rateAppOn  = rc.enable_rate_app;         // Rate App có được bật không
-int rateLevel   = rc.level_start_show_rate_app; // Level hiện Rate App
-bool internetPopup = rc.no_internet_popup_enable; // Popup no-internet
+int cappingTime    = rc.inter_capping_time;           // capping Interstitial (giây)
+int startLevel     = rc.inter_start_level;            // level bắt đầu hiện Interstitial
+bool bannerOn      = rc.enable_banner;                // Banner bật/tắt
+bool rateAppOn     = rc.enable_rate_app;              // Rate App bật/tắt
+int rateLevel      = rc.level_start_show_rate_app;    // Level hiện Rate App
+bool internetPopup = rc.no_internet_popup_enable;     // Popup no-internet bật/tắt
 ```
 
 ### Chờ Remote Config sẵn sàng
@@ -312,18 +362,18 @@ void Start()
 
     if (rc.IsRemoteConfigReady)
     {
-        OnRemoteConfigReady(true);
+        OnConfigReady(true);
     }
     else
     {
-        rc.OnFetchCompleted += OnRemoteConfigReady;
+        rc.OnFetchCompleted += OnConfigReady;
     }
 }
 
-void OnRemoteConfigReady(bool activated)
+void OnConfigReady(bool activated)
 {
-    // activated = true: fetch thành công và có dữ liệu mới
-    // activated = false: dùng giá trị default (Firebase lỗi hoặc không đổi)
+    // activated = true: fetch thành công, dữ liệu đã được cập nhật từ server
+    // activated = false: dùng giá trị mặc định (Firebase lỗi hoặc không có gì mới)
     Debug.Log("Remote Config ready. Banner: " + FirebaseRemoteConfigUtils.Instance.enable_banner);
 }
 ```
@@ -337,13 +387,13 @@ FirebaseRemoteConfigUtils.Instance.FetchAndActivate(ok =>
 });
 ```
 
-> **Editor**: Remote Config luôn dùng giá trị default (không kết nối Firebase) để thuận tiện khi test trong Editor.
+> **Trong Unity Editor**: Remote Config luôn dùng giá trị mặc định (không kết nối Firebase) để thuận tiện khi test.
 
 ---
 
-## 7. Remote Config Keys Reference
+## 8. Remote Config Keys Reference
 
-Các key này phải đặt **đúng tên** trên Firebase Remote Config console để SDK tự động sync:
+Các key phải đặt **đúng tên** trên Firebase Remote Config console để SDK tự động sync (tên biến = tên key):
 
 | Key | Type | Default | Mô tả |
 |---|---|---|---|
@@ -354,13 +404,14 @@ Các key này phải đặt **đúng tên** trên Firebase Remote Config console
 | `level_start_show_rate_app` | Number (int) | `5` | Level bắt đầu hiện Rate App |
 | `no_internet_popup_enable` | Boolean | `true` | `true` = hiện popup yêu cầu kết nối Internet |
 
-> **Lưu ý về ưu tiên**: `enable_banner` (Remote Config) ưu tiên cao hơn `showBannerAfterInit` trong Inspector. Nếu `enable_banner = false` thì Banner không hiện dù `showBannerAfterInit = true`.
+> **Ưu tiên `enable_banner`**: Remote Config `enable_banner = false` sẽ tắt hoàn toàn Banner, kể cả khi `showBannerAfterInit = true` trong Inspector của `AdsManager`.
 
 ---
 
 ## Ghi chú
 
-- **Namespace**: Tất cả class đều nằm trong namespace `GameUpSDK`.
+- **Namespace**: Tất cả class đều trong namespace `GameUpSDK`.
 - **Singleton**: `AdsManager`, `FirebaseRemoteConfigUtils` là `MonoSingleton` – truy cập qua `.Instance`.
+- **Define symbol**: `GAMEUP_SDK_DEPS_READY` được tự động quản lý bởi installer. Không thêm/xóa thủ công.
 - **Test capping**: Dùng `AdsManager.Instance.ResetInterstitialCappingForTest()` để reset timer capping khi test – **không dùng trong production**.
-- **GDPR**: Sau khi hoàn tất consent flow, gọi `AdsManager.Instance.SetAfterCheckGDPR()` để forward thông tin đến các ad network.
+- **GDPR**: Sau khi hoàn tất consent flow, gọi `AdsManager.Instance.SetAfterCheckGDPR()` để forward thông tin đến ad network.

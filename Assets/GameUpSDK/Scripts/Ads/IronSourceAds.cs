@@ -12,7 +12,7 @@ namespace GameUpSDK
     /// Nếu không nhập Ad Unit ID, dùng placement mặc định (DefaultBanner, DefaultInterstitial, DefaultRewardedVideo).
     /// LevelPlay không hỗ trợ App Open; các method App Open no-op / return false.
     /// </summary>
-    public class IronSourceAds : MonoBehaviour, IAds
+    public class IronSourceAds : MonoBehaviour, IAds, IBannerSizeConfig
     {
         [Header("LevelPlay App Key (bắt buộc - lấy từ LevelPlay dashboard)")]
         [SerializeField] private string levelPlayAppKey;
@@ -28,6 +28,11 @@ namespace GameUpSDK
         public event Action<string> OnInterstitialLoadFailed;
         public event Action OnRewardedLoaded;
         public event Action<string> OnRewardedLoadFailed;
+
+        private BannerSize _bannerSize = BannerSize.Large;
+
+        /// <inheritdoc/>
+        public void SetBannerSize(BannerSize size) => _bannerSize = size;
 
         public void SetLevelPlayConfig(string appKey, string bannerId, string interstitialId, string rewardedId)
         {
@@ -141,16 +146,27 @@ namespace GameUpSDK
             var interId = string.IsNullOrEmpty(interstitialAdUnitId) ? DefaultInterstitialId : interstitialAdUnitId;
             var rewardId = string.IsNullOrEmpty(rewardedVideoAdUnitId) ? DefaultRewardedId : rewardedVideoAdUnitId;
 
-            // Dùng size chuẩn để banner có fill. Custom (width x 150) dễ bị network từ chối.
-            // SetDisplayOnLoad(false): chỉ load khi RequestBanner/LoadAd, không tự hiện; chỉ hiện khi AdsManager gọi ShowBanner -> ShowAd().
+            // SetDisplayOnLoad(false): không tự hiện sau khi load; chỉ hiện khi AdsManager gọi ShowBanner → ShowAd().
             var bannerConfig = new LevelPlayBannerAd.Config.Builder()
-                .SetSize(LevelPlayAdSize.LARGE)
+                .SetSize(GetLevelPlayAdSize(_bannerSize))
                 .SetPosition(LevelPlayBannerPosition.BottomCenter)
                 .SetDisplayOnLoad(false)
                 .Build();
             _bannerAd = new LevelPlayBannerAd(bannerId, bannerConfig);
             _interstitialAd = new LevelPlayInterstitialAd(interId);
             _rewardedAd = new LevelPlayRewardedAd(rewardId);
+        }
+
+        private static LevelPlayAdSize GetLevelPlayAdSize(BannerSize size)
+        {
+            switch (size)
+            {
+                case BannerSize.Banner:          return LevelPlayAdSize.BANNER;
+                case BannerSize.Adaptive:        return LevelPlayAdSize.CreateAdaptiveAdSize();
+                case BannerSize.MediumRectangle: return LevelPlayAdSize.MEDIUM_RECTANGLE;
+                case BannerSize.Leaderboard:     return LevelPlayAdSize.LEADERBOARD;
+                default:                         return LevelPlayAdSize.LARGE;
+            }
         }
 
         public void SetAfterCheckGDPR()
