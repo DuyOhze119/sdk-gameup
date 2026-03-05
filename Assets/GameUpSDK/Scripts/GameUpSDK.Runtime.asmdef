@@ -1,7 +1,10 @@
 {
     "name": "GameUpSDK.Runtime",
     "rootNamespace": "GameUpSDK",
-    "references": [],
+    "references": [
+        "GUID:760a4c7888534400e882b82c5b3fba06",
+        "GUID:2a37df438292d4903b4e5159c5de3bf9"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

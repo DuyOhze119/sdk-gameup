@@ -44,7 +44,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 771b6eb068d55e34eb37d2bf84ae9896, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  levelPlayAppKey: 251bf22bd
-  bannerAdUnitId: v088frzdgp4ak0md
-  interstitialAdUnitId: xndve1i8t038ufyy
-  rewardedVideoAdUnitId: o57lc5ti0ja1ceuw
+  levelPlayAppKey: 
+  bannerAdUnitId: 
+  interstitialAdUnitId: 
+  rewardedVideoAdUnitId: 
