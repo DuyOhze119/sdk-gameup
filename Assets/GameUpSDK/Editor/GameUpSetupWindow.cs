@@ -58,6 +58,9 @@ namespace GameUpSDK.Editor
         private static string PathIronSource => PackageRoot + "/Prefab/IronSourceAds.prefab";
         private static string PathAdMob      => PackageRoot + "/Prefab/AdmobAds.prefab";
 
+        private const string PathGoogleMobileAdsSettings   = "Assets/GoogleMobileAds/Resources/GoogleMobileAdsSettings.asset";
+        private const string PathLevelPlayMediationSettings = "Assets/LevelPlay/Resources/LevelPlayMediationSettings.asset";
+
         private int _activeTab;
         private readonly string[] _tabs = { "AppsFlyer", "IronSource Mediation", "AdMob (App Open)", "Firebase RC" };
 
@@ -76,11 +79,19 @@ namespace GameUpSDK.Editor
         private string _ironSourceInterstitialId = "";
         private string _ironSourceRewardedId = "";
 
+        // LevelPlay Mediation Settings (LevelPlayMediationSettings.asset)
+        private string _levelPlayAndroidAppKey = "";
+        private string _levelPlayIOSAppKey = "";
+
         // AdMob (AdmobAds: bannerAdUnitId, interstitialAdUnitId, rewardedAdUnitId, appOpenAdUnitId)
         private string _admobBannerId = "";
         private string _admobInterstitialId = "";
         private string _admobRewardedId = "";
         private string _admobAppOpenId = "";
+
+        // Google Mobile Ads App IDs (GoogleMobileAdsSettings.asset)
+        private string _googleMobileAdsAndroidAppId = "";
+        private string _googleMobileAdsIOSAppId = "";
 
         // FirebaseRemoteConfigUtils on SDK.prefab (default values, sync from Remote at runtime)
         private int _rcInterCappingTime = 120;
@@ -196,6 +207,12 @@ namespace GameUpSDK.Editor
             _ironSourceBannerId = EditorGUILayout.TextField("Banner ID", _ironSourceBannerId);
             _ironSourceInterstitialId = EditorGUILayout.TextField("Interstitial ID", _ironSourceInterstitialId);
             _ironSourceRewardedId = EditorGUILayout.TextField("Rewarded ID", _ironSourceRewardedId);
+
+            EditorGUILayout.Space(12);
+            EditorGUILayout.LabelField("LevelPlay Mediation Settings", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("App Key điền vào " + PathLevelPlayMediationSettings, MessageType.None);
+            _levelPlayAndroidAppKey = EditorGUILayout.TextField("Android App Key", _levelPlayAndroidAppKey);
+            _levelPlayIOSAppKey     = EditorGUILayout.TextField("iOS App Key",     _levelPlayIOSAppKey);
         }
 
         private void DrawAdMobSection()
@@ -209,6 +226,12 @@ namespace GameUpSDK.Editor
             _admobInterstitialId = EditorGUILayout.TextField("Interstitial ID", _admobInterstitialId);
             _admobRewardedId = EditorGUILayout.TextField("Rewarded ID", _admobRewardedId);
             _admobAppOpenId = EditorGUILayout.TextField("App Open ID", _admobAppOpenId);
+
+            EditorGUILayout.Space(12);
+            EditorGUILayout.LabelField("Google Mobile Ads App ID", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("App ID điền vào " + PathGoogleMobileAdsSettings, MessageType.None);
+            _googleMobileAdsAndroidAppId = EditorGUILayout.TextField("Android App ID", _googleMobileAdsAndroidAppId);
+            _googleMobileAdsIOSAppId     = EditorGUILayout.TextField("iOS App ID",     _googleMobileAdsIOSAppId);
         }
 
         private void DrawFirebaseRemoteConfigSection()
@@ -227,10 +250,12 @@ namespace GameUpSDK.Editor
         {
             var errors = new System.Collections.Generic.List<string>();
             if (!LoadAppsFlyer()) errors.Add("Prefab not found at: " + PathAppsFlyer);
-            LoadAppsFlyerUtils(); // AppsFlyerUtils on SDK.prefab (optional)
-            LoadFirebaseRemoteConfigUtils(); // FirebaseRemoteConfigUtils on SDK.prefab (optional)
+            LoadAppsFlyerUtils();
+            LoadFirebaseRemoteConfigUtils();
             if (!LoadIronSource()) errors.Add("Prefab not found at: " + PathIronSource);
             if (!LoadAdMob()) errors.Add("Prefab not found at: " + PathAdMob);
+            LoadGoogleMobileAdsSettings();
+            LoadLevelPlayMediationSettings();
             _loadErrors = errors.Count > 0 ? string.Join("\n", errors) : null;
         }
 
@@ -306,6 +331,50 @@ namespace GameUpSDK.Editor
             return true;
         }
 
+        private void LoadGoogleMobileAdsSettings()
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<ScriptableObject>(PathGoogleMobileAdsSettings);
+            if (asset == null) return;
+            var so = new SerializedObject(asset);
+            Assign(so, "adMobAndroidAppId", ref _googleMobileAdsAndroidAppId);
+            Assign(so, "adMobIOSAppId",     ref _googleMobileAdsIOSAppId);
+        }
+
+        private bool SaveGoogleMobileAdsSettings()
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<ScriptableObject>(PathGoogleMobileAdsSettings);
+            if (asset == null) return false;
+            var so = new SerializedObject(asset);
+            Set(so, "adMobAndroidAppId", _googleMobileAdsAndroidAppId);
+            Set(so, "adMobIOSAppId",     _googleMobileAdsIOSAppId);
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssets();
+            return true;
+        }
+
+        private void LoadLevelPlayMediationSettings()
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<ScriptableObject>(PathLevelPlayMediationSettings);
+            if (asset == null) return;
+            var so = new SerializedObject(asset);
+            Assign(so, "AndroidAppKey", ref _levelPlayAndroidAppKey);
+            Assign(so, "IOSAppKey",     ref _levelPlayIOSAppKey);
+        }
+
+        private bool SaveLevelPlayMediationSettings()
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<ScriptableObject>(PathLevelPlayMediationSettings);
+            if (asset == null) return false;
+            var so = new SerializedObject(asset);
+            Set(so, "AndroidAppKey", _levelPlayAndroidAppKey);
+            Set(so, "IOSAppKey",     _levelPlayIOSAppKey);
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssets();
+            return true;
+        }
+
         private static void Assign(SerializedObject so, string propName, ref string target)
         {
             var p = so.FindProperty(propName);
@@ -332,9 +401,11 @@ namespace GameUpSDK.Editor
             if (!SaveFirebaseRemoteConfigUtils()) errors.Add(PathSDK + " (FirebaseRemoteConfigUtils)");
             if (!SaveIronSource()) errors.Add(PathIronSource);
             if (!SaveAdMob()) errors.Add(PathAdMob);
+            if (!SaveGoogleMobileAdsSettings()) errors.Add(PathGoogleMobileAdsSettings);
+            if (!SaveLevelPlayMediationSettings()) errors.Add(PathLevelPlayMediationSettings);
 
             if (errors.Count > 0)
-                _saveErrors = "Prefab not found at:\n" + string.Join("\n", errors);
+                _saveErrors = "Asset/Prefab not found at:\n" + string.Join("\n", errors);
             else
                 Debug.Log("[GameUpSDK] Configuration Saved!");
         }
