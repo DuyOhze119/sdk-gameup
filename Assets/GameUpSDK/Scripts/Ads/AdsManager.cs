@@ -24,10 +24,19 @@ namespace GameUpSDK
         private List<IAds> _ads = new List<IAds>();
         private bool _initialized;
 
+        // Tái dùng để tránh GC allocation mỗi lần log (FirebaseUtils._LogEvents tiêu thụ đồng bộ, không giữ reference)
+        private readonly Dictionary<object, object> _logParamCache = new Dictionary<object, object>(2);
+        private readonly Dictionary<string, string> _afParamCache = new Dictionary<string, string>(1);
+
         private void Awake()
         {
             BuildAdsList();
             Initialize();
+        }
+
+        private void OnDestroy()
+        {
+            AdsEvent.OnImpressionDataReady -= GameUpAnalytics.LogAdImpression;
         }
 
         private void Update()
@@ -37,13 +46,10 @@ namespace GameUpSDK
 
         private void BuildAdsList()
         {
-            _ads.Clear();
-            foreach (var mb in adsBehaviours)
-            {
-                if (mb is IAds iads)
-                    _ads.Add(iads);
-            }
-            _ads = _ads.OrderBy(a => a.OrderExecute).ToList();
+            _ads = adsBehaviours
+                .OfType<IAds>()
+                .OrderBy(a => a.OrderExecute)
+                .ToList();
         }
 
         /// <summary>
@@ -65,6 +71,7 @@ namespace GameUpSDK
                 return;
             }
 
+            AdsEvent.OnImpressionDataReady -= GameUpAnalytics.LogAdImpression;
             AdsEvent.OnImpressionDataReady += GameUpAnalytics.LogAdImpression;
 
             foreach (var ad in _ads)
@@ -138,7 +145,10 @@ namespace GameUpSDK
                 FirebaseUtils.LogEvent(eventName, null, null);
 
             if (!string.IsNullOrEmpty(appsFlyerEventName) && !string.IsNullOrEmpty(paramWhere))
-                AppsFlyerUtils.LogEvents(appsFlyerEventName, new Dictionary<string, string> { { AdsEvent.ParamAfLevel, paramWhere } });
+            {
+                _afParamCache[AdsEvent.ParamAfLevel] = paramWhere;
+                AppsFlyerUtils.LogEvents(appsFlyerEventName, _afParamCache);
+            }
         }
 
         /// <summary>
@@ -146,24 +156,21 @@ namespace GameUpSDK
         /// </summary>
         private void LogAdsEventWithLevel(string eventName, string where, int level, string appsFlyerEventName = null)
         {
-            var param = new Dictionary<object, object>
-            {
-                { AdsEvent.ParamWhere, where ?? "" },
-                { AdsEvent.ParamLevel, level.ToString() }
-            };
-            FirebaseUtils.LogEventsAPI(eventName, param);
+            _logParamCache[AdsEvent.ParamWhere] = where ?? "";
+            _logParamCache[AdsEvent.ParamLevel] = level.ToString();
+            FirebaseUtils.LogEventsAPI(eventName, _logParamCache);
             if (!string.IsNullOrEmpty(appsFlyerEventName))
-                AppsFlyerUtils.LogEvents(appsFlyerEventName, new Dictionary<string, string> { { AdsEvent.ParamAfLevel, level.ToString() } });
+            {
+                _afParamCache[AdsEvent.ParamAfLevel] = level.ToString();
+                AppsFlyerUtils.LogEvents(appsFlyerEventName, _afParamCache);
+            }
         }
 
         private void LogAdsEventManager(string eventName, string adType, string placement)
         {
-            var param = new Dictionary<object, object>
-            {
-                { AdsEvent.ParamAdType, adType },
-                { AdsEvent.ParamPlacement, placement ?? "" }
-            };
-            FirebaseUtils.LogEventsAPI(eventName, param);
+            _logParamCache[AdsEvent.ParamAdType] = adType;
+            _logParamCache[AdsEvent.ParamPlacement] = placement ?? "";
+            FirebaseUtils.LogEventsAPI(eventName, _logParamCache);
         }
 
         // ---- Show with waterfall ----
@@ -236,8 +243,7 @@ namespace GameUpSDK
                     LogAdsEventWithLevel(AdsEvent.InterShowComplete, where, currentLevel, AdsEvent.AfInterDisplayed);
                     onSuccess?.Invoke();
                 };
-                Action wrappedFail = () => onFail?.Invoke();
-                network.ShowInterstitial(where, wrappedSuccess, wrappedFail);
+                network.ShowInterstitial(where, wrappedSuccess, onFail);
             }
             catch (Exception e)
             {
@@ -271,6 +277,7 @@ namespace GameUpSDK
                 LogAdsEvent(AdsEvent.RewardShow, where, null, AdsEvent.AfRewardShow);
                 Action wrappedSuccess = () =>
                 {
+                    AdsRules.RecordInterstitialShown();
                     LogAdsEventWithLevel(AdsEvent.RewardShowComplete, where, currentLevel, AdsEvent.AfRewardDisplayed);
                     onSuccess?.Invoke();
                 };
@@ -322,6 +329,14 @@ namespace GameUpSDK
                 LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeAppOpen, where);
                 onFail?.Invoke();
             }
+        }
+
+        /// <summary>
+        /// Reset inter capping timer về 0, cho phép inter hiển thị ngay lập tức. Chỉ dùng khi test.
+        /// </summary>
+        public void ResetInterstitialCappingForTest()
+        {
+            AdsRules.ResetInterstitialCappingForTest();
         }
 
         /// <summary>
