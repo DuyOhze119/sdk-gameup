@@ -16,7 +16,9 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [],
+    "defineConstraints": [
+        "GAMEUP_SDK_DEPS_READY"
+    ],
     "versionDefines": [
         {
             "name": "Unity.LevelPlay",

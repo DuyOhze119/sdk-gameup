@@ -498,6 +498,55 @@ namespace GameUpSDK.Installer
             Repaint();
         }
 
+        // ─── Scripting Define Symbol management ──────────────────────────────────
+
+        internal const string DepsReadyDefine = "GAMEUP_SDK_DEPS_READY";
+
+        private static readonly BuildTargetGroup[] s_buildTargetGroups =
+        {
+            BuildTargetGroup.Android,
+            BuildTargetGroup.iOS,
+            BuildTargetGroup.Standalone,
+        };
+
+        /// <summary>
+        /// Thêm hoặc xóa define GAMEUP_SDK_DEPS_READY khỏi Player Settings.
+        /// Khi define này tồn tại, GameUpSDK.Runtime và GameUpSDK.Editor sẽ được compile.
+        /// </summary>
+        internal static void SetDepsReadyDefine(bool enabled)
+        {
+            foreach (var group in s_buildTargetGroups)
+            {
+                try
+                {
+                    string current = PlayerSettings.GetScriptingDefineSymbolsForGroup(group);
+                    var    list    = new List<string>(
+                        current.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
+
+                    bool changed = false;
+                    if (enabled && !list.Contains(DepsReadyDefine))
+                    {
+                        list.Add(DepsReadyDefine);
+                        changed = true;
+                    }
+                    else if (!enabled && list.Remove(DepsReadyDefine))
+                    {
+                        changed = true;
+                    }
+
+                    if (changed)
+                        PlayerSettings.SetScriptingDefineSymbolsForGroup(group, string.Join(";", list));
+                }
+                catch { /* group không tồn tại trong project này, bỏ qua */ }
+            }
+        }
+
+        internal static bool IsDepsReadyDefined()
+        {
+            string current = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Android);
+            return current.Contains(DepsReadyDefine);
+        }
+
         // ─── Status refresh ───────────────────────────────────────────────────────
 
         private void RefreshStatus()
@@ -508,6 +557,19 @@ namespace GameUpSDK.Installer
                 pkg.IsInstalling = false;
                 pkg.InstallError = null;
             }
+
+            // Tự động set/clear define khi trạng thái thay đổi
+            bool allRequired = AreAllRequiredPackagesInstalled();
+            if (allRequired && !IsDepsReadyDefined())
+            {
+                SetDepsReadyDefine(true);
+                Debug.Log("[GameUpSDK] Tất cả dependency đã sẵn sàng — đã thêm define GAMEUP_SDK_DEPS_READY.");
+            }
+            else if (!allRequired && IsDepsReadyDefined())
+            {
+                SetDepsReadyDefine(false);
+            }
+
             Repaint();
         }
 

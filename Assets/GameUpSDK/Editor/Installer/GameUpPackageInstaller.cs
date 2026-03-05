@@ -29,13 +29,20 @@ namespace GameUpSDK.Installer
 
         private static void OnEditorReady()
         {
-            bool setupDone = EditorPrefs.GetBool(GetSetupKey(), false);
+            bool allInstalled = GameUpDependenciesWindow.AreAllRequiredPackagesInstalled();
 
-            // Luôn kiểm tra lại thực tế — setup có thể bị xóa hoặc package bị gỡ
-            if (setupDone && GameUpDependenciesWindow.AreAllRequiredPackagesInstalled())
-                return;
+            // Nếu tất cả deps đã có nhưng define chưa được set (vd: mở project lần đầu sau khi cài deps thủ công)
+            if (allInstalled)
+            {
+                GameUpDependenciesWindow.SetDepsReadyDefine(true);
 
-            GameUpDependenciesWindow.ShowWindow();
+                bool setupDone = EditorPrefs.GetBool(GetSetupKey(), false);
+                if (setupDone) return;
+            }
+
+            // Mở window nếu còn thiếu deps HOẶC chưa hoàn tất setup lần đầu
+            if (!allInstalled || !EditorPrefs.GetBool(GetSetupKey(), false))
+                GameUpDependenciesWindow.ShowWindow();
         }
 
         /// <summary>
