@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
@@ -54,10 +55,26 @@ namespace GameUpSDK.Editor
             }
         }
 
-        private static string PathSDK        => PackageRoot + "/Prefab/SDK.prefab";
-        private static string PathAppsFlyer  => PackageRoot + "/Prefab/AppsFlyerObject.prefab";
-        private static string PathIronSource => PackageRoot + "/Prefab/IronSourceAds.prefab";
-        private static string PathAdMob      => PackageRoot + "/Prefab/AdmobAds.prefab";
+        /// <summary>Bản prefab có thể chỉnh sửa khi SDK cài qua UPM (Packages read-only).</summary>
+        private const string WritablePrefabsRoot = "Assets/SDK/Prefabs";
+
+        private static string GetPackagePrefabDirectory()
+        {
+            return (PackageRoot.Replace('\\', '/') + "/Prefab").Replace("//", "/");
+        }
+
+        /// <summary>Ưu tiên bản clone tại Assets/SDK/Prefabs nếu đã có; ngược lại dùng Prefab trong package / Assets.</summary>
+        private static string GetPrefabDirectory()
+        {
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(WritablePrefabsRoot + "/SDK.prefab") != null)
+                return WritablePrefabsRoot;
+            return GetPackagePrefabDirectory();
+        }
+
+        private static string PathSDK        => GetPrefabDirectory() + "/SDK.prefab";
+        private static string PathAppsFlyer  => GetPrefabDirectory() + "/AppsFlyerObject.prefab";
+        private static string PathIronSource => GetPrefabDirectory() + "/IronSourceAds.prefab";
+        private static string PathAdMob      => GetPrefabDirectory() + "/AdmobAds.prefab";
 
         private const string PathGoogleMobileAdsSettings   = "Assets/GoogleMobileAds/Resources/GoogleMobileAdsSettings.asset";
         private const string PathLevelPlayMediationSettings = "Assets/LevelPlay/Resources/LevelPlayMediationSettings.asset";
@@ -125,7 +142,14 @@ namespace GameUpSDK.Editor
 
         private void OnEnable()
         {
-            LoadFromPrefabs();
+            if (!RequiresPrefabCloneBeforeSetup())
+                LoadFromPrefabs();
+        }
+
+        /// <summary>True khi prefab SDK nằm trong Packages (read-only) và chưa có bản clone trong Assets/SDK/Prefabs.</summary>
+        private static bool RequiresPrefabCloneBeforeSetup()
+        {
+            return AssetDatabase.LoadAssetAtPath<GameObject>(WritablePrefabsRoot + "/SDK.prefab") == null;
         }
 
         private void OnGUI()
@@ -142,6 +166,29 @@ namespace GameUpSDK.Editor
                 EditorGUILayout.HelpBox(_saveErrors, MessageType.Error);
                 _saveErrors = null;
                 EditorGUILayout.Space(4);
+            }
+
+            if (RequiresPrefabCloneBeforeSetup())
+            {
+                EditorGUILayout.HelpBox(
+                    "SDK đang nằm trong Packages (read-only), không thể lưu cấu hình trực tiếp.\n\n" +
+                    "Nhấn nút bên dưới để sao chép toàn bộ prefab từ:\n" + GetPackagePrefabDirectory().Replace('\\', '/') + "\n" +
+                    "sang:\n" + WritablePrefabsRoot + "\n\n" +
+                    "Sau khi clone xong, cửa sổ sẽ hiển thị đầy đủ các tab cấu hình như trước.",
+                    MessageType.Warning);
+                EditorGUILayout.Space(8);
+                if (GUILayout.Button("Clone Prefab từ Package → Assets/SDK/Prefabs", GUILayout.Height(36)))
+                {
+                    if (TryClonePackagePrefabsToWritable(out var cloneErr))
+                    {
+                        LoadFromPrefabs();
+                        Debug.Log("[GameUpSDK] Đã clone prefab sang " + WritablePrefabsRoot + " — có thể chỉnh sửa và lưu.");
+                    }
+                    else if (!string.IsNullOrEmpty(cloneErr))
+                        _saveErrors = cloneErr;
+                }
+                EditorGUILayout.EndScrollView();
+                return;
             }
 
             _activeTab = GUILayout.Toolbar(_activeTab, _tabs);
@@ -274,7 +321,9 @@ namespace GameUpSDK.Editor
             if (!LoadAppsFlyer()) errors.Add("Prefab not found at: " + PathAppsFlyer);
             LoadAppsFlyerUtils();
             LoadFirebaseRemoteConfigUtils();
+            #if USE_LEVEL_PLAY_MEDIATION
             if (!LoadIronSource()) errors.Add("Prefab not found at: " + PathIronSource);
+            #endif
             if (!LoadAdMob()) errors.Add("Prefab not found at: " + PathAdMob);
             LoadGoogleMobileAdsSettings();
             LoadLevelPlayMediationSettings();
@@ -418,6 +467,131 @@ namespace GameUpSDK.Editor
             if (p != null) target = p.boolValue;
         }
 
+        private static string AssetPathToAbsolute(string assetPath)
+        {
+            if (string.IsNullOrEmpty(assetPath) || !assetPath.StartsWith("Assets/", StringComparison.Ordinal))
+                return null;
+            var relative = assetPath.Substring("Assets/".Length).Replace('/', Path.DirectorySeparatorChar);
+            return Path.Combine(Application.dataPath, relative);
+        }
+
+        private static void RewirePrefabYamlGuidReferences(string assetPath, Dictionary<string, string> guidMap)
+        {
+            if (guidMap == null || guidMap.Count == 0)
+                return;
+
+            var abs = AssetPathToAbsolute(assetPath);
+            if (string.IsNullOrEmpty(abs) || !File.Exists(abs))
+                return;
+
+            var text = File.ReadAllText(abs);
+            var changed = false;
+            foreach (var kv in guidMap)
+            {
+                if (string.IsNullOrEmpty(kv.Key) || string.IsNullOrEmpty(kv.Value) || kv.Key == kv.Value)
+                    continue;
+                var needle = "guid: " + kv.Key;
+                if (text.IndexOf(needle, StringComparison.Ordinal) < 0)
+                    continue;
+                text = text.Replace(needle, "guid: " + kv.Value);
+                changed = true;
+            }
+
+            if (!changed)
+                return;
+
+            File.WriteAllText(abs, text);
+            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+        }
+
+        /// <summary>Copy mọi prefab trong thư mục Prefab của package sang Assets/SDK/Prefabs và cập nhật guid tham chiếu.</summary>
+        private static bool TryClonePackagePrefabsToWritable(out string errorMessage)
+        {
+            errorMessage = null;
+            var srcDir = GetPackagePrefabDirectory().Replace('\\', '/').TrimEnd('/');
+
+            if (!AssetDatabase.IsValidFolder(srcDir))
+            {
+                errorMessage = "Không tìm thấy thư mục prefab: " + srcDir;
+                return false;
+            }
+
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(WritablePrefabsRoot + "/SDK.prefab") != null)
+                return true;
+
+            if (!AssetDatabase.IsValidFolder("Assets/SDK"))
+                AssetDatabase.CreateFolder("Assets", "SDK");
+            if (!AssetDatabase.IsValidFolder(WritablePrefabsRoot))
+                AssetDatabase.CreateFolder("Assets/SDK", "Prefabs");
+
+            var prefabGuids = AssetDatabase.FindAssets("t:Prefab", new[] { srcDir });
+            var guidMap = new Dictionary<string, string>();
+            var copiedDestPaths = new List<string>();
+            var srcPaths = new List<string>();
+
+            foreach (var g in prefabGuids)
+            {
+                var p = AssetDatabase.GUIDToAssetPath(g).Replace('\\', '/');
+                var prefix = srcDir.EndsWith("/", StringComparison.Ordinal) ? srcDir : srcDir + "/";
+                if (!p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && !string.Equals(p, srcDir, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                srcPaths.Add(p);
+            }
+
+            srcPaths.Sort(StringComparer.Ordinal);
+
+            foreach (var src in srcPaths)
+            {
+                var fileName = Path.GetFileName(src);
+                if (string.IsNullOrEmpty(fileName) || !fileName.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var dst = WritablePrefabsRoot + "/" + fileName;
+                if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(src) == null)
+                    continue;
+
+                var oldGuid = AssetDatabase.AssetPathToGUID(src);
+                if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(dst) != null)
+                {
+                    var existingGuid = AssetDatabase.AssetPathToGUID(dst);
+                    if (!string.IsNullOrEmpty(oldGuid) && !string.IsNullOrEmpty(existingGuid))
+                        guidMap[oldGuid] = existingGuid;
+                    copiedDestPaths.Add(dst);
+                    continue;
+                }
+
+                if (!AssetDatabase.CopyAsset(src, dst))
+                {
+                    Debug.LogWarning("[GameUpSDK] Không copy được: " + src + " → " + dst);
+                    continue;
+                }
+
+                var newGuid = AssetDatabase.AssetPathToGUID(dst);
+                if (!string.IsNullOrEmpty(oldGuid) && !string.IsNullOrEmpty(newGuid))
+                    guidMap[oldGuid] = newGuid;
+                copiedDestPaths.Add(dst);
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            foreach (var dstPath in copiedDestPaths)
+            {
+                if (dstPath.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+                    RewirePrefabYamlGuidReferences(dstPath, guidMap);
+            }
+
+            AssetDatabase.Refresh();
+
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(WritablePrefabsRoot + "/SDK.prefab") == null)
+            {
+                errorMessage = "Clone không tạo được SDK.prefab trong " + WritablePrefabsRoot + ". Xem Console.";
+                return false;
+            }
+
+            return true;
+        }
+
         private void SaveToPrefabs()
         {
             var errors = new System.Collections.Generic.List<string>();
@@ -483,14 +657,8 @@ namespace GameUpSDK.Editor
             if (prop == null) return false;
 
 #if USE_LEVEL_PLAY_MEDIATION
-            var list = new List<>();
+            var list = new List<IronSourceAds>();
             foreach (var c in go.GetComponentsInChildren<IronSourceAds>(true))
-            {
-                if (c.gameObject == go) continue;
-                list.Add(c);
-            }
-            
-            foreach (var c in go.GetComponentsInChildren<AdmobAds>(true))
             {
                 if (c.gameObject == go) continue;
                 list.Add(c);
