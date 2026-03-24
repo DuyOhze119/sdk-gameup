@@ -23,10 +23,13 @@ namespace GameUpSDK.Installer
         {
             /// <summary>Cài qua Unity Package Manager bằng Git URL</summary>
             GitUrl,
+
             /// <summary>Cài qua scoped registry trong manifest.json</summary>
             ScopedRegistry,
+
             /// <summary>Import .unitypackage đã được bundle trong thư mục Packages~</summary>
             UnityPackage,
+
             /// <summary>Chỉ mở trang web — cài thủ công</summary>
             OpenUrl,
         }
@@ -79,23 +82,82 @@ namespace GameUpSDK.Installer
         // Đặt file vào Assets/GameUpSDK/Packages~/ để dùng local (Git URL install).
         // Nếu không có file local, installer tự download từ HostedUrls (unitypackage install).
 
+#if USE_LEVEL_PLAY_MEDIATION
         private static readonly PackageDef[] s_packages =
         {
             new PackageDef
             {
-                DisplayName      = "IronSource LevelPlay SDK",
-                Description      = "Bắt buộc. Mediation chính: Banner, Interstitial, Rewarded.",
-                Required         = true,
-                AssemblyName     = "Unity.LevelPlay",
-                Method           = InstallMethod.UnityPackage,
+                DisplayName = "IronSource LevelPlay SDK",
+                Description = "Bắt buộc. Mediation chính: Banner, Interstitial, Rewarded.",
+                Required = true,
+                AssemblyName = "Unity.LevelPlay",
+                Method = InstallMethod.UnityPackage,
                 BundledFileNames = new[] { "UnityLevelPlay_v9.2.0.unitypackage" },
-                HostedUrls       = new[]
+                HostedUrls = new[]
                 {
                     "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/UnityLevelPlay_v9.2.0.unitypackage",
                 },
-                DownloadUrl      = "https://developers.is.com/ironsource-mobile/unity/unity-plugin/",
-                DownloadLabel    = "Tải IronSource SDK →",
+                DownloadUrl = "https://developers.is.com/ironsource-mobile/unity/unity-plugin/",
+                DownloadLabel = "Tải IronSource SDK →",
             },
+            new PackageDef
+            {
+                // Firebase gồm 3 file riêng trong subfolder Firebase/
+                // EDM4U (Google.VersionHandler) được bundle kèm trong FirebaseAnalytics
+                DisplayName = "Firebase SDK  (Analytics + Crashlytics + Remote Config)",
+                Description = "Bắt buộc. Analytics, crash reporting, remote configuration. Bao gồm EDM4U.",
+                Required = true,
+                AssemblyName = "Firebase.App",
+                Method = InstallMethod.UnityPackage,
+                BundledFileNames = new[]
+                {
+                    "Firebase/FirebaseAnalytics.unitypackage",
+                    "Firebase/FirebaseCrashlytics.unitypackage",
+                    "Firebase/FirebaseRemoteConfig.unitypackage",
+                },
+                HostedUrls = new[]
+                {
+                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/FirebaseAnalytics.unitypackage",
+                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/FirebaseCrashlytics.unitypackage",
+                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/FirebaseRemoteConfig.unitypackage",
+                },
+                DownloadUrl = "https://firebase.google.com/docs/unity/setup",
+                DownloadLabel = "Tải Firebase Unity SDK →",
+            },
+            new PackageDef
+            {
+                DisplayName = "Google Mobile Ads — AdMob",
+                Description = "Tùy chọn. Dùng cho App Open Ads (ngoài mediation IronSource).",
+                Required = false,
+                AssemblyName = "GoogleMobileAds",
+                Method = InstallMethod.UnityPackage,
+                BundledFileNames = new[] { "GoogleMobileAds-v10.7.0.unitypackage" },
+                HostedUrls = new[]
+                {
+                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/GoogleMobileAds-v10.7.0.unitypackage",
+                },
+                DownloadUrl = "https://github.com/googlesamples/unity-admob-sdk/releases",
+                DownloadLabel = "Tải AdMob Plugin →",
+            },
+            new PackageDef
+            {
+                DisplayName = "AppsFlyer Attribution SDK",
+                Description = "Tùy chọn. Mobile measurement & attribution.",
+                Required = false,
+                AssemblyName = "AppsFlyer",
+                Method = InstallMethod.UnityPackage,
+                BundledFileNames = new[] { "appsflyer-unity-plugin-6.17.81.unitypackage" },
+                HostedUrls = new[]
+                {
+                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/appsflyer-unity-plugin-6.17.81.unitypackage",
+                },
+                DownloadUrl = "https://github.com/AppsFlyerSDK/appsflyer-unity-plugin/releases",
+                DownloadLabel = "Tải AppsFlyer SDK →",
+            },
+        };
+#else
+        private static readonly PackageDef[] s_packages =
+        {
             new PackageDef
             {
                 // Firebase gồm 3 file riêng trong subfolder Firebase/
@@ -123,7 +185,7 @@ namespace GameUpSDK.Installer
             new PackageDef
             {
                 DisplayName      = "Google Mobile Ads — AdMob",
-                Description      = "Tùy chọn. Dùng cho App Open Ads (ngoài mediation IronSource).",
+                Description      = "Bắt buộc. Dùng Admob Mediation",
                 Required         = false,
                 AssemblyName     = "GoogleMobileAds",
                 Method           = InstallMethod.UnityPackage,
@@ -150,7 +212,30 @@ namespace GameUpSDK.Installer
                 DownloadUrl      = "https://github.com/AppsFlyerSDK/appsflyer-unity-plugin/releases",
                 DownloadLabel    = "Tải AppsFlyer SDK →",
             },
+            
+            new PackageDef
+            {
+                DisplayName      = "Admob Mediation Adapter (Unity + Ironsource)",
+                Description      = "Dùng khi sử dụng Admob Mediation",
+                Required         = true,
+                AssemblyName     = "GoogleMobileAds.Mediation.IronSource.Api",
+                Method           = InstallMethod.UnityPackage,
+                BundledFileNames = new[]
+                {
+                    "GoogleMobileAdsUnityAdsMediation.unitypackage",
+                    "GoogleMobileAdsIronSourceMediation.unitypackage",
+                },
+                HostedUrls       = new[]
+                {
+                    "https://github.com/haopro2911/repo-sdk-importer/releases/download/sdk/GoogleMobileAdsIronSourceMediation.unitypackage",
+                    "https://github.com/haopro2911/repo-sdk-importer/releases/download/sdk/GoogleMobileAdsUnityAdsMediation.unitypackage"
+                },
+                DownloadUrl      = "https://firebase.google.com/docs/unity/setup",
+                DownloadLabel    = "Admob Mediation Adapter →",
+            },
         };
+#endif
+
 
         // ─── State ────────────────────────────────────────────────────────────────
 
@@ -166,23 +251,24 @@ namespace GameUpSDK.Installer
         // ── Parallel download state ──
         private class DownloadTask
         {
-            public PackageDef      Pkg;
-            public string          FileName;
-            public string          TempPath;
+            public PackageDef Pkg;
+            public string FileName;
+            public string TempPath;
             public UnityWebRequest Request;
-            public bool            IsDone;
-            public bool            HasError;
-            public string          ErrorMessage;
+            public bool IsDone;
+            public bool HasError;
+            public string ErrorMessage;
         }
 
         private List<DownloadTask> _parallelTasks;
-        private Action             _parallelDoneCallback;
-        private float              _downloadProgress;
-        private string             _downloadStatus;
+        private Action _parallelDoneCallback;
+        private float _downloadProgress;
+        private string _downloadStatus;
 
         // Kept for backward compat with OnDisable / PollDownloadQueue references — sẽ không dùng nữa
-        private UnityWebRequest    _activeDownload;
-        private PackageDef         _downloadingPkg;
+        private UnityWebRequest _activeDownload;
+        private PackageDef _downloadingPkg;
+        private bool _useLevelPlayMediation;
 
         // ─── Static helpers ───────────────────────────────────────────────────────
 
@@ -212,6 +298,7 @@ namespace GameUpSDK.Installer
 
         private void OnEnable()
         {
+            _useLevelPlayMediation = HasDefine("USE_LEVEL_PLAY_MEDIATION");
             RefreshStatus();
         }
 
@@ -225,6 +312,7 @@ namespace GameUpSDK.Installer
                     t.Request?.Dispose();
                 _parallelTasks = null;
             }
+
             _activeDownload?.Dispose();
             _activeDownload = null;
         }
@@ -234,12 +322,50 @@ namespace GameUpSDK.Installer
         private void OnGUI()
         {
             DrawHeader();
+            DrawMediationCheckBox();
 
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
             DrawPackageList();
             EditorGUILayout.EndScrollView();
 
             DrawFooter();
+        }
+        
+        private static bool HasDefine(string define)
+        {
+            string symbols = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Android);
+            return symbols.Contains(define);
+        }
+        
+        private static void SetDefine(string define, bool enabled)
+        {
+            foreach (var group in s_buildTargetGroups)
+            {
+                try
+                {
+                    string current = PlayerSettings.GetScriptingDefineSymbolsForGroup(group);
+                    var list = new List<string>(
+                        current.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
+
+                    bool changed = false;
+
+                    if (enabled && !list.Contains(define))
+                    {
+                        list.Add(define);
+                        changed = true;
+                    }
+                    else if (!enabled && list.Remove(define))
+                    {
+                        changed = true;
+                    }
+
+                    if (changed)
+                    {
+                        PlayerSettings.SetScriptingDefineSymbolsForGroup(group, string.Join(";", list));
+                    }
+                }
+                catch { }
+            }
         }
 
         private void DrawHeader()
@@ -261,6 +387,36 @@ namespace GameUpSDK.Installer
             EditorGUILayout.Space(6);
         }
 
+        private void DrawMediationCheckBox()
+        {
+            EditorGUILayout.Space(6);
+
+            EditorGUILayout.BeginVertical("box");
+
+            EditorGUILayout.LabelField("Mediation Settings", EditorStyles.boldLabel);
+
+            bool newValue = EditorGUILayout.ToggleLeft(
+                "Use LevelPlay Mediation (IronSource)",
+                _useLevelPlayMediation
+            );
+
+            if (newValue != _useLevelPlayMediation)
+            {
+                _useLevelPlayMediation = newValue;
+
+                SetDefine(GUDefinetion.UseLevelPlayMediation, _useLevelPlayMediation);
+                RefreshStatus();
+            }
+
+            EditorGUILayout.HelpBox(
+                "Bật: dùng IronSource LevelPlay làm mediation chính.\n" +
+                "Tắt: dùng Admob Mediation flow.",
+                MessageType.Info
+            );
+
+            EditorGUILayout.EndVertical();
+        }
+
         private void DrawPackageList()
         {
             bool drewRequired = false, drewOptional = false;
@@ -273,6 +429,7 @@ namespace GameUpSDK.Installer
                     DrawSectionHeader("BẮT BUỘC");
                     drewRequired = true;
                 }
+
                 if (!pkg.Required && !drewOptional)
                 {
                     EditorGUILayout.Space(8);
@@ -289,7 +446,7 @@ namespace GameUpSDK.Installer
             var style = new GUIStyle(EditorStyles.miniLabel)
             {
                 fontStyle = FontStyle.Bold,
-                padding   = new RectOffset(4, 0, 6, 2),
+                padding = new RectOffset(4, 0, 6, 2),
             };
             EditorGUILayout.LabelField(title, style);
         }
@@ -297,12 +454,12 @@ namespace GameUpSDK.Installer
         private void DrawPackageRow(PackageDef pkg)
         {
             bool isDownloading = _parallelTasks?.Any(t => t.Pkg == pkg && !t.IsDone) == true;
-            bool isInstalling  = pkg.IsInstalling
-                || (_isBatchInstalling && _installQueue.Contains(pkg))
-                || isDownloading;
-            Color boxColor    = pkg.IsInstalled ? new Color(0.18f, 0.45f, 0.18f, 0.3f)
-                              : isInstalling    ? new Color(0.3f,  0.3f,  0.6f,  0.3f)
-                              :                   new Color(0.45f, 0.18f, 0.18f, 0.3f);
+            bool isInstalling = pkg.IsInstalling
+                                || (_isBatchInstalling && _installQueue.Contains(pkg))
+                                || isDownloading;
+            Color boxColor = pkg.IsInstalled ? new Color(0.18f, 0.45f, 0.18f, 0.3f)
+                : isInstalling ? new Color(0.3f, 0.3f, 0.6f, 0.3f)
+                : new Color(0.45f, 0.18f, 0.18f, 0.3f);
 
             // Row background
             var rect = EditorGUILayout.BeginVertical();
@@ -315,8 +472,8 @@ namespace GameUpSDK.Installer
             string icon = pkg.IsInstalled ? "✓" : isInstalling ? "⟳" : "✗";
             var iconStyle = new GUIStyle(EditorStyles.boldLabel)
             {
-                fontSize  = 14,
-                normal    = { textColor = pkg.IsInstalled ? Color.green : isInstalling ? Color.yellow : Color.red },
+                fontSize = 14,
+                normal = { textColor = pkg.IsInstalled ? Color.green : isInstalling ? Color.yellow : Color.red },
                 fixedWidth = 24,
             };
             GUILayout.Label(icon, iconStyle, GUILayout.Width(24));
@@ -344,9 +501,9 @@ namespace GameUpSDK.Installer
             else if (isDownloading)
             {
                 var pkgTasks = _parallelTasks?.Where(t => t.Pkg == pkg).ToList();
-                int total    = pkgTasks?.Count ?? 0;
-                int done     = pkgTasks?.Count(t => t.IsDone) ?? 0;
-                float prog   = total > 0
+                int total = pkgTasks?.Count ?? 0;
+                int done = pkgTasks?.Count(t => t.IsDone) ?? 0;
+                float prog = total > 0
                     ? pkgTasks.Average(t => t.IsDone ? 1f : t.Request?.downloadProgress ?? 0f)
                     : 0f;
 
@@ -380,8 +537,8 @@ namespace GameUpSDK.Installer
                         if (localPaths != null)
                         {
                             // Có file local trong Packages~
-                            int total  = pkg.BundledFileNames?.Length ?? 0;
-                            int found  = localPaths.Count;
+                            int total = pkg.BundledFileNames?.Length ?? 0;
+                            int found = localPaths.Count;
                             string lbl = total > 1
                                 ? $"⬇ Import ({found}/{total} files)"
                                 : "⬇ Import package";
@@ -400,6 +557,7 @@ namespace GameUpSDK.Installer
                             if (GUILayout.Button(pkg.DownloadLabel ?? "Tải về →", GUILayout.Width(160)))
                                 Application.OpenURL(pkg.DownloadUrl);
                         }
+
                         break;
                     }
 
@@ -530,9 +688,9 @@ namespace GameUpSDK.Installer
             // 3) Download + import song song các UnityPackage chưa có file local nhưng có HostedUrls
             var downloadPkgs = s_packages
                 .Where(p => !p.IsInstalled
-                    && p.Method == InstallMethod.UnityPackage
-                    && GetBundledPackagePaths(p.BundledFileNames) == null
-                    && p.HostedUrls?.Length > 0)
+                            && p.Method == InstallMethod.UnityPackage
+                            && GetBundledPackagePaths(p.BundledFileNames) == null
+                            && p.HostedUrls?.Length > 0)
                 .ToList();
 
             void FinishBatch()
@@ -583,7 +741,7 @@ namespace GameUpSDK.Installer
             if (_installQueue.Count == 0)
             {
                 _currentInstallingPackage = null;
-                _currentAddRequest        = null;
+                _currentAddRequest = null;
                 EditorApplication.update -= PollInstallQueue;
 
                 var cb = _onQueueDone;
@@ -594,6 +752,7 @@ namespace GameUpSDK.Installer
                     _isBatchInstalling = false;
                     RefreshStatus();
                 }
+
                 return;
             }
 
@@ -619,7 +778,7 @@ namespace GameUpSDK.Installer
 
                 if (_currentAddRequest.Status == StatusCode.Success)
                 {
-                    pkg.IsInstalled  = true;
+                    pkg.IsInstalled = true;
                     pkg.InstallError = null;
                 }
                 else
@@ -629,7 +788,7 @@ namespace GameUpSDK.Installer
             }
 
             _installQueue.Dequeue();
-            _currentAddRequest        = null;
+            _currentAddRequest = null;
             _currentInstallingPackage = null;
 
             ProcessNextInQueue();
@@ -679,8 +838,8 @@ namespace GameUpSDK.Installer
             // Thử tìm qua PackageInfo khi cài via UPM
             try
             {
-                Assembly asm         = Assembly.GetExecutingAssembly();
-                Type     pkgInfoType = Type.GetType("UnityEditor.PackageManager.PackageInfo, UnityEditor");
+                Assembly asm = Assembly.GetExecutingAssembly();
+                Type pkgInfoType = Type.GetType("UnityEditor.PackageManager.PackageInfo, UnityEditor");
                 if (pkgInfoType != null)
                 {
                     MethodInfo findMethod = pkgInfoType.GetMethod(
@@ -692,13 +851,15 @@ namespace GameUpSDK.Installer
                     if (info != null)
                     {
                         string resolved = pkgInfoType.GetProperty("resolvedPath")
-                                                      ?.GetValue(info) as string;
+                            ?.GetValue(info) as string;
                         if (!string.IsNullOrEmpty(resolved))
                             return Path.Combine(resolved, "Packages~");
                     }
                 }
             }
-            catch { }
+            catch
+            {
+            }
 
             // Fallback: cài via .unitypackage → scripts nằm ở Assets/GameUpSDK
             return Path.Combine(Application.dataPath, "GameUpSDK", "Packages~");
@@ -732,7 +893,7 @@ namespace GameUpSDK.Installer
             pkg.IsInstalling = false;
             if (errors.Count == 0)
             {
-                pkg.IsInstalled  = true;
+                pkg.IsInstalled = true;
                 pkg.InstallError = null;
             }
             else
@@ -764,7 +925,7 @@ namespace GameUpSDK.Installer
                 EditorApplication.update -= PollParallelDownloads;
             }
 
-            _parallelTasks        = new List<DownloadTask>();
+            _parallelTasks = new List<DownloadTask>();
             _parallelDoneCallback = onAllDone;
 
             foreach (var pkg in pkgs)
@@ -776,22 +937,22 @@ namespace GameUpSDK.Installer
 
                 for (int i = 0; i < pkg.HostedUrls.Length; i++)
                 {
-                    string url      = pkg.HostedUrls[i];
+                    string url = pkg.HostedUrls[i];
                     string fileName = pkg.BundledFileNames != null && i < pkg.BundledFileNames.Length
                         ? Path.GetFileName(pkg.BundledFileNames[i])
                         : $"{i}.unitypackage";
                     string tempPath = Path.Combine(Application.temporaryCachePath, fileName);
 
-                    var req                = new UnityWebRequest(url, UnityWebRequest.kHttpVerbGET);
-                    req.downloadHandler    = new DownloadHandlerFile(tempPath) { removeFileOnAbort = true };
+                    var req = new UnityWebRequest(url, UnityWebRequest.kHttpVerbGET);
+                    req.downloadHandler = new DownloadHandlerFile(tempPath) { removeFileOnAbort = true };
                     req.SendWebRequest();
 
                     _parallelTasks.Add(new DownloadTask
                     {
-                        Pkg      = pkg,
+                        Pkg = pkg,
                         FileName = fileName,
                         TempPath = tempPath,
-                        Request  = req,
+                        Request = req,
                     });
                 }
             }
@@ -815,15 +976,20 @@ namespace GameUpSDK.Installer
             foreach (var task in _parallelTasks)
             {
                 if (task.IsDone) continue;
-                if (!task.Request.isDone) { anyRunning = true; continue; }
+                if (!task.Request.isDone)
+                {
+                    anyRunning = true;
+                    continue;
+                }
 
                 // Request hoàn thành
                 task.IsDone = true;
                 if (task.Request.result != UnityWebRequest.Result.Success)
                 {
-                    task.HasError     = true;
+                    task.HasError = true;
                     task.ErrorMessage = task.Request.error;
                 }
+
                 task.Request.Dispose();
                 task.Request = null;
             }
@@ -832,8 +998,8 @@ namespace GameUpSDK.Installer
             float totalProgress = _parallelTasks.Sum(t =>
                 t.IsDone ? 1f : t.Request?.downloadProgress ?? 0f);
             _downloadProgress = totalProgress / _parallelTasks.Count;
-            int doneCount     = _parallelTasks.Count(t => t.IsDone);
-            _downloadStatus   = $"Đang tải: {doneCount}/{_parallelTasks.Count} files";
+            int doneCount = _parallelTasks.Count(t => t.IsDone);
+            _downloadStatus = $"Đang tải: {doneCount}/{_parallelTasks.Count} files";
             Repaint();
 
             if (anyRunning) return;
@@ -848,11 +1014,11 @@ namespace GameUpSDK.Installer
 
             foreach (var kv in byPkg)
             {
-                PackageDef         pkg      = kv.Key;
-                List<DownloadTask> tasks    = kv.Value;
+                PackageDef pkg = kv.Key;
+                List<DownloadTask> tasks = kv.Value;
                 var successPaths = tasks.Where(t => !t.HasError).Select(t => t.TempPath).ToList();
-                var errorMsgs    = tasks.Where(t => t.HasError)
-                                        .Select(t => $"{t.FileName}: {t.ErrorMessage}").ToList();
+                var errorMsgs = tasks.Where(t => t.HasError)
+                    .Select(t => $"{t.FileName}: {t.ErrorMessage}").ToList();
 
                 pkg.IsInstalling = false;
                 if (errorMsgs.Count > 0)
@@ -862,9 +1028,9 @@ namespace GameUpSDK.Installer
                     ImportUnityPackage(pkg, successPaths);
             }
 
-            _parallelTasks    = null;
+            _parallelTasks = null;
             _downloadProgress = 0;
-            _downloadStatus   = null;
+            _downloadStatus = null;
 
             var cb = _parallelDoneCallback;
             _parallelDoneCallback = null;
@@ -879,8 +1045,8 @@ namespace GameUpSDK.Installer
 
             try
             {
-                string json    = System.IO.File.ReadAllText(manifestPath);
-                var    manifest = SimpleJsonHelper.ParseObject(json);
+                string json = System.IO.File.ReadAllText(manifestPath);
+                var manifest = SimpleJsonHelper.ParseObject(json);
 
                 // Thêm scoped registry nếu chưa có
                 if (!string.IsNullOrEmpty(pkg.RegistryUrl))
@@ -896,8 +1062,8 @@ namespace GameUpSDK.Installer
                     {
                         registries.Add(new Dictionary<string, object>
                         {
-                            ["name"]   = pkg.RegistryName,
-                            ["url"]    = pkg.RegistryUrl,
+                            ["name"] = pkg.RegistryName,
+                            ["url"] = pkg.RegistryUrl,
                             ["scopes"] = pkg.RegistryScopes?.ToList<object>() ?? new List<object>(),
                         });
                     }
@@ -915,7 +1081,7 @@ namespace GameUpSDK.Installer
                 AssetDatabase.Refresh();
 
                 pkg.IsInstalling = false;
-                pkg.IsInstalled  = true;
+                pkg.IsInstalled = true;
             }
             catch (Exception ex)
             {
@@ -927,8 +1093,6 @@ namespace GameUpSDK.Installer
         }
 
         // ─── Scripting Define Symbol management ──────────────────────────────────
-
-        internal const string DepsReadyDefine = "GAMEUP_SDK_DEPS_READY";
 
         private static readonly BuildTargetGroup[] s_buildTargetGroups =
         {
@@ -948,16 +1112,16 @@ namespace GameUpSDK.Installer
                 try
                 {
                     string current = PlayerSettings.GetScriptingDefineSymbolsForGroup(group);
-                    var    list    = new List<string>(
+                    var list = new List<string>(
                         current.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
 
                     bool changed = false;
-                    if (enabled && !list.Contains(DepsReadyDefine))
+                    if (enabled && !list.Contains(GUDefinetion.DepsReadyDefine))
                     {
-                        list.Add(DepsReadyDefine);
+                        list.Add(GUDefinetion.DepsReadyDefine);
                         changed = true;
                     }
-                    else if (!enabled && list.Remove(DepsReadyDefine))
+                    else if (!enabled && list.Remove(GUDefinetion.DepsReadyDefine))
                     {
                         changed = true;
                     }
@@ -965,14 +1129,17 @@ namespace GameUpSDK.Installer
                     if (changed)
                         PlayerSettings.SetScriptingDefineSymbolsForGroup(group, string.Join(";", list));
                 }
-                catch { /* group không tồn tại trong project này, bỏ qua */ }
+                catch
+                {
+                    /* group không tồn tại trong project này, bỏ qua */
+                }
             }
         }
 
         internal static bool IsDepsReadyDefined()
         {
             string current = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Android);
-            return current.Contains(DepsReadyDefine);
+            return current.Contains(GUDefinetion.DepsReadyDefine);
         }
 
         // ─── Status refresh ───────────────────────────────────────────────────────
@@ -981,7 +1148,7 @@ namespace GameUpSDK.Installer
         {
             foreach (var pkg in s_packages)
             {
-                pkg.IsInstalled  = IsAssemblyLoaded(pkg.AssemblyName);
+                pkg.IsInstalled = IsAssemblyLoaded(pkg.AssemblyName);
                 pkg.IsInstalling = false;
                 pkg.InstallError = null;
             }
@@ -1007,7 +1174,7 @@ namespace GameUpSDK.Installer
                 return true;
             if (p.Method == InstallMethod.UnityPackage)
                 return GetBundledPackagePaths(p.BundledFileNames) != null
-                    || (p.HostedUrls?.Length > 0);
+                       || (p.HostedUrls?.Length > 0);
             return false;
         }
 
@@ -1019,6 +1186,7 @@ namespace GameUpSDK.Installer
                 if (string.Equals(asm.GetName().Name, assemblyName, StringComparison.OrdinalIgnoreCase))
                     return true;
             }
+
             return false;
         }
     }
@@ -1046,9 +1214,24 @@ namespace GameUpSDK.Installer
             if (c == '{') return ParseObject(s, ref i);
             if (c == '[') return ParseArray(s, ref i);
             if (c == '"') return ParseString(s, ref i);
-            if (c == 't') { i += 4; return true; }
-            if (c == 'f') { i += 5; return false; }
-            if (c == 'n') { i += 4; return null; }
+            if (c == 't')
+            {
+                i += 4;
+                return true;
+            }
+
+            if (c == 'f')
+            {
+                i += 5;
+                return false;
+            }
+
+            if (c == 'n')
+            {
+                i += 4;
+                return null;
+            }
+
             return ParseNumber(s, ref i);
         }
 
@@ -1057,7 +1240,11 @@ namespace GameUpSDK.Installer
             var dict = new Dictionary<string, object>();
             i++; // skip '{'
             SkipWhitespace(s, ref i);
-            if (i < s.Length && s[i] == '}') { i++; return dict; }
+            if (i < s.Length && s[i] == '}')
+            {
+                i++;
+                return dict;
+            }
 
             while (i < s.Length)
             {
@@ -1068,9 +1255,19 @@ namespace GameUpSDK.Installer
                 object val = ParseValue(s, ref i);
                 dict[key] = val;
                 SkipWhitespace(s, ref i);
-                if (i < s.Length && s[i] == ',') { i++; continue; }
-                if (i < s.Length && s[i] == '}') { i++; break; }
+                if (i < s.Length && s[i] == ',')
+                {
+                    i++;
+                    continue;
+                }
+
+                if (i < s.Length && s[i] == '}')
+                {
+                    i++;
+                    break;
+                }
             }
+
             return dict;
         }
 
@@ -1079,15 +1276,29 @@ namespace GameUpSDK.Installer
             var list = new List<object>();
             i++; // skip '['
             SkipWhitespace(s, ref i);
-            if (i < s.Length && s[i] == ']') { i++; return list; }
+            if (i < s.Length && s[i] == ']')
+            {
+                i++;
+                return list;
+            }
 
             while (i < s.Length)
             {
                 list.Add(ParseValue(s, ref i));
                 SkipWhitespace(s, ref i);
-                if (i < s.Length && s[i] == ',') { i++; continue; }
-                if (i < s.Length && s[i] == ']') { i++; break; }
+                if (i < s.Length && s[i] == ',')
+                {
+                    i++;
+                    continue;
+                }
+
+                if (i < s.Length && s[i] == ']')
+                {
+                    i++;
+                    break;
+                }
             }
+
             return list;
         }
 
@@ -1104,29 +1315,31 @@ namespace GameUpSDK.Installer
                     char esc = s[i++];
                     switch (esc)
                     {
-                        case '"':  sb.Append('"');  break;
+                        case '"': sb.Append('"'); break;
                         case '\\': sb.Append('\\'); break;
-                        case '/':  sb.Append('/');  break;
-                        case 'n':  sb.Append('\n'); break;
-                        case 'r':  sb.Append('\r'); break;
-                        case 't':  sb.Append('\t'); break;
-                        default:   sb.Append(esc);  break;
+                        case '/': sb.Append('/'); break;
+                        case 'n': sb.Append('\n'); break;
+                        case 'r': sb.Append('\r'); break;
+                        case 't': sb.Append('\t'); break;
+                        default: sb.Append(esc); break;
                     }
                 }
                 else sb.Append(c);
             }
+
             return sb.ToString();
         }
 
         private static object ParseNumber(string s, ref int i)
         {
             int start = i;
-            while (i < s.Length && (char.IsDigit(s[i]) || s[i] == '-' || s[i] == '.' || s[i] == 'e' || s[i] == 'E' || s[i] == '+'))
+            while (i < s.Length && (char.IsDigit(s[i]) || s[i] == '-' || s[i] == '.' || s[i] == 'e' || s[i] == 'E' ||
+                                    s[i] == '+'))
                 i++;
             string num = s.Substring(start, i - start);
             if (int.TryParse(num, out int iv)) return iv;
             if (double.TryParse(num, System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out double dv)) return dv;
+                    System.Globalization.CultureInfo.InvariantCulture, out double dv)) return dv;
             return num;
         }
 
@@ -1137,21 +1350,21 @@ namespace GameUpSDK.Installer
 
         public static string Serialize(object obj, int indent = 0)
         {
-            string pad  = new string(' ', indent * 2);
+            string pad = new string(' ', indent * 2);
             string pad1 = new string(' ', (indent + 1) * 2);
 
             switch (obj)
             {
-                case null:    return "null";
-                case bool b:  return b ? "true" : "false";
-                case int iv:  return iv.ToString();
+                case null: return "null";
+                case bool b: return b ? "true" : "false";
+                case int iv: return iv.ToString();
                 case long lv: return lv.ToString();
                 case double dv:
                     return dv.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 case string sv:
                     return "\"" + sv.Replace("\\", "\\\\").Replace("\"", "\\\"")
-                                    .Replace("\n", "\\n").Replace("\r", "\\r")
-                                    .Replace("\t", "\\t") + "\"";
+                        .Replace("\n", "\\n").Replace("\r", "\\r")
+                        .Replace("\t", "\\t") + "\"";
 
                 case Dictionary<string, object> dict:
                 {

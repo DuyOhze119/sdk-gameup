@@ -9,6 +9,13 @@
       },
       "hash": "53e1baac3cde90c46934f82ee1d61802d2bd6651"
     },
+    "com.gameup.core": {
+      "version": "https://github.com/ohze/gameup-unity-template.git?path=Assets/GameUpCore#duylv/plan",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "2a7ca0c87e4fb297e6fb504778004dcd12754900"
+    },
     "com.unity.2d.animation": {
       "version": "9.2.0",
       "depth": 1,

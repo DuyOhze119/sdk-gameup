@@ -12,8 +12,9 @@ namespace GameUpSDK
     /// </summary>
     public class AdmobAds : MonoBehaviour, IAds
     {
-        [Header("Ad Unit IDs (optional - set via code)")]
-        [SerializeField] private string bannerAdUnitId;
+        [Header("Ad Unit IDs (optional - set via code)")] [SerializeField]
+        private string bannerAdUnitId;
+
         [SerializeField] private string interstitialAdUnitId;
         [SerializeField] private string rewardedAdUnitId;
         [SerializeField] private string appOpenAdUnitId;
@@ -74,9 +75,11 @@ namespace GameUpSDK
 
         public void SetAfterCheckGDPR()
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE) && !USE_LEVEL_PLAY_MEDIATION
             // Consent is typically handled by UMP; SDK respects it after init.
             Debug.Log("[GameUp] AdmobAds SetAfterCheckGDPR called.");
+            GoogleMobileAds.Mediation.UnityAds.Api.UnityAds.SetConsentMetaData("gdpr.consent", true);
+            GoogleMobileAds.Mediation.IronSource.Api.IronSource.SetMetaData("do_not_sell", "true");
 #endif
         }
 
@@ -86,7 +89,12 @@ namespace GameUpSDK
             if (!_initialized || string.IsNullOrEmpty(bannerAdUnitId)) return;
             MainThreadDispatcher.Enqueue(() =>
             {
-                if (_bannerView != null) { _bannerView.Destroy(); _bannerView = null; }
+                if (_bannerView != null)
+                {
+                    _bannerView.Destroy();
+                    _bannerView = null;
+                }
+
                 // Dùng size chuẩn để có fill. Custom (full width x 150) dễ bị "request doesn't meet size requirements".
                 _bannerView = new BannerView(bannerAdUnitId, AdSize.Banner, AdPosition.Bottom);
                 var request = new AdRequest();
@@ -110,6 +118,7 @@ namespace GameUpSDK
                         OnInterstitialLoadFailed?.Invoke(source);
                         return;
                     }
+
                     if (_interstitialAd != null) _interstitialAd.Destroy();
                     _interstitialAd = ad;
                     RegisterInterstitialEvents(ad);
@@ -134,9 +143,28 @@ namespace GameUpSDK
                         OnRewardedLoadFailed?.Invoke(source);
                         return;
                     }
+
                     if (_rewardedAd != null) _rewardedAd.Destroy();
                     _rewardedAd = ad;
                     OnRewardedLoaded?.Invoke();
+                    ad.OnAdPaid += adValue =>
+                    {
+                        MainThreadDispatcher.Enqueue(() =>
+                        {
+                            if (adValue == null)
+                                return;
+                            double value = adValue.Value * 0.000001f;
+                            var data = new AdImpressionData
+                            {
+                                AdNetwork = "Admob",
+                                AdUnit = ad.GetAdUnitID(),
+                                InstanceName = ad.GetAdUnitID(),
+                                AdFormat = "Rewarded",
+                                Revenue = value
+                            };
+                            MainThreadDispatcher.Enqueue(() => AdsEvent.RaiseImpressionDataReady(data));
+                        });
+                    };
                 });
             });
 #endif
@@ -146,7 +174,12 @@ namespace GameUpSDK
         {
 #if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
             if (!_initialized || string.IsNullOrEmpty(appOpenAdUnitId)) return;
-            if (_appOpenAd != null) { _appOpenAd.Destroy(); _appOpenAd = null; }
+            if (_appOpenAd != null)
+            {
+                _appOpenAd.Destroy();
+                _appOpenAd = null;
+            }
+
             var request = new AdRequest();
             AppOpenAd.Load(appOpenAdUnitId, request, (ad, error) =>
             {
@@ -157,6 +190,7 @@ namespace GameUpSDK
                         Debug.Log("[GameUp] AdmobAds AppOpen load failed: " + (error?.GetMessage() ?? "null"));
                         return;
                     }
+
                     _appOpenAd = ad;
                     _appOpenExpireTime = DateTime.Now + TimeSpan.FromHours(AppOpenTimeoutHours);
                     RegisterAppOpenEvents(ad);
@@ -186,6 +220,25 @@ namespace GameUpSDK
                     RequestInterstitial();
                 });
             };
+
+            ad.OnAdPaid += adValue =>
+            {
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (adValue == null)
+                        return;
+                    double value = adValue.Value * 0.000001f;
+                    var data = new AdImpressionData
+                    {
+                        AdNetwork = "Admob",
+                        AdUnit = ad.GetAdUnitID(),
+                        InstanceName = ad.GetAdUnitID(),
+                        AdFormat = "Interstitial",
+                        Revenue = value
+                    };
+                    MainThreadDispatcher.Enqueue(() => AdsEvent.RaiseImpressionDataReady(data));
+                });
+            };
         }
 
         private void RegisterAppOpenEvents(AppOpenAd ad)
@@ -206,6 +259,25 @@ namespace GameUpSDK
                     _appOpenAd?.Destroy();
                     _appOpenAd = null;
                     RequestAppOpenAds();
+                });
+            };
+
+            ad.OnAdPaid += adValue =>
+            {
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (adValue == null)
+                        return;
+                    double value = adValue.Value * 0.000001f;
+                    var data = new AdImpressionData
+                    {
+                        AdNetwork = "Admob",
+                        AdUnit = ad.GetAdUnitID(),
+                        InstanceName = ad.GetAdUnitID(),
+                        AdFormat = "AppOpenAd",
+                        Revenue = value
+                    };
+                    MainThreadDispatcher.Enqueue(() => AdsEvent.RaiseImpressionDataReady(data));
                 });
             };
         }
@@ -261,10 +333,7 @@ namespace GameUpSDK
         public void HideBanner(string where)
         {
 #if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
-            MainThreadDispatcher.Enqueue(() =>
-            {
-                _bannerView?.Hide();
-            });
+            MainThreadDispatcher.Enqueue(() => { _bannerView?.Hide(); });
 #endif
         }
 
@@ -276,6 +345,7 @@ namespace GameUpSDK
                 onFail?.Invoke();
                 return;
             }
+
             var ad = _interstitialAd;
             _interstitialAd = null;
             ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() => onSuccess?.Invoke());
@@ -294,6 +364,7 @@ namespace GameUpSDK
                 onFail?.Invoke();
                 return;
             }
+
             var rewardGranted = false;
             var ad = _rewardedAd;
             _rewardedAd = null;
@@ -307,7 +378,11 @@ namespace GameUpSDK
             };
             ad.OnAdFullScreenContentFailed += _ =>
             {
-                MainThreadDispatcher.Enqueue(() => { onFail?.Invoke(); RequestRewardedVideo(); });
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    onFail?.Invoke();
+                    RequestRewardedVideo();
+                });
             };
             ad.Show(reward =>
             {
@@ -327,10 +402,19 @@ namespace GameUpSDK
                 onFail?.Invoke();
                 return;
             }
+
             var ad = _appOpenAd;
             _appOpenAd = null;
-            ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() => { onSuccess?.Invoke(); RequestAppOpenAds(); });
-            ad.OnAdFullScreenContentFailed += _ => MainThreadDispatcher.Enqueue(() => { onFail?.Invoke(); RequestAppOpenAds(); });
+            ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
+            {
+                onSuccess?.Invoke();
+                RequestAppOpenAds();
+            });
+            ad.OnAdFullScreenContentFailed += _ => MainThreadDispatcher.Enqueue(() =>
+            {
+                onFail?.Invoke();
+                RequestAppOpenAds();
+            });
             ad.Show();
 #else
             onFail?.Invoke();

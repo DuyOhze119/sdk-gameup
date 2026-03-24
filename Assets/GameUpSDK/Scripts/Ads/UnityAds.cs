@@ -1,6 +1,6 @@
 using System;
 using UnityEngine;
-#if GAMEUP_SDK_DEPS_READY
+#if GAMEUP_SDK_DEPS_READY && USE_LEVEL_PLAY_MEDIATION
 using Unity.Services.LevelPlay;
 #endif
 
@@ -35,7 +35,7 @@ namespace GameUpSDK
             rewardedVideoAdUnitId = rewardedId;
         }
 
-#if GAMEUP_SDK_DEPS_READY
+#if GAMEUP_SDK_DEPS_READY && USE_LEVEL_PLAY_MEDIATION
         private bool _initialized;
         private bool _bannerLoaded;
         private LevelPlayBannerAd _bannerAd;

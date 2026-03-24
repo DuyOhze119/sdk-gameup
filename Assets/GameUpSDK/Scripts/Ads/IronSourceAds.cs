@@ -1,6 +1,6 @@
 using System;
 using UnityEngine;
-#if GAMEUP_SDK_DEPS_READY
+#if GAMEUP_SDK_DEPS_READY && USE_LEVEL_PLAY_MEDIATION
 using Unity.Services.LevelPlay;
 #endif
 
@@ -12,6 +12,7 @@ namespace GameUpSDK
     /// Nếu không nhập Ad Unit ID, dùng placement mặc định (DefaultBanner, DefaultInterstitial, DefaultRewardedVideo).
     /// LevelPlay không hỗ trợ App Open; các method App Open no-op / return false.
     /// </summary>
+    
     public class IronSourceAds : MonoBehaviour, IAds, IBannerSizeConfig
     {
         [Header("LevelPlay App Key (bắt buộc - lấy từ LevelPlay dashboard)")]
@@ -42,7 +43,7 @@ namespace GameUpSDK
             rewardedVideoAdUnitId = rewardedId;
         }
 
-#if GAMEUP_SDK_DEPS_READY
+#if GAMEUP_SDK_DEPS_READY && USE_LEVEL_PLAY_MEDIATION
         private const string DefaultBannerId = "DefaultBanner";
         private const string DefaultInterstitialId = "DefaultInterstitial";
         private const string DefaultRewardedId = "DefaultRewardedVideo";
