@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
@@ -62,7 +63,12 @@ namespace GameUpSDK.Editor
         private const string PathLevelPlayMediationSettings = "Assets/LevelPlay/Resources/LevelPlayMediationSettings.asset";
 
         private int _activeTab;
+        #if USE_LEVEL_PLAY_MEDIATION
         private readonly string[] _tabs = { "AppsFlyer", "IronSource Mediation", "AdMob (App Open)", "Firebase RC" };
+        #endif
+        #if !USE_LEVEL_PLAY_MEDIATION
+        private readonly string[] _tabs = { "AppsFlyer", "AdMob (App Open)", "Firebase RC" };
+        #endif
 
         // AppsFlyer (AppsFlyerObjectScript on AppsFlyerObject.prefab: devKey, appID)
         private string _appsFlyerDevKey = "";
@@ -141,6 +147,7 @@ namespace GameUpSDK.Editor
             _activeTab = GUILayout.Toolbar(_activeTab, _tabs);
             EditorGUILayout.Space(8);
 
+            #if USE_LEVEL_PLAY_MEDIATION
             switch (_activeTab)
             {
                 case 0: DrawAppsFlyerSection(); break;
@@ -148,6 +155,16 @@ namespace GameUpSDK.Editor
                 case 2: DrawAdMobSection(); break;
                 case 3: DrawFirebaseRemoteConfigSection(); break;
             }
+            #endif
+
+            #if !USE_LEVEL_PLAY_MEDIATION
+            switch (_activeTab)
+            {
+                case 0: DrawAppsFlyerSection(); break;
+                case 1: DrawAdMobSection(); break;
+                case 2: DrawFirebaseRemoteConfigSection(); break;
+            }
+            #endif
 
             EditorGUILayout.Space(16);
             if (GUILayout.Button("Save Configuration", GUILayout.Height(32)))
@@ -222,7 +239,7 @@ namespace GameUpSDK.Editor
 
         private void DrawAdMobSection()
         {
-            EditorGUILayout.LabelField("AdMob (chỉ dùng cho App Open)", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("AdMob", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
                 "SDK mặc định chỉ dùng IronSource Mediation. Thêm AdmobAds vào adsBehaviours trong prefab SDK nếu cần App Open.\n" +
                 "Target: AdmobAds trên " + PathAdMob, MessageType.None);
@@ -310,6 +327,7 @@ namespace GameUpSDK.Editor
 
         private bool LoadIronSource()
         {
+            #if USE_LEVEL_PLAY_MEDIATION
             var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathIronSource);
             if (go == null) return false;
             var comp = go.GetComponent<GameUpSDK.IronSourceAds>();
@@ -320,6 +338,8 @@ namespace GameUpSDK.Editor
             Assign(so, "interstitialAdUnitId", ref _ironSourceInterstitialId);
             Assign(so, "rewardedVideoAdUnitId", ref _ironSourceRewardedId);
             return true;
+            #endif
+            return false;
         }
 
         private bool LoadAdMob()
@@ -404,7 +424,10 @@ namespace GameUpSDK.Editor
             if (!SaveAppsFlyer()) errors.Add(PathAppsFlyer);
             if (!SaveAppsFlyerUtils()) errors.Add(PathSDK + " (AppsFlyerUtils)");
             if (!SaveFirebaseRemoteConfigUtils()) errors.Add(PathSDK + " (FirebaseRemoteConfigUtils)");
+            if (!SaveAdsManager()) errors.Add(PathSDK + " (AdsManager)");
+            #if USE_LEVEL_PLAY_MEDIATION
             if (!SaveIronSource()) errors.Add(PathIronSource);
+            #endif
             if (!SaveAdMob()) errors.Add(PathAdMob);
             if (!SaveGoogleMobileAdsSettings()) errors.Add(PathGoogleMobileAdsSettings);
             if (!SaveLevelPlayMediationSettings()) errors.Add(PathLevelPlayMediationSettings);
@@ -443,6 +466,47 @@ namespace GameUpSDK.Editor
             Set(so, "appId", _appsFlyerUtilsAppId);
             var isDev = so.FindProperty("isDevMode");
             if (isDev != null) isDev.boolValue = _appsFlyerUtilsIsDevMode;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(comp);
+            PrefabUtility.SavePrefabAsset(go);
+            return true;
+        }
+
+        private bool SaveAdsManager()
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathSDK);
+            if (go == null) return false;
+            var comp = go.GetComponent<GameUpSDK.AdsManager>();
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            var prop = so.FindProperty("adsBehaviours");
+            if (prop == null) return false;
+
+#if USE_LEVEL_PLAY_MEDIATION
+            var list = new List<>();
+            foreach (var c in go.GetComponentsInChildren<IronSourceAds>(true))
+            {
+                if (c.gameObject == go) continue;
+                list.Add(c);
+            }
+            
+            foreach (var c in go.GetComponentsInChildren<AdmobAds>(true))
+            {
+                if (c.gameObject == go) continue;
+                list.Add(c);
+            }
+#else
+            var list = new List<AdmobAds>();
+            foreach (var c in go.GetComponentsInChildren<AdmobAds>(true))
+            {
+                if (c.gameObject == go) continue;
+                list.Add(c);
+            }
+#endif
+            prop.arraySize = list.Count;
+            for (int i = 0; i < list.Count; i++)
+                prop.GetArrayElementAtIndex(i).objectReferenceValue = list[i];
+
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(comp);
             PrefabUtility.SavePrefabAsset(go);

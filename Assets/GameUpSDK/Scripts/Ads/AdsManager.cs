@@ -41,7 +41,11 @@ namespace GameUpSDK
     /// </summary>
     public class AdsManager : MonoSingleton<AdsManager>
     {
-        [SerializeField] private List<MonoBehaviour> adsBehaviours = new List<MonoBehaviour>();
+#if USE_LEVEL_PLAY_MEDIATION
+        [SerializeField] private List<IronSourceAds> adsBehaviours = new List<IronSourceAds>();
+#else
+        [SerializeField] private List<AdmobAds> adsBehaviours = new List<AdmobAds>();
+#endif
 
         [Header("Banner sau Initialize")]
         [Tooltip("Chỉ có hiệu lực khi enable_banner (Remote Config) = true. enable_banner ưu tiên cao hơn.")]
@@ -61,8 +65,34 @@ namespace GameUpSDK
 
         private void Awake()
         {
+            CollectAdsFromChildren();
             BuildAdsList();
             Initialize();
+        }
+
+        /// <summary>
+        /// Gán adsBehaviours từ component trên object con (không gồm chính GameObject chứa AdsManager).
+        /// USE_LEVEL_PLAY_MEDIATION: IronSourceAds; ngược lại: AdmobAds.
+        /// </summary>
+        private void CollectAdsFromChildren()
+        {
+#if USE_LEVEL_PLAY_MEDIATION
+            adsBehaviours.Clear();
+            foreach (var a in GetComponentsInChildren<IronSourceAds>(true))
+            {
+                if (a.transform == transform)
+                    continue;
+                adsBehaviours.Add(a);
+            }
+#else
+            adsBehaviours.Clear();
+            foreach (var a in GetComponentsInChildren<AdmobAds>(true))
+            {
+                if (a.transform == transform)
+                    continue;
+                adsBehaviours.Add(a);
+            }
+#endif
         }
 
         private void OnDestroy()
@@ -78,7 +108,8 @@ namespace GameUpSDK
         private void BuildAdsList()
         {
             _ads = adsBehaviours
-                .OfType<IAds>()
+                .Where(a => a != null)
+                .Cast<IAds>()
                 .OrderBy(a => a.OrderExecute)
                 .ToList();
         }
