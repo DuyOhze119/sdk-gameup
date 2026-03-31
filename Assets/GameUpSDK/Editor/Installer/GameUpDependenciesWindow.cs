@@ -185,6 +185,7 @@ namespace GameUpSDK.Installer
 
         /// <summary>Package sẽ cài trong lần batch hiện tại (null = toàn bộ s_packages — chỉ dùng nội bộ).</summary>
         private List<PackageDef> _batchScope;
+        private bool _wasCompiling;
 
         // Queue PackageManager (GitUrl / ScopedRegistry)
         private readonly Queue<PackageDef> _installQueue = new Queue<PackageDef>();
@@ -245,6 +246,7 @@ namespace GameUpSDK.Installer
         private void OnEnable()
         {
             RefreshStatus();
+            _wasCompiling = EditorApplication.isCompiling;
             EditorApplication.update += EditorUpdateRepaintWhenBusy;
         }
 
@@ -267,7 +269,15 @@ namespace GameUpSDK.Installer
         /// <summary>Làm mới UI khi đang compile hoặc đang cài để nút bật/tắt đúng lúc compile xong.</summary>
         private void EditorUpdateRepaintWhenBusy()
         {
-            if (EditorApplication.isCompiling || IsInstallOrDownloadBusy())
+            bool compiling = EditorApplication.isCompiling;
+
+            // Compile vừa kết thúc → assemblies đã reload, refresh trạng thái package một lần.
+            if (_wasCompiling && !compiling)
+                RefreshStatus();
+
+            _wasCompiling = compiling;
+
+            if (compiling || IsInstallOrDownloadBusy())
                 Repaint();
         }
 
