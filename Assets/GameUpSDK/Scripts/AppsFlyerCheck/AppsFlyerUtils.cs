@@ -1,6 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
-#if GAMEUP_SDK_DEPS_READY
+#if APPSFLYER_DEPENDENCIES_INSTALLED
 using AppsFlyerSDK;
 #endif
 
@@ -8,7 +8,7 @@ namespace GameUpSDK
 {
     public class AppsFlyerUtils : MonoSingleton<AppsFlyerUtils>
     {
-#if GAMEUP_SDK_DEPS_READY
+#if APPSFLYER_DEPENDENCIES_INSTALLED
         [SerializeField] private string sdkKey;
         [SerializeField] private string appId;
         [SerializeField] private bool isDevMode = false;
@@ -39,7 +39,7 @@ namespace GameUpSDK
         [SerializeField] private string appId;
         [SerializeField] private bool isDevMode = false;
 
-        public static void LogAdRevenue(string monetizationNetwork, string mediationNetwork,
+        public static void LogAdRevenue(string monetizationNetwork, int mediationNetwork,
             double eventRevenue, string revenueCurrency, Dictionary<string, string> additionalParameters = null) { }
 
         public static void LogEvents(string eventName, Dictionary<string, string> eventValues = null) { }

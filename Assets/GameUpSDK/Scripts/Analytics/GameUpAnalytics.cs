@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
-#if GAMEUP_SDK_DEPS_READY
+#if FIREBASE_DEPENDENCIES_INSTALLED
 using Firebase.Analytics;
+#endif
+#if APPSFLYER_DEPENDENCIES_INSTALLED
 using AppsFlyerSDK;
 #endif
 
@@ -13,7 +15,6 @@ namespace GameUpSDK
     /// </summary>
     public static class GameUpAnalytics
     {
-#if GAMEUP_SDK_DEPS_READY
         private static void LogFirebase(string eventName, string paramName = null, string paramValue = null)
         {
             if (string.IsNullOrEmpty(eventName)) return;
@@ -173,6 +174,7 @@ namespace GameUpSDK
             if (!string.IsNullOrEmpty(registrationMethod)) p[AnalyticsEvent.ParamAfRegistrationMethod] = registrationMethod;
             if (!string.IsNullOrEmpty(customerUserId)) p[AnalyticsEvent.ParamAfCustomerUserId] = customerUserId;
             LogAppsFlyer(AnalyticsEvent.AfPurchase, p);
+            LogFirebaseParams(AnalyticsEvent.AfPurchase, p);
         }
 
         /// <summary> af_tutorial_completion </summary>
@@ -193,6 +195,7 @@ namespace GameUpSDK
 
         // ---------- Firebase: Ad Revenue Measurement (ARM) ----------
 
+#if APPSFLYER_DEPENDENCIES_INSTALLED
         private static MediationNetwork GetMediationNetworkFromAdNetwork(string adNetwork)
         {
             if (string.IsNullOrEmpty(adNetwork)) return MediationNetwork.Custom;
@@ -211,6 +214,7 @@ namespace GameUpSDK
             if (n.Contains("ironsource")) return MediationNetwork.IronSource;
             return MediationNetwork.Custom;
         }
+#endif
 
         /// <summary>
         /// Logs ad_impression to Firebase for Ad Revenue Measurement (ARM).
@@ -223,41 +227,23 @@ namespace GameUpSDK
             double revenue = data.Revenue.Value;
             string adNetwork = data.AdNetwork ?? "unknown";
 
+#if FIREBASE_DEPENDENCIES_INSTALLED
             var parameters = new Parameter[]
             {
-                new Parameter(FirebaseAnalytics.ParameterAdPlatform, "ironSource"),
+                new Parameter(FirebaseAnalytics.ParameterAdPlatform, "mediation"),
                 new Parameter(FirebaseAnalytics.ParameterAdSource, adNetwork),
                 new Parameter(FirebaseAnalytics.ParameterAdUnitName, data.AdUnit ?? ""),
                 new Parameter(FirebaseAnalytics.ParameterAdFormat, data.InstanceName ?? data.AdFormat ?? ""),
                 new Parameter(FirebaseAnalytics.ParameterCurrency, "USD"),
                 new Parameter(FirebaseAnalytics.ParameterValue, revenue)
             };
-
             FirebaseUtils.LogEvent(FirebaseAnalytics.EventAdImpression, parameters);
+#endif
+
+#if APPSFLYER_DEPENDENCIES_INSTALLED
             AppsFlyerUtils.LogAdRevenue(adNetwork, GetMediationNetworkFromAdNetwork(adNetwork), revenue, "USD");
+#endif
             Debug.Log($"[GameUpAnalytics] Logged Ad Revenue: {revenue} USD, network: {adNetwork}");
         }
-#else
-        public static void LogFirebaseParams(string eventName, Dictionary<string, string> param) { }
-        public static void LogStartLevel1() { }
-        public static void LogCompleteLevel1() { }
-        public static void LogEarnVirtualCurrency(string virtualCurrencyName, string value, string source) { }
-        public static void LogSpendVirtualCurrency(string virtualCurrencyName, string value, string source) { }
-        public static void LogStartLoading() { }
-        public static void LogCompleteLoading() { }
-        public static void LogLevelStart(int level, int index) { }
-        public static void LogLevelFail(int level, int index, float timeSeconds) { }
-        public static void LogLevelComplete(int level, int index, float timeSeconds, int? score = null) { }
-        public static void LogButtonClick(string source) { }
-        public static void LogWaveStart(int level, int wave) { }
-        public static void LogWaveFail(int level, int wave) { }
-        public static void LogWaveComplete(int level, int wave) { }
-        public static void LogCompleteRegistration(string registrationMethod) { }
-        public static void LogPurchase(string currencyCode, int quantity, string contentId, string purchasePrice, string orderId,
-            string registrationMethod = null, string customerUserId = null) { }
-        public static void LogTutorialCompletion(bool success, string tutorialId = null) { }
-        public static void LogAchievementUnlocked(string contentId, int? level = null) { }
-        public static void LogAdImpression(AdImpressionData data) { }
-#endif
     }
 }

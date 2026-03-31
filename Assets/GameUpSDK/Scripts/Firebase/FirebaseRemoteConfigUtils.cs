@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
-#if GAMEUP_SDK_DEPS_READY
+#if FIREBASE_DEPENDENCIES_INSTALLED
 using Firebase;
 using Firebase.Extensions;
 using Firebase.RemoteConfig;
@@ -76,7 +76,7 @@ namespace GameUpSDK
             };
         }
 
-#if GAMEUP_SDK_DEPS_READY
+#if FIREBASE_DEPENDENCIES_INSTALLED
         private FirebaseRemoteConfig _remoteConfig;
 
         private void Start()

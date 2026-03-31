@@ -41,11 +41,15 @@ namespace GameUpSDK
     /// </summary>
     public class AdsManager : MonoSingleton<AdsManager>
     {
-#if USE_LEVEL_PLAY_MEDIATION
-        [SerializeField] private List<IronSourceAds> adsBehaviours = new List<IronSourceAds>();
-#else
-        [SerializeField] private List<AdmobAds> adsBehaviours = new List<AdmobAds>();
-#endif
+        public enum PrimaryMediation
+        {
+            LevelPlay,
+            AdMob
+        }
+
+        [Header("Ad behaviours (auto collected from children on Awake)")]
+        [SerializeField] private List<IronSourceAds> levelPlayAdsBehaviours = new List<IronSourceAds>();
+        [SerializeField] private List<AdmobAds> admobAdsBehaviours = new List<AdmobAds>();
 
         [Header("Banner sau Initialize")]
         [Tooltip("Chỉ có hiệu lực khi enable_banner (Remote Config) = true. enable_banner ưu tiên cao hơn.")]
@@ -71,28 +75,26 @@ namespace GameUpSDK
         }
 
         /// <summary>
-        /// Gán adsBehaviours từ component trên object con (không gồm chính GameObject chứa AdsManager).
-        /// USE_LEVEL_PLAY_MEDIATION: IronSourceAds; ngược lại: AdmobAds.
+        /// Auto collect ad behaviours từ object con (không gồm chính GameObject chứa AdsManager).
+        /// Giúp chuyển đổi mediation dễ dàng chỉ bằng việc đổi primaryMediation.
         /// </summary>
         private void CollectAdsFromChildren()
         {
-#if USE_LEVEL_PLAY_MEDIATION
-            adsBehaviours.Clear();
+            levelPlayAdsBehaviours.Clear();
             foreach (var a in GetComponentsInChildren<IronSourceAds>(true))
             {
                 if (a.transform == transform)
                     continue;
-                adsBehaviours.Add(a);
+                levelPlayAdsBehaviours.Add(a);
             }
-#else
-            adsBehaviours.Clear();
+
+            admobAdsBehaviours.Clear();
             foreach (var a in GetComponentsInChildren<AdmobAds>(true))
             {
                 if (a.transform == transform)
                     continue;
-                adsBehaviours.Add(a);
+                admobAdsBehaviours.Add(a);
             }
-#endif
         }
 
         private void OnDestroy()
@@ -107,9 +109,20 @@ namespace GameUpSDK
 
         private void BuildAdsList()
         {
-            _ads = adsBehaviours
-                .Where(a => a != null)
-                .Cast<IAds>()
+            // Mediation chính do Scripting Define Symbols (GameUp SDK/Setup Dependencies) — ổn khi SDK cài dạng package.
+#if GAMEUP_PRIMARY_MEDIATION_ADMOB
+            IEnumerable<IAds> preferred = admobAdsBehaviours.Where(a => a != null).Cast<IAds>();
+            IEnumerable<IAds> fallback = levelPlayAdsBehaviours.Where(a => a != null).Cast<IAds>();
+#else
+            IEnumerable<IAds> preferred = levelPlayAdsBehaviours.Where(a => a != null).Cast<IAds>();
+            IEnumerable<IAds> fallback = admobAdsBehaviours.Where(a => a != null).Cast<IAds>();
+#endif
+
+            var list = preferred.ToList();
+            if (list.Count == 0)
+                list = fallback.ToList();
+
+            _ads = list
                 .OrderBy(a => a.OrderExecute)
                 .ToList();
         }

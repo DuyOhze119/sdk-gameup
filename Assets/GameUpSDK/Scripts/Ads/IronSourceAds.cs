@@ -1,6 +1,6 @@
 using System;
 using UnityEngine;
-#if GAMEUP_SDK_DEPS_READY && USE_LEVEL_PLAY_MEDIATION
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
 using Unity.Services.LevelPlay;
 #endif
 
@@ -43,7 +43,7 @@ namespace GameUpSDK
             rewardedVideoAdUnitId = rewardedId;
         }
 
-#if GAMEUP_SDK_DEPS_READY && USE_LEVEL_PLAY_MEDIATION
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
         private const string DefaultBannerId = "DefaultBanner";
         private const string DefaultInterstitialId = "DefaultInterstitial";
         private const string DefaultRewardedId = "DefaultRewardedVideo";

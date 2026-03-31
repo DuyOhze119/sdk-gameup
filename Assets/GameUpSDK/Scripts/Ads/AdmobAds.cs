@@ -1,6 +1,6 @@
 using System;
 using UnityEngine;
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
 using GoogleMobileAds.Api;
 using GoogleMobileAds.Common;
 #endif
@@ -12,7 +12,8 @@ namespace GameUpSDK
     /// </summary>
     public class AdmobAds : MonoBehaviour, IAds
     {
-        [Header("Ad Unit IDs (optional - set via code)")] [SerializeField]
+        [Header("Ad Unit IDs (optional - set via code)")]
+        [SerializeField]
         private string bannerAdUnitId;
 
         [SerializeField] private string interstitialAdUnitId;
@@ -28,7 +29,7 @@ namespace GameUpSDK
 
         private bool _initialized;
 
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
         private BannerView _bannerView;
         private InterstitialAd _interstitialAd;
         private RewardedAd _rewardedAd;
@@ -47,7 +48,7 @@ namespace GameUpSDK
 
         public void Initialize()
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (_initialized)
             {
                 Debug.Log("[GameUp] AdmobAds already initialized.");
@@ -75,7 +76,7 @@ namespace GameUpSDK
 
         public void SetAfterCheckGDPR()
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE) && !USE_LEVEL_PLAY_MEDIATION
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             // Consent is typically handled by UMP; SDK respects it after init.
             Debug.Log("[GameUp] AdmobAds SetAfterCheckGDPR called.");
             GoogleMobileAds.Mediation.UnityAds.Api.UnityAds.SetConsentMetaData("gdpr.consent", true);
@@ -85,7 +86,7 @@ namespace GameUpSDK
 
         public void RequestBanner()
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (!_initialized || string.IsNullOrEmpty(bannerAdUnitId)) return;
             MainThreadDispatcher.Enqueue(() =>
             {
@@ -97,6 +98,24 @@ namespace GameUpSDK
 
                 // Dùng size chuẩn để có fill. Custom (full width x 150) dễ bị "request doesn't meet size requirements".
                 _bannerView = new BannerView(bannerAdUnitId, AdSize.Banner, AdPosition.Bottom);
+                _bannerView.OnAdPaid += adValue =>
+                {
+                    MainThreadDispatcher.Enqueue(() =>
+                    {
+                        if (adValue == null)
+                            return;
+                        double value = adValue.Value * 0.000001f;
+                        var data = new AdImpressionData
+                        {
+                            AdNetwork = "Admob",
+                            AdUnit = bannerAdUnitId,
+                            InstanceName = bannerAdUnitId,
+                            AdFormat = "Banner",
+                            Revenue = value
+                        };
+                        AdsEvent.RaiseImpressionDataReady(data);
+                    });
+                };
                 var request = new AdRequest();
                 _bannerView.LoadAd(request);
             });
@@ -105,7 +124,7 @@ namespace GameUpSDK
 
         public void RequestInterstitial()
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (!_initialized || string.IsNullOrEmpty(interstitialAdUnitId)) return;
             var request = new AdRequest();
             InterstitialAd.Load(interstitialAdUnitId, request, (ad, error) =>
@@ -130,7 +149,7 @@ namespace GameUpSDK
 
         public void RequestRewardedVideo()
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (!_initialized || string.IsNullOrEmpty(rewardedAdUnitId)) return;
             var request = new AdRequest();
             RewardedAd.Load(rewardedAdUnitId, request, (ad, error) =>
@@ -172,7 +191,7 @@ namespace GameUpSDK
 
         public void RequestAppOpenAds()
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (!_initialized || string.IsNullOrEmpty(appOpenAdUnitId)) return;
             if (_appOpenAd != null)
             {
@@ -199,7 +218,7 @@ namespace GameUpSDK
 #endif
         }
 
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
         private void RegisterInterstitialEvents(InterstitialAd ad)
         {
             ad.OnAdFullScreenContentClosed += () =>
@@ -285,7 +304,7 @@ namespace GameUpSDK
 
         public bool IsBannerAvailable()
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             return _bannerView != null;
 #else
             return false;
@@ -294,7 +313,7 @@ namespace GameUpSDK
 
         public bool IsInterstitialAvailable()
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             return _interstitialAd != null && _interstitialAd.CanShowAd();
 #else
             return false;
@@ -303,7 +322,7 @@ namespace GameUpSDK
 
         public bool IsRewardedVideoAvailable()
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             return _rewardedAd != null && _rewardedAd.CanShowAd();
 #else
             return false;
@@ -312,7 +331,7 @@ namespace GameUpSDK
 
         public bool IsAppOpenAdsAvailable()
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             return _appOpenAd != null && _appOpenAd.CanShowAd() && DateTime.Now < _appOpenExpireTime;
 #else
             return false;
@@ -321,7 +340,7 @@ namespace GameUpSDK
 
         public void ShowBanner(string where)
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             MainThreadDispatcher.Enqueue(() =>
             {
                 if (_bannerView != null)
@@ -332,14 +351,14 @@ namespace GameUpSDK
 
         public void HideBanner(string where)
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             MainThreadDispatcher.Enqueue(() => { _bannerView?.Hide(); });
 #endif
         }
 
         public void ShowInterstitial(string where, Action onSuccess, Action onFail)
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (_interstitialAd == null || !_interstitialAd.CanShowAd())
             {
                 onFail?.Invoke();
@@ -358,7 +377,7 @@ namespace GameUpSDK
 
         public void ShowRewardedVideo(string where, Action onSuccess, Action onFail)
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (_rewardedAd == null || !_rewardedAd.CanShowAd())
             {
                 onFail?.Invoke();
@@ -396,7 +415,7 @@ namespace GameUpSDK
 
         public void ShowAppOpenAds(string where, Action onSuccess, Action onFail)
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (_appOpenAd == null || !_appOpenAd.CanShowAd() || DateTime.Now >= _appOpenExpireTime)
             {
                 onFail?.Invoke();
@@ -423,7 +442,7 @@ namespace GameUpSDK
 
         private void OnDestroy()
         {
-#if GAMEUP_SDK_DEPS_READY && (UNITY_ANDROID || UNITY_IPHONE)
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             _bannerView?.Destroy();
             _interstitialAd?.Destroy();
             _rewardedAd?.Destroy();

@@ -80,12 +80,17 @@ namespace GameUpSDK.Editor
         private const string PathLevelPlayMediationSettings = "Assets/LevelPlay/Resources/LevelPlayMediationSettings.asset";
 
         private int _activeTab;
-        #if USE_LEVEL_PLAY_MEDIATION
-        private readonly string[] _tabs = { "AppsFlyer", "IronSource Mediation", "AdMob (App Open)", "Firebase RC" };
-        #endif
-        #if !USE_LEVEL_PLAY_MEDIATION
-        private readonly string[] _tabs = { "AppsFlyer", "AdMob (App Open)", "Firebase RC" };
-        #endif
+        private string[] _tabs;
+        private Dictionary<int, Action> _tabDrawers;
+        private GameUpSDK.AdsManager.PrimaryMediation _lastPrimaryMediation;
+
+        private enum SetupTab
+        {
+            AppsFlyer,
+            IronSourceMediation,
+            AdMobAppOpen,
+            FirebaseRemoteConfig,
+        }
 
         // AppsFlyer (AppsFlyerObjectScript on AppsFlyerObject.prefab: devKey, appID)
         private string _appsFlyerDevKey = "";
@@ -144,6 +149,9 @@ namespace GameUpSDK.Editor
         {
             if (!RequiresPrefabCloneBeforeSetup())
                 LoadFromPrefabs();
+
+            _lastPrimaryMediation = GetPrimaryMediationFromDefines();
+            BuildTabsForPrimaryMediation(_lastPrimaryMediation, keepActiveTab: false);
         }
 
         /// <summary>True khi prefab SDK nằm trong Packages (read-only) và chưa có bản clone trong Assets/SDK/Prefabs.</summary>
@@ -191,27 +199,26 @@ namespace GameUpSDK.Editor
                 return;
             }
 
+            // Nếu user đổi Primary Mediation ở Dependencies window, setup window tự cập nhật tab cho đúng.
+            var pm = GetPrimaryMediationFromDefines();
+            if (pm != _lastPrimaryMediation)
+            {
+                _lastPrimaryMediation = pm;
+                BuildTabsForPrimaryMediation(pm, keepActiveTab: true);
+            }
+
+            if (_tabs == null || _tabs.Length == 0 || _tabDrawers == null || _tabDrawers.Count == 0)
+            {
+                BuildTabsForPrimaryMediation(pm, keepActiveTab: false);
+            }
+
             _activeTab = GUILayout.Toolbar(_activeTab, _tabs);
             EditorGUILayout.Space(8);
 
-            #if USE_LEVEL_PLAY_MEDIATION
-            switch (_activeTab)
-            {
-                case 0: DrawAppsFlyerSection(); break;
-                case 1: DrawIronSourceSection(); break;
-                case 2: DrawAdMobSection(); break;
-                case 3: DrawFirebaseRemoteConfigSection(); break;
-            }
-            #endif
-
-            #if !USE_LEVEL_PLAY_MEDIATION
-            switch (_activeTab)
-            {
-                case 0: DrawAppsFlyerSection(); break;
-                case 1: DrawAdMobSection(); break;
-                case 2: DrawFirebaseRemoteConfigSection(); break;
-            }
-            #endif
+            if (_activeTab < 0) _activeTab = 0;
+            if (_activeTab >= _tabs.Length) _activeTab = _tabs.Length - 1;
+            if (_tabDrawers.TryGetValue(_activeTab, out var draw))
+                draw?.Invoke();
 
             EditorGUILayout.Space(16);
             if (GUILayout.Button("Save Configuration", GUILayout.Height(32)))
@@ -227,6 +234,94 @@ namespace GameUpSDK.Editor
             }
 
             EditorGUILayout.EndScrollView();
+        }
+
+        private static GameUpSDK.AdsManager.PrimaryMediation GetPrimaryMediationFromDefines()
+        {
+            // Default LevelPlay nếu chưa set gì.
+            try
+            {
+                string symbols = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Android);
+                if (!string.IsNullOrEmpty(symbols) && symbols.Contains(GameUpSDK.GUDefinetion.PrimaryMediationAdMob))
+                    return GameUpSDK.AdsManager.PrimaryMediation.AdMob;
+            }
+            catch
+            {
+                // ignore
+            }
+
+            return GameUpSDK.AdsManager.PrimaryMediation.LevelPlay;
+        }
+
+        private void BuildTabsForPrimaryMediation(GameUpSDK.AdsManager.PrimaryMediation pm, bool keepActiveTab)
+        {
+            // Preserve current visible tab by name when possible
+            string previousTabName = (_tabs != null && _activeTab >= 0 && _activeTab < _tabs.Length)
+                ? _tabs[_activeTab]
+                : null;
+
+            var tabs = new List<SetupTab>
+            {
+                SetupTab.AppsFlyer,
+            };
+
+            if (pm == GameUpSDK.AdsManager.PrimaryMediation.LevelPlay)
+            {
+                tabs.Add(SetupTab.IronSourceMediation);
+                tabs.Add(SetupTab.AdMobAppOpen);
+            }
+            else
+            {
+                tabs.Add(SetupTab.AdMobAppOpen);
+            }
+
+            tabs.Add(SetupTab.FirebaseRemoteConfig);
+
+            _tabs = tabs.ConvertAll(GetTabLabel).ToArray();
+            _tabDrawers = new Dictionary<int, Action>(_tabs.Length);
+            for (int i = 0; i < tabs.Count; i++)
+            {
+                var t = tabs[i];
+                _tabDrawers[i] = () =>
+                {
+                    switch (t)
+                    {
+                        case SetupTab.AppsFlyer: DrawAppsFlyerSection(); break;
+                        case SetupTab.IronSourceMediation: DrawIronSourceSection(); break;
+                        case SetupTab.AdMobAppOpen: DrawAdMobSection(); break;
+                        case SetupTab.FirebaseRemoteConfig: DrawFirebaseRemoteConfigSection(); break;
+                    }
+                };
+            }
+
+            if (keepActiveTab && !string.IsNullOrEmpty(previousTabName))
+            {
+                int idx = Array.IndexOf(_tabs, previousTabName);
+                _activeTab = idx >= 0 ? idx : GetDefaultTabIndexFor(pm);
+            }
+            else
+            {
+                _activeTab = GetDefaultTabIndexFor(pm);
+            }
+        }
+
+        private static int GetDefaultTabIndexFor(GameUpSDK.AdsManager.PrimaryMediation pm)
+        {
+            // Mở tab ads theo PrimaryMediation để user cấu hình nhanh nhất.
+            // LevelPlay -> IronSource; AdMob -> AdMob.
+            return pm == GameUpSDK.AdsManager.PrimaryMediation.LevelPlay ? 1 : 1;
+        }
+
+        private static string GetTabLabel(SetupTab tab)
+        {
+            switch (tab)
+            {
+                case SetupTab.AppsFlyer: return "AppsFlyer";
+                case SetupTab.IronSourceMediation: return "IronSource Mediation";
+                case SetupTab.AdMobAppOpen: return "AdMob (App Open)";
+                case SetupTab.FirebaseRemoteConfig: return "Firebase RC";
+                default: return tab.ToString();
+            }
         }
 
         private void CreateSDKInCurrentScene()

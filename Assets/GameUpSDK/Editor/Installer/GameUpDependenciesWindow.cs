@@ -82,31 +82,13 @@ namespace GameUpSDK.Installer
         // Đặt file vào Assets/GameUpSDK/Packages~/ để dùng local (Git URL install).
         // Nếu không có file local, installer tự download từ HostedUrls (unitypackage install).
 
-#if USE_LEVEL_PLAY_MEDIATION
         private static readonly PackageDef[] s_packages =
         {
             new PackageDef
             {
-                DisplayName = "IronSource LevelPlay SDK",
-                Description = "Bắt buộc. Mediation chính: Banner, Interstitial, Rewarded.",
-                Required = true,
-                AssemblyName = "Unity.LevelPlay",
-                Method = InstallMethod.UnityPackage,
-                BundledFileNames = new[] { "UnityLevelPlay_v9.2.0.unitypackage" },
-                HostedUrls = new[]
-                {
-                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/UnityLevelPlay_v9.2.0.unitypackage",
-                },
-                DownloadUrl = "https://developers.is.com/ironsource-mobile/unity/unity-plugin/",
-                DownloadLabel = "Tải IronSource SDK →",
-            },
-            new PackageDef
-            {
-                // Firebase gồm 3 file riêng trong subfolder Firebase/
-                // EDM4U (Google.VersionHandler) được bundle kèm trong FirebaseAnalytics
                 DisplayName = "Firebase SDK  (Analytics + Crashlytics + Remote Config)",
                 Description = "Bắt buộc. Analytics, crash reporting, remote configuration. Bao gồm EDM4U.",
-                Required = true,
+                Required = false,
                 AssemblyName = "Firebase.App",
                 Method = InstallMethod.UnityPackage,
                 BundledFileNames = new[]
@@ -127,7 +109,7 @@ namespace GameUpSDK.Installer
             new PackageDef
             {
                 DisplayName = "Google Mobile Ads — AdMob",
-                Description = "Tùy chọn. Dùng cho App Open Ads (ngoài mediation IronSource).",
+                Description = "Bắt buộc nếu dùng AdMob standalone (Interstitial/Rewarded/AppOpen) hoặc muốn bắt paid event để log ad_impression.",
                 Required = false,
                 AssemblyName = "GoogleMobileAds",
                 Method = InstallMethod.UnityPackage,
@@ -141,64 +123,23 @@ namespace GameUpSDK.Installer
             },
             new PackageDef
             {
-                DisplayName = "AppsFlyer Attribution SDK",
-                Description = "Tùy chọn. Mobile measurement & attribution.",
+                DisplayName = "IronSource LevelPlay SDK",
+                Description = "Tùy chọn. Cần nếu bạn chọn Primary Mediation = LevelPlay trong AdsManager.",
                 Required = false,
-                AssemblyName = "AppsFlyer",
+                AssemblyName = "Unity.LevelPlay",
                 Method = InstallMethod.UnityPackage,
-                BundledFileNames = new[] { "appsflyer-unity-plugin-6.17.81.unitypackage" },
+                BundledFileNames = new[] { "UnityLevelPlay_v9.2.0.unitypackage" },
                 HostedUrls = new[]
                 {
-                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/appsflyer-unity-plugin-6.17.81.unitypackage",
+                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/UnityLevelPlay_v9.2.0.unitypackage",
                 },
-                DownloadUrl = "https://github.com/AppsFlyerSDK/appsflyer-unity-plugin/releases",
-                DownloadLabel = "Tải AppsFlyer SDK →",
+                DownloadUrl = "https://developers.is.com/ironsource-mobile/unity/unity-plugin/",
+                DownloadLabel = "Tải IronSource SDK →",
             },
-        };
-#else
-        private static readonly PackageDef[] s_packages =
-        {
             new PackageDef
             {
                 // Firebase gồm 3 file riêng trong subfolder Firebase/
                 // EDM4U (Google.VersionHandler) được bundle kèm trong FirebaseAnalytics
-                DisplayName      = "Firebase SDK  (Analytics + Crashlytics + Remote Config)",
-                Description      = "Bắt buộc. Analytics, crash reporting, remote configuration. Bao gồm EDM4U.",
-                Required         = true,
-                AssemblyName     = "Firebase.App",
-                Method           = InstallMethod.UnityPackage,
-                BundledFileNames = new[]
-                {
-                    "Firebase/FirebaseAnalytics.unitypackage",
-                    "Firebase/FirebaseCrashlytics.unitypackage",
-                    "Firebase/FirebaseRemoteConfig.unitypackage",
-                },
-                HostedUrls       = new[]
-                {
-                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/FirebaseAnalytics.unitypackage",
-                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/FirebaseCrashlytics.unitypackage",
-                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/FirebaseRemoteConfig.unitypackage",
-                },
-                DownloadUrl      = "https://firebase.google.com/docs/unity/setup",
-                DownloadLabel    = "Tải Firebase Unity SDK →",
-            },
-            new PackageDef
-            {
-                DisplayName      = "Google Mobile Ads — AdMob",
-                Description      = "Bắt buộc. Dùng Admob Mediation",
-                Required         = false,
-                AssemblyName     = "GoogleMobileAds",
-                Method           = InstallMethod.UnityPackage,
-                BundledFileNames = new[] { "GoogleMobileAds-v10.7.0.unitypackage" },
-                HostedUrls       = new[]
-                {
-                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/GoogleMobileAds-v10.7.0.unitypackage",
-                },
-                DownloadUrl      = "https://github.com/googlesamples/unity-admob-sdk/releases",
-                DownloadLabel    = "Tải AdMob Plugin →",
-            },
-            new PackageDef
-            {
                 DisplayName      = "AppsFlyer Attribution SDK",
                 Description      = "Tùy chọn. Mobile measurement & attribution.",
                 Required         = false,
@@ -212,12 +153,12 @@ namespace GameUpSDK.Installer
                 DownloadUrl      = "https://github.com/AppsFlyerSDK/appsflyer-unity-plugin/releases",
                 DownloadLabel    = "Tải AppsFlyer SDK →",
             },
-            
+
             new PackageDef
             {
                 DisplayName      = "Admob Mediation Adapter (Unity + Ironsource)",
                 Description      = "Dùng khi sử dụng Admob Mediation",
-                Required         = true,
+                Required         = false,
                 AssemblyName     = "GoogleMobileAds.Mediation.IronSource.Api",
                 Method           = InstallMethod.UnityPackage,
                 BundledFileNames = new[]
@@ -227,14 +168,13 @@ namespace GameUpSDK.Installer
                 },
                 HostedUrls       = new[]
                 {
+                    "https://github.com/haopro2911/repo-sdk-importer/releases/download/sdk/GoogleMobileAdsUnityAdsMediation.unitypackage",
                     "https://github.com/haopro2911/repo-sdk-importer/releases/download/sdk/GoogleMobileAdsIronSourceMediation.unitypackage",
-                    "https://github.com/haopro2911/repo-sdk-importer/releases/download/sdk/GoogleMobileAdsUnityAdsMediation.unitypackage"
                 },
                 DownloadUrl      = "https://firebase.google.com/docs/unity/setup",
                 DownloadLabel    = "Admob Mediation Adapter →",
             },
         };
-#endif
 
 
         // ─── State ────────────────────────────────────────────────────────────────
@@ -242,6 +182,9 @@ namespace GameUpSDK.Installer
         private Vector2 _scroll;
         private bool _isRefreshing;
         private bool _isBatchInstalling;
+
+        /// <summary>Package sẽ cài trong lần batch hiện tại (null = toàn bộ s_packages — chỉ dùng nội bộ).</summary>
+        private List<PackageDef> _batchScope;
 
         // Queue PackageManager (GitUrl / ScopedRegistry)
         private readonly Queue<PackageDef> _installQueue = new Queue<PackageDef>();
@@ -268,7 +211,10 @@ namespace GameUpSDK.Installer
         // Kept for backward compat with OnDisable / PollDownloadQueue references — sẽ không dùng nữa
         private UnityWebRequest _activeDownload;
         private PackageDef _downloadingPkg;
-        private bool _useLevelPlayMediation;
+        private const string LevelPlayDepsDefine = "LEVELPLAY_DEPENDENCIES_INSTALLED";
+        private const string AdMobDepsDefine = "ADMOB_DEPENDENCIES_INSTALLED";
+        private const string FirebaseDepsDefine = "FIREBASE_DEPENDENCIES_INSTALLED";
+        private const string AppsFlyerDepsDefine = "APPSFLYER_DEPENDENCIES_INSTALLED";
 
         // ─── Static helpers ───────────────────────────────────────────────────────
 
@@ -298,12 +244,13 @@ namespace GameUpSDK.Installer
 
         private void OnEnable()
         {
-            _useLevelPlayMediation = HasDefine("USE_LEVEL_PLAY_MEDIATION");
             RefreshStatus();
+            EditorApplication.update += EditorUpdateRepaintWhenBusy;
         }
 
         private void OnDisable()
         {
+            EditorApplication.update -= EditorUpdateRepaintWhenBusy;
             EditorApplication.update -= PollInstallQueue;
             EditorApplication.update -= PollParallelDownloads;
             if (_parallelTasks != null)
@@ -317,12 +264,47 @@ namespace GameUpSDK.Installer
             _activeDownload = null;
         }
 
+        /// <summary>Làm mới UI khi đang compile hoặc đang cài để nút bật/tắt đúng lúc compile xong.</summary>
+        private void EditorUpdateRepaintWhenBusy()
+        {
+            if (EditorApplication.isCompiling || IsInstallOrDownloadBusy())
+                Repaint();
+        }
+
+        private bool IsInstallOrDownloadBusy()
+        {
+            if (_isBatchInstalling) return true;
+            if (_installQueue.Count > 0) return true;
+            if (_currentAddRequest != null) return true;
+            if (_parallelTasks != null && _parallelTasks.Count > 0) return true;
+            foreach (var p in s_packages)
+            {
+                if (p.IsInstalling) return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>Khóa mọi thao tác: đang compile hoặc đang cài/tải package.</summary>
+        private bool IsInteractionLocked()
+        {
+            return EditorApplication.isCompiling || IsInstallOrDownloadBusy();
+        }
+
         // ─── GUI ─────────────────────────────────────────────────────────────────
 
         private void OnGUI()
         {
+            if (EditorApplication.isCompiling)
+            {
+                EditorGUILayout.HelpBox(
+                    "Unity đang compile — chờ xong rồi mới thao tác tiếp.",
+                    MessageType.Info);
+                EditorGUILayout.Space(4);
+            }
+
             DrawHeader();
-            DrawMediationCheckBox();
+            DrawMediationInfo();
 
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
             DrawPackageList();
@@ -330,13 +312,13 @@ namespace GameUpSDK.Installer
 
             DrawFooter();
         }
-        
+
         private static bool HasDefine(string define)
         {
             string symbols = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Android);
             return symbols.Contains(define);
         }
-        
+
         private static void SetDefine(string define, bool enabled)
         {
             foreach (var group in s_buildTargetGroups)
@@ -379,15 +361,14 @@ namespace GameUpSDK.Installer
             EditorGUILayout.Space(4);
 
             EditorGUILayout.HelpBox(
-                "Cài đặt các package phụ thuộc bên dưới để sử dụng GameUp SDK.\n" +
-                "• Package \"tự động\": thêm trực tiếp qua Unity Package Manager.\n" +
-                "• Package \"thủ công\": tải .unitypackage về rồi import vào project.",
+                "Chọn Primary Mediation, rồi dùng nút \"Cài dependency\" trong khung Mediation để cài một lần: Firebase, AppsFlyer và bộ quảng cáo tương ứng (đã có thì bỏ qua).\n" +
+                "Khi Unity đang compile hoặc đang cài package, các nút sẽ bị khóa cho tới khi xong.",
                 MessageType.Info);
 
             EditorGUILayout.Space(6);
         }
 
-        private void DrawMediationCheckBox()
+        private void DrawMediationInfo()
         {
             EditorGUILayout.Space(6);
 
@@ -395,26 +376,107 @@ namespace GameUpSDK.Installer
 
             EditorGUILayout.LabelField("Mediation Settings", EditorStyles.boldLabel);
 
-            bool newValue = EditorGUILayout.ToggleLeft(
-                "Use LevelPlay Mediation (IronSource)",
-                _useLevelPlayMediation
-            );
-
-            if (newValue != _useLevelPlayMediation)
+            EditorGUI.BeginDisabledGroup(IsInteractionLocked());
+            var current = GetPrimaryMediationFromDefines();
+            var next = (AdsManager.PrimaryMediation)EditorGUILayout.EnumPopup("Primary Mediation", current);
+            if (next != current)
             {
-                _useLevelPlayMediation = newValue;
-
-                SetDefine(GUDefinetion.UseLevelPlayMediation, _useLevelPlayMediation);
+                SetPrimaryMediationDefines(next);
                 RefreshStatus();
             }
 
+            EditorGUI.EndDisabledGroup();
+
+            var pm = GetPrimaryMediationFromDefines();
+            var planned = GetPackagesForSdkSetup(pm);
+            var missingAuto = planned.Where(p => !p.IsInstalled && CanAutoInstall(p)).ToList();
+            var missingManual = planned.Where(p => !p.IsInstalled && !CanAutoInstall(p)).ToList();
+
+            string planDesc = pm == AdsManager.PrimaryMediation.AdMob
+                ? "Firebase, AppsFlyer, Google Mobile Ads, AdMob Mediation Adapters."
+                : "Firebase, AppsFlyer, IronSource LevelPlay SDK.";
+
             EditorGUILayout.HelpBox(
-                "Bật: dùng IronSource LevelPlay làm mediation chính.\n" +
-                "Tắt: dùng Admob Mediation flow.",
+                "Một lần bấm sẽ cài (nếu chưa có): " + planDesc,
+                MessageType.None);
+
+            if (missingManual.Count > 0)
+            {
+                EditorGUILayout.HelpBox(
+                    "Có package trong bộ này không cài tự động được (thiếu file trong Packages~ và không có URL tải). Cần tải thủ công theo mô tả từng mục trong danh sách bên dưới.",
+                    MessageType.Warning);
+            }
+
+            EditorGUI.BeginDisabledGroup(IsInteractionLocked() || missingAuto.Count == 0);
+            if (GUILayout.Button(
+                    missingAuto.Count > 0
+                        ? $"⬇ Cài dependency theo Primary Mediation ({missingAuto.Count} chưa có)"
+                        : "✓ Đã đủ package (tự động) cho Primary Mediation",
+                    GUILayout.Height(28)))
+            {
+                if (missingAuto.Count > 0)
+                    StartBatchInstall(planned);
+            }
+
+            EditorGUI.EndDisabledGroup();
+
+            EditorGUILayout.HelpBox(
+                "Primary Mediation lưu bằng Scripting Define Symbols (`" + GUDefinetion.PrimaryMediationLevelPlay + "` / `" + GUDefinetion.PrimaryMediationAdMob + "`) — phù hợp khi GameUp SDK cài dạng UPM package (không tạo asset trong Assets/).",
                 MessageType.Info
             );
 
             EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>Firebase + AppsFlyer + bộ mediation theo lựa chọn (AdMob: GMA + adapters; LevelPlay: LevelPlay).</summary>
+        private static List<PackageDef> GetPackagesForSdkSetup(AdsManager.PrimaryMediation mediation)
+        {
+            var list = new List<PackageDef>();
+
+            void AddByAssembly(string assemblyName)
+            {
+                var p = s_packages.FirstOrDefault(x => x.AssemblyName == assemblyName);
+                if (p != null && !list.Contains(p))
+                    list.Add(p);
+            }
+
+            AddByAssembly("Firebase.App");
+            AddByAssembly("AppsFlyer");
+
+            if (mediation == AdsManager.PrimaryMediation.AdMob)
+            {
+                AddByAssembly("GoogleMobileAds");
+                AddByAssembly("GoogleMobileAds.Mediation.IronSource.Api");
+            }
+            else
+            {
+                AddByAssembly("Unity.LevelPlay");
+            }
+
+            return list;
+        }
+
+        private static AdsManager.PrimaryMediation GetPrimaryMediationFromDefines()
+        {
+            if (HasDefine(GUDefinetion.PrimaryMediationAdMob)) return AdsManager.PrimaryMediation.AdMob;
+            return AdsManager.PrimaryMediation.LevelPlay;
+        }
+
+        private static void SetPrimaryMediationDefines(AdsManager.PrimaryMediation mediation)
+        {
+            SetDefine(GUDefinetion.PrimaryMediationAdMob, mediation == AdsManager.PrimaryMediation.AdMob);
+            SetDefine(GUDefinetion.PrimaryMediationLevelPlay, mediation == AdsManager.PrimaryMediation.LevelPlay);
+        }
+
+        /// <summary>Đảm bảo có đúng một define mediation (mặc định LevelPlay nếu chưa có).</summary>
+        private static void EnsurePrimaryMediationDefines()
+        {
+            bool lp = HasDefine(GUDefinetion.PrimaryMediationLevelPlay);
+            bool admob = HasDefine(GUDefinetion.PrimaryMediationAdMob);
+            if (!lp && !admob)
+                SetDefine(GUDefinetion.PrimaryMediationLevelPlay, true);
+            else if (lp && admob)
+                SetDefine(GUDefinetion.PrimaryMediationAdMob, false);
         }
 
         private void DrawPackageList()
@@ -487,15 +549,12 @@ namespace GameUpSDK.Installer
                 EditorGUILayout.HelpBox(pkg.InstallError, MessageType.Error);
             EditorGUILayout.EndVertical();
 
-            // Action button
+            // Trạng thái (cài gom qua nút trong Mediation Settings)
             GUILayout.Space(4);
-            bool wasEnabled = GUI.enabled;
-            GUI.enabled = !isInstalling && !_isBatchInstalling;
-
             if (pkg.IsInstalled)
             {
                 var greenStyle = new GUIStyle(EditorStyles.miniLabel)
-                    { normal = { textColor = Color.green }, fontStyle = FontStyle.Bold };
+                { normal = { textColor = Color.green }, fontStyle = FontStyle.Bold };
                 GUILayout.Label("Đã cài", greenStyle, GUILayout.Width(64));
             }
             else if (isDownloading)
@@ -521,54 +580,13 @@ namespace GameUpSDK.Installer
             }
             else
             {
-                switch (pkg.Method)
+                var hint = new GUIStyle(EditorStyles.miniLabel)
                 {
-                    case InstallMethod.GitUrl:
-                    case InstallMethod.ScopedRegistry:
-                        if (GUILayout.Button("Cài tự động", GUILayout.Width(110)))
-                            StartInstall(pkg);
-                        break;
-
-                    case InstallMethod.UnityPackage:
-                    {
-                        var localPaths = GetBundledPackagePaths(pkg.BundledFileNames);
-                        bool hasHosted = pkg.HostedUrls != null && pkg.HostedUrls.Length > 0;
-
-                        if (localPaths != null)
-                        {
-                            // Có file local trong Packages~
-                            int total = pkg.BundledFileNames?.Length ?? 0;
-                            int found = localPaths.Count;
-                            string lbl = total > 1
-                                ? $"⬇ Import ({found}/{total} files)"
-                                : "⬇ Import package";
-                            if (GUILayout.Button(lbl, GUILayout.Width(160)))
-                                ImportUnityPackage(pkg, localPaths);
-                        }
-                        else if (hasHosted)
-                        {
-                            // Không có local → tự download từ hosted URL
-                            if (GUILayout.Button("⬇ Download & Import", GUILayout.Width(160)))
-                                StartDownloadAndImport(pkg);
-                        }
-                        else
-                        {
-                            // Không có gì cả → mở trang tải thủ công
-                            if (GUILayout.Button(pkg.DownloadLabel ?? "Tải về →", GUILayout.Width(160)))
-                                Application.OpenURL(pkg.DownloadUrl);
-                        }
-
-                        break;
-                    }
-
-                    case InstallMethod.OpenUrl:
-                        if (GUILayout.Button(pkg.DownloadLabel ?? "Tải thủ công →", GUILayout.Width(180)))
-                            Application.OpenURL(pkg.DownloadUrl);
-                        break;
-                }
+                    wordWrap = true,
+                    normal = { textColor = new Color(0.55f, 0.55f, 0.55f) },
+                };
+                GUILayout.Label("← nút Cài dependency", hint, GUILayout.Width(118));
             }
-
-            GUI.enabled = wasEnabled;
             GUILayout.Space(8);
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.Space(4);
@@ -582,23 +600,11 @@ namespace GameUpSDK.Installer
             EditorGUILayout.Space(8);
             EditorGUILayout.BeginHorizontal();
 
-            // Refresh button
-            bool wasEnabled = GUI.enabled;
-            GUI.enabled = !_isBatchInstalling;
-
+            EditorGUI.BeginDisabledGroup(IsInteractionLocked());
             if (GUILayout.Button("↻  Làm mới trạng thái", GUILayout.Height(30)))
                 RefreshStatus();
 
-            // Install All Auto button
-            bool hasAutoUninstalled = s_packages.Any(p => !p.IsInstalled && CanAutoInstall(p));
-
-            if (hasAutoUninstalled)
-            {
-                if (GUILayout.Button("⬇  Cài tất cả (tự động)", GUILayout.Height(30)))
-                    StartBatchInstall();
-            }
-
-            GUI.enabled = wasEnabled;
+            EditorGUI.EndDisabledGroup();
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(4);
@@ -608,11 +614,8 @@ namespace GameUpSDK.Installer
             if (hasManualUninstalled)
             {
                 EditorGUILayout.HelpBox(
-                    "Một số package cần cài thủ công:\n" +
-                    "1. Nhấn nút \"Tải thủ công →\" để mở trang tải.\n" +
-                    "2. Tải file .unitypackage về máy.\n" +
-                    "3. Double-click file hoặc vào Assets > Import Package > Custom Package...\n" +
-                    "4. Nhấn \"Làm mới trạng thái\" để kiểm tra lại.",
+                    "Một số package chỉ cài được thủ công: tải .unitypackage từ trang nhà cung cấp, " +
+                    "rồi Assets → Import Package → Custom Package…, sau đó \"Làm mới trạng thái\".",
                     MessageType.Warning);
             }
 
@@ -627,12 +630,15 @@ namespace GameUpSDK.Installer
                     "Nhấn bên dưới để mở cửa sổ cấu hình SDK.",
                     MessageType.None);
 
+                EditorGUI.BeginDisabledGroup(IsInteractionLocked());
                 if (GUILayout.Button("→  Mở cấu hình SDK (GameUp SDK Setup)", GUILayout.Height(36)))
                 {
                     GameUpPackageInstaller.MarkSetupComplete();
                     Close();
                     EditorApplication.ExecuteMenuItem("GameUp SDK/Setup");
                 }
+
+                EditorGUI.EndDisabledGroup();
             }
         }
 
@@ -657,13 +663,18 @@ namespace GameUpSDK.Installer
             }
         }
 
-        private void StartBatchInstall()
+        private void StartBatchInstall(IReadOnlyList<PackageDef> scope)
         {
+            _batchScope = scope != null && scope.Count > 0
+                ? scope.Distinct().ToList()
+                : s_packages.ToList();
             _isBatchInstalling = true;
             _installQueue.Clear();
 
+            IEnumerable<PackageDef> InScope() => _batchScope;
+
             // 1) Import các UnityPackage đã có file local (đồng bộ, nhanh)
-            foreach (var pkg in s_packages)
+            foreach (var pkg in InScope())
             {
                 if (pkg.IsInstalled) continue;
                 if (pkg.Method != InstallMethod.UnityPackage) continue;
@@ -676,7 +687,7 @@ namespace GameUpSDK.Installer
             }
 
             // 2) Cài GitUrl / ScopedRegistry (bất đồng bộ)
-            foreach (var pkg in s_packages)
+            foreach (var pkg in InScope())
             {
                 if (pkg.IsInstalled) continue;
                 if (pkg.Method != InstallMethod.GitUrl && pkg.Method != InstallMethod.ScopedRegistry) continue;
@@ -686,7 +697,7 @@ namespace GameUpSDK.Installer
             }
 
             // 3) Download + import song song các UnityPackage chưa có file local nhưng có HostedUrls
-            var downloadPkgs = s_packages
+            var downloadPkgs = InScope()
                 .Where(p => !p.IsInstalled
                             && p.Method == InstallMethod.UnityPackage
                             && GetBundledPackagePaths(p.BundledFileNames) == null
@@ -696,6 +707,7 @@ namespace GameUpSDK.Installer
             void FinishBatch()
             {
                 _isBatchInstalling = false;
+                _batchScope = null;
                 RefreshStatus();
             }
 
@@ -750,6 +762,7 @@ namespace GameUpSDK.Installer
                 else
                 {
                     _isBatchInstalling = false;
+                    _batchScope = null;
                     RefreshStatus();
                 }
 
@@ -1146,6 +1159,8 @@ namespace GameUpSDK.Installer
 
         private void RefreshStatus()
         {
+            EnsurePrimaryMediationDefines();
+
             foreach (var pkg in s_packages)
             {
                 pkg.IsInstalled = IsAssemblyLoaded(pkg.AssemblyName);
@@ -1153,17 +1168,45 @@ namespace GameUpSDK.Installer
                 pkg.InstallError = null;
             }
 
+            // Auto set/clear LevelPlay define theo trạng thái package
+            bool levelPlayInstalled = IsAssemblyLoaded("Unity.LevelPlay");
+            if (levelPlayInstalled && !HasDefine(LevelPlayDepsDefine))
+                SetDefine(LevelPlayDepsDefine, true);
+            else if (!levelPlayInstalled && HasDefine(LevelPlayDepsDefine))
+                SetDefine(LevelPlayDepsDefine, false);
+
+            // Auto set/clear AdMob define theo trạng thái package
+            bool admobInstalled = IsAssemblyLoaded("GoogleMobileAds");
+            if (admobInstalled && !HasDefine(AdMobDepsDefine))
+                SetDefine(AdMobDepsDefine, true);
+            else if (!admobInstalled && HasDefine(AdMobDepsDefine))
+                SetDefine(AdMobDepsDefine, false);
+
+            // Auto set/clear Firebase define theo trạng thái package
+            bool firebaseInstalled = IsAssemblyLoaded("Firebase.App");
+            if (firebaseInstalled && !HasDefine(FirebaseDepsDefine))
+                SetDefine(FirebaseDepsDefine, true);
+            else if (!firebaseInstalled && HasDefine(FirebaseDepsDefine))
+                SetDefine(FirebaseDepsDefine, false);
+
+            // Auto set/clear AppsFlyer define theo trạng thái package
+            bool appsFlyerInstalled = IsAssemblyLoaded("AppsFlyer");
+            if (appsFlyerInstalled && !HasDefine(AppsFlyerDepsDefine))
+                SetDefine(AppsFlyerDepsDefine, true);
+            else if (!appsFlyerInstalled && HasDefine(AppsFlyerDepsDefine))
+                SetDefine(AppsFlyerDepsDefine, false);
+
             // Tự động set/clear define khi trạng thái thay đổi
-            bool allRequired = AreAllRequiredPackagesInstalled();
-            if (allRequired && !IsDepsReadyDefined())
-            {
+            // GAMEUP_SDK_DEPS_READY chỉ còn ý nghĩa "SDK enabled" (backward compat).
+            // Bật khi có (Firebase hoặc AppsFlyer) AND (AdMob hoặc LevelPlay).
+            // Không dùng define này để include SDK bên thứ 3 nữa.
+            bool hasAnalytics = firebaseInstalled || appsFlyerInstalled;
+            bool hasMediation = admobInstalled || levelPlayInstalled;
+            bool sdkEnabled = hasAnalytics && hasMediation;
+            if (sdkEnabled && !IsDepsReadyDefined())
                 SetDepsReadyDefine(true);
-                Debug.Log("[GameUpSDK] Tất cả dependency đã sẵn sàng — đã thêm define GAMEUP_SDK_DEPS_READY.");
-            }
-            else if (!allRequired && IsDepsReadyDefined())
-            {
+            else if (!sdkEnabled && IsDepsReadyDefined())
                 SetDepsReadyDefine(false);
-            }
 
             Repaint();
         }
@@ -1367,19 +1410,19 @@ namespace GameUpSDK.Installer
                         .Replace("\t", "\\t") + "\"";
 
                 case Dictionary<string, object> dict:
-                {
-                    if (dict.Count == 0) return "{}";
-                    var lines = dict.Select(
-                        kv => pad1 + "\"" + kv.Key + "\": " + Serialize(kv.Value, indent + 1));
-                    return "{\n" + string.Join(",\n", lines) + "\n" + pad + "}";
-                }
+                    {
+                        if (dict.Count == 0) return "{}";
+                        var lines = dict.Select(
+                            kv => pad1 + "\"" + kv.Key + "\": " + Serialize(kv.Value, indent + 1));
+                        return "{\n" + string.Join(",\n", lines) + "\n" + pad + "}";
+                    }
 
                 case List<object> list:
-                {
-                    if (list.Count == 0) return "[]";
-                    var lines = list.Select(item => pad1 + Serialize(item, indent + 1));
-                    return "[\n" + string.Join(",\n", lines) + "\n" + pad + "]";
-                }
+                    {
+                        if (list.Count == 0) return "[]";
+                        var lines = list.Select(item => pad1 + Serialize(item, indent + 1));
+                        return "[\n" + string.Join(",\n", lines) + "\n" + pad + "]";
+                    }
 
                 default:
                     return "\"" + obj.ToString() + "\"";

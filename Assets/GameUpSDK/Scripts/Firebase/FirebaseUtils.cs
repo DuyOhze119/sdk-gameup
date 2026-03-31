@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 using System.Collections.Generic;
-#if GAMEUP_SDK_DEPS_READY
+#if FIREBASE_DEPENDENCIES_INSTALLED
 using Firebase;
 using Firebase.Analytics;
 using Firebase.Crashlytics;
@@ -17,7 +17,7 @@ namespace GameUpSDK
         /// <summary>True khi Firebase đã init xong (dùng để RemoteConfig init sau).</summary>
         public bool IsInitialized => _initialized;
 
-#if GAMEUP_SDK_DEPS_READY
+#if FIREBASE_DEPENDENCIES_INSTALLED
         private void Awake()
         {
             FirebaseInit();
