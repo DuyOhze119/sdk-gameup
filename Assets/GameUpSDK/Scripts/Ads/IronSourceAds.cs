@@ -12,7 +12,7 @@ namespace GameUpSDK
     /// Nếu không nhập Ad Unit ID, dùng placement mặc định (DefaultBanner, DefaultInterstitial, DefaultRewardedVideo).
     /// LevelPlay không hỗ trợ App Open; các method App Open no-op / return false.
     /// </summary>
-    
+
     public class IronSourceAds : MonoBehaviour, IAds, IBannerSizeConfig
     {
         [Header("LevelPlay App Key (bắt buộc - lấy từ LevelPlay dashboard)")]
@@ -162,11 +162,11 @@ namespace GameUpSDK
         {
             switch (size)
             {
-                case BannerSize.Banner:          return LevelPlayAdSize.BANNER;
-                case BannerSize.Adaptive:        return LevelPlayAdSize.CreateAdaptiveAdSize();
+                case BannerSize.Banner: return LevelPlayAdSize.BANNER;
+                case BannerSize.Adaptive: return LevelPlayAdSize.CreateAdaptiveAdSize();
                 case BannerSize.MediumRectangle: return LevelPlayAdSize.MEDIUM_RECTANGLE;
-                case BannerSize.Leaderboard:     return LevelPlayAdSize.LEADERBOARD;
-                default:                         return LevelPlayAdSize.LARGE;
+                case BannerSize.Leaderboard: return LevelPlayAdSize.LEADERBOARD;
+                default: return LevelPlayAdSize.LARGE;
             }
         }
 
