@@ -216,7 +216,7 @@ namespace GameUpSDK.Installer
                 {
                     "https://github.com/haopro2911/repo-sdk-importer/releases/download/sdk/GoogleMobileAdsUnityAdsMediation.unitypackage",
                     "https://github.com/haopro2911/repo-sdk-importer/releases/download/sdk/GoogleMobileAdsIronSourceMediation.unitypackage",
-                    // Liftoff: ưu tiên file local trong Assets/SDK. Nếu cần hosted sau này, thêm URL tương ứng tại đây.
+                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/GoogleMobileAdsLiftoffMonetizeMediation.unitypackage",
                 },
                 DownloadUrl      = "https://firebase.google.com/docs/unity/setup",
                 DownloadLabel    = "Admob Mediation Adapter →",
@@ -956,15 +956,6 @@ namespace GameUpSDK.Installer
                         found.Add(full);
                         continue;
                     }
-                }
-
-                // 2) Assets/SDK (khi project bundle unitypackages ở đây)
-                string sdkFolder = Path.Combine(Application.dataPath, "SDK");
-                string sdkFull = Path.Combine(sdkFolder, Path.GetFileName(normalized));
-                if (File.Exists(sdkFull))
-                {
-                    found.Add(sdkFull);
-                    continue;
                 }
             }
 
