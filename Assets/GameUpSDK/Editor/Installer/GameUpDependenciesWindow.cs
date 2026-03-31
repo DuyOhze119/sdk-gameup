@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using UnityEditor;
+using UnityEditor.Compilation;
 using UnityEditor.PackageManager;
 using UnityEditor.PackageManager.Requests;
 using UnityEngine;
@@ -11,6 +12,48 @@ using UnityEngine.Networking;
 
 namespace GameUpSDK.Installer
 {
+    [InitializeOnLoad]
+    internal static class GameUpDependenciesWindowAutoRefresh
+    {
+        private static bool s_hooked;
+
+        static GameUpDependenciesWindowAutoRefresh()
+        {
+            Hook();
+        }
+
+        private static void Hook()
+        {
+            if (s_hooked) return;
+            s_hooked = true;
+
+            AssemblyReloadEvents.afterAssemblyReload -= RefreshAllOpenWindows;
+            AssemblyReloadEvents.afterAssemblyReload += RefreshAllOpenWindows;
+            CompilationPipeline.compilationFinished -= OnCompilationFinished;
+            CompilationPipeline.compilationFinished += OnCompilationFinished;
+        }
+
+        private static void OnCompilationFinished(object _)
+        {
+            // compilationFinished có thể bắn trước khi UI repaint; delay để state ổn định rồi mới scan assemblies.
+            EditorApplication.delayCall += RefreshAllOpenWindows;
+        }
+
+        private static void RefreshAllOpenWindows()
+        {
+            EditorApplication.delayCall += () =>
+            {
+                var wins = Resources.FindObjectsOfTypeAll<GameUpDependenciesWindow>();
+                if (wins == null || wins.Length == 0) return;
+                foreach (var w in wins)
+                {
+                    if (w == null) continue;
+                    w.ForceRefreshFromExternalEvent();
+                }
+            };
+        }
+    }
+
     /// <summary>
     /// Cửa sổ hướng dẫn cài đặt tất cả package phụ thuộc của GameUp SDK.
     /// Tự động xuất hiện khi SDK được cài lần đầu tiên qua Git URL Package.
@@ -248,6 +291,14 @@ namespace GameUpSDK.Installer
             RefreshStatus();
             _wasCompiling = EditorApplication.isCompiling;
             EditorApplication.update += EditorUpdateRepaintWhenBusy;
+
+            // Khi đổi Scripting Define Symbols, Unity sẽ trigger compile + domain reload.
+            // Rely vào _wasCompiling đôi khi miss edge (window bị recreate sau reload),
+            // nên subscribe thêm các events này để luôn refresh UI/state sau khi compile/reload xong.
+            AssemblyReloadEvents.afterAssemblyReload -= AfterAssemblyReloadRefresh;
+            AssemblyReloadEvents.afterAssemblyReload += AfterAssemblyReloadRefresh;
+            CompilationPipeline.compilationFinished -= OnCompilationFinishedRefresh;
+            CompilationPipeline.compilationFinished += OnCompilationFinishedRefresh;
         }
 
         private void OnDisable()
@@ -255,6 +306,8 @@ namespace GameUpSDK.Installer
             EditorApplication.update -= EditorUpdateRepaintWhenBusy;
             EditorApplication.update -= PollInstallQueue;
             EditorApplication.update -= PollParallelDownloads;
+            AssemblyReloadEvents.afterAssemblyReload -= AfterAssemblyReloadRefresh;
+            CompilationPipeline.compilationFinished -= OnCompilationFinishedRefresh;
             if (_parallelTasks != null)
             {
                 foreach (var t in _parallelTasks)
@@ -264,6 +317,32 @@ namespace GameUpSDK.Installer
 
             _activeDownload?.Dispose();
             _activeDownload = null;
+        }
+
+        private void AfterAssemblyReloadRefresh()
+        {
+            // DelayCall để đảm bảo assemblies đã available đầy đủ trước khi scan IsAssemblyLoaded.
+            EditorApplication.delayCall += () =>
+            {
+                if (this == null) return;
+                RefreshStatus();
+            };
+        }
+
+        private void OnCompilationFinishedRefresh(object _)
+        {
+            // compilationFinished có thể bắn khi window vừa được recreate,
+            // nên chỉ cần schedule refresh + repaint an toàn.
+            EditorApplication.delayCall += () =>
+            {
+                if (this == null) return;
+                RefreshStatus();
+            };
+        }
+
+        internal void ForceRefreshFromExternalEvent()
+        {
+            RefreshStatus();
         }
 
         /// <summary>Làm mới UI khi đang compile hoặc đang cài để nút bật/tắt đúng lúc compile xong.</summary>
@@ -610,11 +689,11 @@ namespace GameUpSDK.Installer
             EditorGUILayout.Space(8);
             EditorGUILayout.BeginHorizontal();
 
-            EditorGUI.BeginDisabledGroup(IsInteractionLocked());
+            // Nút refresh thủ công luôn active.
+            // Nếu đang compile thì delay để refresh sau khi compile/reload xong.
             if (GUILayout.Button("↻  Làm mới trạng thái", GUILayout.Height(30)))
-                RefreshStatus();
+                RequestManualRefresh();
 
-            EditorGUI.EndDisabledGroup();
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(4);
@@ -640,16 +719,46 @@ namespace GameUpSDK.Installer
                     "Nhấn bên dưới để mở cửa sổ cấu hình SDK.",
                     MessageType.None);
 
+                // Khi đang compile/cài, không cho bấm (không trigger delay-call) để đúng luồng UX.
                 EditorGUI.BeginDisabledGroup(IsInteractionLocked());
                 if (GUILayout.Button("→  Mở cấu hình SDK (GameUp SDK Setup)", GUILayout.Height(36)))
-                {
-                    GameUpPackageInstaller.MarkSetupComplete();
-                    Close();
-                    EditorApplication.ExecuteMenuItem("GameUp SDK/Setup");
-                }
-
+                    RequestOpenSetup();
                 EditorGUI.EndDisabledGroup();
             }
+        }
+
+        private void RequestManualRefresh()
+        {
+            if (EditorApplication.isCompiling)
+            {
+                EditorApplication.delayCall += () =>
+                {
+                    if (this == null) return;
+                    RefreshStatus();
+                };
+                Repaint();
+                return;
+            }
+
+            RefreshStatus();
+        }
+
+        private void RequestOpenSetup()
+        {
+            if (IsInteractionLocked())
+            {
+                EditorApplication.delayCall += () =>
+                {
+                    if (this == null) return;
+                    RequestOpenSetup();
+                };
+                Repaint();
+                return;
+            }
+
+            GameUpPackageInstaller.MarkSetupComplete();
+            Close();
+            EditorApplication.ExecuteMenuItem("GameUp SDK/Setup");
         }
 
         // ─── Install logic ────────────────────────────────────────────────────────
@@ -861,14 +970,14 @@ namespace GameUpSDK.Installer
             // Thử tìm qua PackageInfo khi cài via UPM
             try
             {
-                Assembly asm = Assembly.GetExecutingAssembly();
+                System.Reflection.Assembly asm = System.Reflection.Assembly.GetExecutingAssembly();
                 Type pkgInfoType = Type.GetType("UnityEditor.PackageManager.PackageInfo, UnityEditor");
                 if (pkgInfoType != null)
                 {
                     MethodInfo findMethod = pkgInfoType.GetMethod(
                         "FindForAssembly",
                         BindingFlags.Static | BindingFlags.Public,
-                        null, new[] { typeof(Assembly) }, null);
+                        null, new[] { typeof(System.Reflection.Assembly) }, null);
 
                     object info = findMethod?.Invoke(null, new object[] { asm });
                     if (info != null)

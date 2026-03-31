@@ -266,6 +266,10 @@ PrefabInstance:
       propertyPath: primaryMediation
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: c7771033b0a93bd4e901053cde0e5cda, type: 3}
+      propertyPath: bannerAdUnitId
+      value: 
+      objectReference: {fileID: 0}
     - target: {fileID: 4275973953013205297, guid: c7771033b0a93bd4e901053cde0e5cda, type: 3}
       propertyPath: m_Name
       value: SDK
