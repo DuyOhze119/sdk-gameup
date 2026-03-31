@@ -12,6 +12,7 @@ dependencies {
     implementation 'com.appsflyer:unity-wrapper:6.17.81' // Assets/AppsFlyer/Editor/AppsFlyerDependencies.xml:6
     implementation 'com.google.ads.mediation:ironsource:9.3.0.1' // Assets/GoogleMobileAds/Mediation/IronSource/Editor/IronSourceMediationDependencies.xml:24
     implementation 'com.google.ads.mediation:unity:4.16.6.0' // Assets/GoogleMobileAds/Mediation/UnityAds/Editor/UnityMediationDependencies.xml:25
+    implementation 'com.google.ads.mediation:vungle:7.7.1.0' // Assets/GoogleMobileAds/Mediation/LiftoffMonetize/Editor/LiftoffMonetizeMediationDependencies.xml:24
     implementation 'com.google.android.gms:play-services-ads:24.9.0' // Assets/LevelPlay/Editor/ISAdMobAdapterDependencies.xml:8
     implementation 'com.google.android.gms:play-services-ads-identifier:18.1.0' // Assets/LevelPlay/Editor/IronSourceSDKDependencies.xml:12
     implementation 'com.google.android.gms:play-services-base:18.10.0' // Assets/Firebase/Editor/AppDependencies.xml:20

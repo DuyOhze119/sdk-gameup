@@ -73,6 +73,10 @@ mono_crash.*
 *.unitypackage.meta
 *.app
 
+# Allow bundling specific installer unitypackages in repo
+!Assets/SDK/GoogleMobileAdsLiftoffMonetizeMediation.unitypackage
+!Assets/SDK/GoogleMobileAdsLiftoffMonetizeMediation.unitypackage.meta
+
 # Crashlytics generated file
 crashlytics-build.properties
 

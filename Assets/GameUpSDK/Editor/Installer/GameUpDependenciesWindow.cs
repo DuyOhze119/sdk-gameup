@@ -199,20 +199,24 @@ namespace GameUpSDK.Installer
 
             new PackageDef
             {
-                DisplayName      = "Admob Mediation Adapter (Unity + Ironsource)",
+                DisplayName      = "Admob Mediation Adapter (Unity + Ironsource + Liftoff)",
                 Description      = "Dùng khi sử dụng Admob Mediation",
                 Required         = false,
+                // Detect một trong các adapters đã được import.
+                // (Không có built-in multi-assembly check; ưu tiên 1 adapter phổ biến để "đánh dấu đã cài").
                 AssemblyName     = "GoogleMobileAds.Mediation.IronSource.Api",
                 Method           = InstallMethod.UnityPackage,
                 BundledFileNames = new[]
                 {
                     "GoogleMobileAdsUnityAdsMediation.unitypackage",
                     "GoogleMobileAdsIronSourceMediation.unitypackage",
+                    "GoogleMobileAdsLiftoffMonetizeMediation.unitypackage",
                 },
                 HostedUrls       = new[]
                 {
                     "https://github.com/haopro2911/repo-sdk-importer/releases/download/sdk/GoogleMobileAdsUnityAdsMediation.unitypackage",
                     "https://github.com/haopro2911/repo-sdk-importer/releases/download/sdk/GoogleMobileAdsIronSourceMediation.unitypackage",
+                    // Liftoff: ưu tiên file local trong Assets/SDK. Nếu cần hosted sau này, thêm URL tương ứng tại đây.
                 },
                 DownloadUrl      = "https://firebase.google.com/docs/unity/setup",
                 DownloadLabel    = "Admob Mediation Adapter →",
@@ -937,15 +941,31 @@ namespace GameUpSDK.Installer
         {
             if (fileNames == null || fileNames.Length == 0) return null;
 
-            string folder = GetPackagesFolder();
-            if (string.IsNullOrEmpty(folder)) return null;
-
             var found = new List<string>();
             foreach (string name in fileNames)
             {
-                string full = Path.Combine(folder, name.Replace('/', Path.DirectorySeparatorChar));
-                if (File.Exists(full))
-                    found.Add(full);
+                string normalized = name.Replace('/', Path.DirectorySeparatorChar);
+
+                // 1) Packages~ (khi SDK cài dạng UPM package hoặc assets-based fallback)
+                string packagesFolder = GetPackagesFolder();
+                if (!string.IsNullOrEmpty(packagesFolder))
+                {
+                    string full = Path.Combine(packagesFolder, normalized);
+                    if (File.Exists(full))
+                    {
+                        found.Add(full);
+                        continue;
+                    }
+                }
+
+                // 2) Assets/SDK (khi project bundle unitypackages ở đây)
+                string sdkFolder = Path.Combine(Application.dataPath, "SDK");
+                string sdkFull = Path.Combine(sdkFolder, Path.GetFileName(normalized));
+                if (File.Exists(sdkFull))
+                {
+                    found.Add(sdkFull);
+                    continue;
+                }
             }
 
             return found.Count > 0 ? found : null;
