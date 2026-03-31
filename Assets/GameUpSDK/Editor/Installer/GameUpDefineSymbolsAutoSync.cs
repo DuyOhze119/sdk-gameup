@@ -44,6 +44,20 @@ namespace GameUpSDK.Installer
             Events.registeredPackages += OnRegisteredPackages;
         }
 
+        [MenuItem("GameUp SDK/Sync Define Symbols", priority = 21)]
+        private static void MenuSyncNow()
+        {
+            try
+            {
+                SyncDefines();
+                Debug.Log("[GameUp] Sync Define Symbols: done.");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[GameUp] Sync Define Symbols failed: " + e);
+            }
+        }
+
         private static void OnCompilationFinished(object _)
         {
             TrySyncSoon();
