@@ -354,7 +354,6 @@ namespace GameUpSDK
                 LogAdsEvent(AdsEvent.RewardShow, where, null, AdsEvent.AfRewardShow);
                 Action wrappedSuccess = () =>
                 {
-                    AdsRules.RecordInterstitialShown();
                     LogAdsEventWithLevel(AdsEvent.RewardShowComplete, where, currentLevel, AdsEvent.AfRewardDisplayed);
                     onSuccess?.Invoke();
                 };

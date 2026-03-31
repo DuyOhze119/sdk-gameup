@@ -384,6 +384,7 @@ namespace GameUpSDK
                 return;
             }
 
+            AdsRules.BeginInterstitialCappingPause();
             var rewardGranted = false;
             var ad = _rewardedAd;
             _rewardedAd = null;
@@ -391,6 +392,7 @@ namespace GameUpSDK
             {
                 MainThreadDispatcher.Enqueue(() =>
                 {
+                    AdsRules.EndInterstitialCappingPause();
                     if (!rewardGranted) onFail?.Invoke();
                     RequestRewardedVideo();
                 });
@@ -399,6 +401,7 @@ namespace GameUpSDK
             {
                 MainThreadDispatcher.Enqueue(() =>
                 {
+                    AdsRules.EndInterstitialCappingPause();
                     onFail?.Invoke();
                     RequestRewardedVideo();
                 });

@@ -186,6 +186,7 @@ namespace GameUpSDK
                 Debug.Log("[CtySDK] UnityAds ShowRewardedVideo: ad not ready.");
                 onFail?.Invoke(); return;
             }
+            AdsRules.BeginInterstitialCappingPause();
             var rewardGranted = false;
             _rewardedAd.OnAdClosed += OnRewardedClosed;
             _rewardedAd.OnAdRewarded += OnRewardedEarned;
@@ -196,6 +197,7 @@ namespace GameUpSDK
                 _rewardedAd.OnAdClosed -= OnRewardedClosed;
                 _rewardedAd.OnAdRewarded -= OnRewardedEarned;
                 _rewardedAd.OnAdDisplayFailed -= OnRewardedDisplayFailed;
+                AdsRules.EndInterstitialCappingPause();
                 if (!rewardGranted) MainThreadDispatcher.Enqueue(() => onFail?.Invoke());
                 RequestRewardedVideo();
             }
@@ -211,6 +213,7 @@ namespace GameUpSDK
                 _rewardedAd.OnAdClosed -= OnRewardedClosed;
                 _rewardedAd.OnAdRewarded -= OnRewardedEarned;
                 _rewardedAd.OnAdDisplayFailed -= OnRewardedDisplayFailed;
+                AdsRules.EndInterstitialCappingPause();
                 MainThreadDispatcher.Enqueue(() => onFail?.Invoke());
                 RequestRewardedVideo();
             }

@@ -10,6 +10,9 @@ namespace GameUpSDK
     public static class AdsRules
     {
         private static double _lastInterstitialShowTime;
+        private static double _pausedSinceLastInterstitialShowSeconds;
+        private static int _interstitialCappingPauseDepth;
+        private static double _interstitialCappingPauseStartTime;
 
         /// <summary>
         /// Kiểm tra có được phép hiển thị Interstitial tại level hiện tại không.
@@ -32,7 +35,13 @@ namespace GameUpSDK
 
             double now = GetCurrentTimeSeconds();
             double elapsed = now - _lastInterstitialShowTime;
-            return elapsed >= cappingSeconds;
+            // Loại trừ thời gian đang xem rewarded khỏi bộ đếm inter (pause countdown during rewarded).
+            // Nếu đang trong trạng thái pause (ad đang hiển thị), loại trừ cả phần đang chạy (now - pauseStart).
+            var paused = _pausedSinceLastInterstitialShowSeconds;
+            if (_interstitialCappingPauseDepth > 0)
+                paused += Math.Max(0, now - _interstitialCappingPauseStartTime);
+            double elapsedActive = elapsed - paused;
+            return elapsedActive >= cappingSeconds;
         }
 
         /// <summary>
@@ -41,6 +50,39 @@ namespace GameUpSDK
         public static void RecordInterstitialShown()
         {
             _lastInterstitialShowTime = GetCurrentTimeSeconds();
+            _pausedSinceLastInterstitialShowSeconds = 0;
+        }
+
+        /// <summary>
+        /// Pause bộ đếm capping của Interstitial (dùng khi đang xem Rewarded để không tính thời gian đó vào countdown).
+        /// Gọi Begin trước khi show rewarded full-screen, và End khi ad đóng/failed.
+        /// </summary>
+        public static void BeginInterstitialCappingPause()
+        {
+            if (_interstitialCappingPauseDepth == 0)
+                _interstitialCappingPauseStartTime = GetCurrentTimeSeconds();
+            _interstitialCappingPauseDepth++;
+        }
+
+        /// <summary>
+        /// Kết thúc pause của capping Interstitial, cộng dồn thời gian pause vào tổng thời gian bị loại trừ.
+        /// Safe-guard nếu End bị gọi thừa.
+        /// </summary>
+        public static void EndInterstitialCappingPause()
+        {
+            if (_interstitialCappingPauseDepth <= 0)
+            {
+                _interstitialCappingPauseDepth = 0;
+                return;
+            }
+
+            _interstitialCappingPauseDepth--;
+            if (_interstitialCappingPauseDepth == 0)
+            {
+                var now = GetCurrentTimeSeconds();
+                _pausedSinceLastInterstitialShowSeconds += Math.Max(0, now - _interstitialCappingPauseStartTime);
+                _interstitialCappingPauseStartTime = 0;
+            }
         }
 
         /// <summary>
@@ -64,6 +106,9 @@ namespace GameUpSDK
         public static void ResetInterstitialCappingForTest()
         {
             _lastInterstitialShowTime = 0;
+            _pausedSinceLastInterstitialShowSeconds = 0;
+            _interstitialCappingPauseDepth = 0;
+            _interstitialCappingPauseStartTime = 0;
         }
     }
 }
