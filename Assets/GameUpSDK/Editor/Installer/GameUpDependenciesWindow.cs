@@ -12,48 +12,6 @@ using UnityEngine.Networking;
 
 namespace GameUpSDK.Installer
 {
-    [InitializeOnLoad]
-    internal static class GameUpDependenciesWindowAutoRefresh
-    {
-        private static bool s_hooked;
-
-        static GameUpDependenciesWindowAutoRefresh()
-        {
-            Hook();
-        }
-
-        private static void Hook()
-        {
-            if (s_hooked) return;
-            s_hooked = true;
-
-            AssemblyReloadEvents.afterAssemblyReload -= RefreshAllOpenWindows;
-            AssemblyReloadEvents.afterAssemblyReload += RefreshAllOpenWindows;
-            CompilationPipeline.compilationFinished -= OnCompilationFinished;
-            CompilationPipeline.compilationFinished += OnCompilationFinished;
-        }
-
-        private static void OnCompilationFinished(object _)
-        {
-            // compilationFinished có thể bắn trước khi UI repaint; delay để state ổn định rồi mới scan assemblies.
-            EditorApplication.delayCall += RefreshAllOpenWindows;
-        }
-
-        private static void RefreshAllOpenWindows()
-        {
-            EditorApplication.delayCall += () =>
-            {
-                var wins = Resources.FindObjectsOfTypeAll<GameUpDependenciesWindow>();
-                if (wins == null || wins.Length == 0) return;
-                foreach (var w in wins)
-                {
-                    if (w == null) continue;
-                    w.ForceRefreshFromExternalEvent();
-                }
-            };
-        }
-    }
-
     /// <summary>
     /// Cửa sổ hướng dẫn cài đặt tất cả package phụ thuộc của GameUp SDK.
     /// Tự động xuất hiện khi SDK được cài lần đầu tiên qua Git URL Package.
@@ -303,6 +261,20 @@ namespace GameUpSDK.Installer
             AssemblyReloadEvents.afterAssemblyReload += AfterAssemblyReloadRefresh;
             CompilationPipeline.compilationFinished -= OnCompilationFinishedRefresh;
             CompilationPipeline.compilationFinished += OnCompilationFinishedRefresh;
+            AssetDatabase.importPackageCompleted -= OnImportPackageRefresh;
+            AssetDatabase.importPackageCompleted += OnImportPackageRefresh;
+            AssetDatabase.importPackageFailed -= OnImportPackageFailedRefresh;
+            AssetDatabase.importPackageFailed += OnImportPackageFailedRefresh;
+            AssetDatabase.importPackageCancelled -= OnImportPackageRefresh;
+            AssetDatabase.importPackageCancelled += OnImportPackageRefresh;
+
+            // Sau domain reload/restore window, timing load assemblies có thể trễ hơn compilationFinished.
+            // DelayCall 1 nhịp là đủ để tránh scan quá sớm.
+            EditorApplication.delayCall += () =>
+            {
+                if (this == null) return;
+                RefreshStatus();
+            };
         }
 
         private void OnDisable()
@@ -312,6 +284,9 @@ namespace GameUpSDK.Installer
             EditorApplication.update -= PollParallelDownloads;
             AssemblyReloadEvents.afterAssemblyReload -= AfterAssemblyReloadRefresh;
             CompilationPipeline.compilationFinished -= OnCompilationFinishedRefresh;
+            AssetDatabase.importPackageCompleted -= OnImportPackageRefresh;
+            AssetDatabase.importPackageFailed -= OnImportPackageFailedRefresh;
+            AssetDatabase.importPackageCancelled -= OnImportPackageRefresh;
             if (_parallelTasks != null)
             {
                 foreach (var t in _parallelTasks)
@@ -344,9 +319,23 @@ namespace GameUpSDK.Installer
             };
         }
 
-        internal void ForceRefreshFromExternalEvent()
+        private void OnImportPackageRefresh(string _)
         {
-            RefreshStatus();
+            // ImportPackage hoàn thành có thể trigger refresh/compile; delayCall để tránh scan quá sớm.
+            EditorApplication.delayCall += () =>
+            {
+                if (this == null) return;
+                RefreshStatus();
+            };
+        }
+
+        private void OnImportPackageFailedRefresh(string _, string __)
+        {
+            EditorApplication.delayCall += () =>
+            {
+                if (this == null) return;
+                RefreshStatus();
+            };
         }
 
         /// <summary>Làm mới UI khi đang compile hoặc đang cài để nút bật/tắt đúng lúc compile xong.</summary>
@@ -381,18 +370,17 @@ namespace GameUpSDK.Installer
         /// <summary>Khóa mọi thao tác: đang compile hoặc đang cài/tải package.</summary>
         private bool IsInteractionLocked()
         {
-            return EditorApplication.isCompiling || IsInstallOrDownloadBusy();
+            // Theo yêu cầu: luôn mở UI để tránh trường hợp trạng thái nút không kịp cập nhật sau compile/import.
+            return false;
         }
 
         // ─── GUI ─────────────────────────────────────────────────────────────────
 
         private void OnGUI()
         {
-            if (EditorApplication.isCompiling)
+            if (IsInstallOrDownloadBusy())
             {
-                EditorGUILayout.HelpBox(
-                    "Unity đang compile — chờ xong rồi mới thao tác tiếp.",
-                    MessageType.Info);
+                EditorGUILayout.HelpBox("Đang xử lý cài/tải dependency…", MessageType.Info);
                 EditorGUILayout.Space(4);
             }
 
@@ -1032,6 +1020,11 @@ namespace GameUpSDK.Installer
                     Debug.LogError($"[GameUpSDK] Import {Path.GetFileName(path)} thất bại: {ex.Message}");
                 }
             }
+
+            // Ép Unity re-scan assets/dll sau khi import để giảm độ trễ load assemblies.
+            // (ImportPackage chạy async; refresh thêm nhịp sau giúp state ổn định nhanh hơn.)
+            AssetDatabase.Refresh();
+            EditorApplication.delayCall += AssetDatabase.Refresh;
 
             pkg.IsInstalling = false;
             if (errors.Count == 0)
