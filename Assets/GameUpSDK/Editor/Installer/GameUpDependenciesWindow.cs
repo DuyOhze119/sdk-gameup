@@ -531,6 +531,7 @@ namespace GameUpSDK.Installer
             DrawHeader();
             DrawMediationInfo();
             DrawUgUiPackageCacheTroubleshootFoldout();
+            DrawFacebookExamplesCleanupSection();
 
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
             DrawPackageList();
@@ -695,6 +696,77 @@ namespace GameUpSDK.Installer
 
             if (GUILayout.Button("Xóa Package Cache + ScriptAssemblies (tải lại gói Unity UI)", GUILayout.Height(26)))
                 RepairUnityPackageCacheWithConfirmation();
+        }
+
+        private const string FacebookExamplesAssetPath = "Assets/FacebookSDK/Examples";
+
+        private static bool FacebookSdkExamplesFolderExists()
+        {
+            return AssetDatabase.IsValidFolder(FacebookExamplesAssetPath);
+        }
+
+        private void DrawFacebookExamplesCleanupSection()
+        {
+            EditorGUILayout.Space(4);
+            EditorGUILayout.BeginVertical("box");
+
+            EditorGUILayout.LabelField("Facebook SDK — Examples", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Thư mục Examples thường không cần cho production và có thể gây lỗi compile. " +
+                "Khi cài Facebook qua installer, Examples đã được xóa tự động; nếu bạn import tay hoặc còn sót, dùng nút bên dưới.",
+                MessageType.None);
+
+            EditorGUI.BeginDisabledGroup(IsInstallOrDownloadBusy() || !FacebookSdkExamplesFolderExists());
+            if (GUILayout.Button("Xóa thủ công: Assets/FacebookSDK/Examples", GUILayout.Height(26)))
+            {
+                if (EditorUtility.DisplayDialog(
+                        "GameUp SDK — Xóa Facebook Examples",
+                        "Xóa toàn bộ thư mục Assets/FacebookSDK/Examples?\n\n" +
+                        "SDK Facebook chính (ngoài Examples) không bị gỡ. Có thể hoàn tác qua Git/VCS nếu cần.",
+                        "Xóa",
+                        "Hủy"))
+                {
+                    TryDeleteFacebookExamplesFolder();
+                    Repaint();
+                }
+            }
+
+            EditorGUI.EndDisabledGroup();
+
+            if (!FacebookSdkExamplesFolderExists())
+            {
+                EditorGUILayout.LabelField(
+                    "Không thấy thư mục (đã xóa hoặc chưa import Facebook SDK).",
+                    EditorStyles.miniLabel);
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>Xóa <c>Assets/FacebookSDK/Examples</c> qua AssetDatabase (nút thủ công trong installer).</summary>
+        internal static void TryDeleteFacebookExamplesFolder()
+        {
+            if (!FacebookSdkExamplesFolderExists())
+            {
+                EditorUtility.DisplayDialog(
+                    "GameUp SDK",
+                    "Không có thư mục " + FacebookExamplesAssetPath + ".",
+                    "OK");
+                return;
+            }
+
+            if (!AssetDatabase.DeleteAsset(FacebookExamplesAssetPath))
+            {
+                Debug.LogWarning("[GameUpSDK] Không xóa được: " + FacebookExamplesAssetPath);
+                EditorUtility.DisplayDialog(
+                    "GameUp SDK",
+                    "Xóa thất bại. Kiểm tra Console hoặc đóng file đang mở trong thư mục đó.",
+                    "OK");
+                return;
+            }
+
+            AssetDatabase.Refresh();
+            Debug.Log("[GameUpSDK] Đã xóa " + FacebookExamplesAssetPath);
         }
 
         /// <summary>Firebase + AppsFlyer + bộ mediation theo lựa chọn (AdMob: GMA + adapters; LevelPlay: LevelPlay), đã sort <see cref="PackageDef.InstallPriority"/>.</summary>
