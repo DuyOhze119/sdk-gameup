@@ -693,10 +693,8 @@ namespace GameUpSDK.Installer
                 "Mở project luôn bằng đúng phiên bản Unity trong ProjectSettings/ProjectVersion.txt.",
                 MessageType.Warning);
 
-            EditorGUI.BeginDisabledGroup(IsInstallOrDownloadBusy());
             if (GUILayout.Button("Xóa Package Cache + ScriptAssemblies (tải lại gói Unity UI)", GUILayout.Height(26)))
                 RepairUnityPackageCacheWithConfirmation();
-            EditorGUI.EndDisabledGroup();
         }
 
         /// <summary>Firebase + AppsFlyer + bộ mediation theo lựa chọn (AdMob: GMA + adapters; LevelPlay: LevelPlay), đã sort <see cref="PackageDef.InstallPriority"/>.</summary>
@@ -854,7 +852,6 @@ namespace GameUpSDK.Installer
             else
             {
                 bool canAuto = CanAutoInstall(pkg);
-                EditorGUI.BeginDisabledGroup(IsInstallOrDownloadBusy());
                 if (canAuto)
                 {
                     if (GUILayout.Button("Cài pack", GUILayout.Width(88), GUILayout.Height(24)))
@@ -875,8 +872,6 @@ namespace GameUpSDK.Installer
                     };
                     GUILayout.Label("Cần file Packages~/URL", manualStyle, GUILayout.Width(118));
                 }
-
-                EditorGUI.EndDisabledGroup();
             }
 
             GUILayout.Space(8);
