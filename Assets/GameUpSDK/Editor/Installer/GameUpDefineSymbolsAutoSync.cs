@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.Compilation;
@@ -31,6 +32,25 @@ namespace GameUpSDK.Installer
 
         private const string SessionThrottleKey = "GameUpSDK_DefinesAutoSync_Throttled";
 
+        private const string GameAnalyticsRuntimeAsmdefAssetPath = "Assets/GameAnalytics/Plugins/GameAnalyticsSDK.asmdef";
+        private const string GameAnalyticsMarkerScriptPath = "Assets/GameAnalytics/Plugins/Scripts/GameAnalytics.cs";
+
+        private const string GameAnalyticsRuntimeAsmdefJson =
+            "{\n" +
+            "    \"name\": \"GameAnalyticsSDK\",\n" +
+            "    \"rootNamespace\": \"GameAnalyticsSDK\",\n" +
+            "    \"references\": [],\n" +
+            "    \"includePlatforms\": [],\n" +
+            "    \"excludePlatforms\": [],\n" +
+            "    \"allowUnsafeCode\": false,\n" +
+            "    \"overrideReferences\": false,\n" +
+            "    \"precompiledReferences\": [],\n" +
+            "    \"autoReferenced\": true,\n" +
+            "    \"defineConstraints\": [],\n" +
+            "    \"versionDefines\": [],\n" +
+            "    \"noEngineReferences\": false\n" +
+            "}\n";
+
         static GameUpDefineSymbolsAutoSync()
         {
             // Unity load → schedule 1 lần (đợi domain ổn định)
@@ -43,6 +63,15 @@ namespace GameUpSDK.Installer
             // Khi UPM packages thay đổi (nếu deps được cài bằng UPM)
             Events.registeredPackages -= OnRegisteredPackages;
             Events.registeredPackages += OnRegisteredPackages;
+        }
+
+        [MenuItem("GameUp SDK/Ensure GameAnalytics runtime asmdef", priority = 23)]
+        private static void MenuEnsureGameAnalyticsAsmdef()
+        {
+            if (TryEnsureGameAnalyticsRuntimeAsmdef(out string message))
+                Debug.Log("[GameUp] " + message);
+            else
+                Debug.LogWarning("[GameUp] " + message);
         }
 
         [MenuItem("GameUp SDK/Sync Define Symbols", priority = 21)]
@@ -100,7 +129,7 @@ namespace GameUpSDK.Installer
 
         private static void SyncDefines()
         {
-            GameUpGameAnalyticsAsmdefBootstrap.TryEnsureRuntimeAsmdef(out _);
+            TryEnsureGameAnalyticsRuntimeAsmdef(out _);
             EnsurePrimaryMediationDefines();
 
             bool levelPlayInstalled = IsAssemblyLoaded("Unity.LevelPlay");
@@ -120,6 +149,42 @@ namespace GameUpSDK.Installer
             bool hasMediation = admobInstalled || levelPlayInstalled;
             bool sdkEnabled = hasAnalytics && hasMediation;
             GameUpDependenciesWindow.SetDepsReadyDefine(sdkEnabled);
+        }
+
+        /// <summary>
+        /// Tạo <c>GameAnalyticsSDK.asmdef</c> tại <c>Assets/GameAnalytics/Plugins/</c> khi đã có script GA chuẩn nhưng thiếu asmdef (thường gặp với .unitypackage cũ).
+        /// </summary>
+        private static bool TryEnsureGameAnalyticsRuntimeAsmdef(out string message)
+        {
+            message = null;
+            string dataPath = Application.dataPath;
+            if (string.IsNullOrEmpty(dataPath))
+            {
+                message = "Ensure GameAnalytics asmdef: Application.dataPath is empty.";
+                return false;
+            }
+
+            string markerFull = Path.Combine(dataPath, "GameAnalytics", "Plugins", "Scripts", "GameAnalytics.cs");
+            if (!File.Exists(markerFull))
+            {
+                message =
+                    "Ensure GameAnalytics asmdef: không thấy " + GameAnalyticsMarkerScriptPath + ". Import GameAnalytics SDK hoặc layout tương tự.";
+                return false;
+            }
+
+            string asmdefFull = Path.Combine(dataPath, "GameAnalytics", "Plugins", "GameAnalyticsSDK.asmdef");
+            if (File.Exists(asmdefFull))
+            {
+                message = "GameAnalytics runtime asmdef đã tồn tại: " + GameAnalyticsRuntimeAsmdefAssetPath;
+                return true;
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(asmdefFull) ?? "");
+            File.WriteAllText(asmdefFull, GameAnalyticsRuntimeAsmdefJson);
+            AssetDatabase.ImportAsset(GameAnalyticsRuntimeAsmdefAssetPath, ImportAssetOptions.ForceUpdate);
+            message =
+                "Đã tạo " + GameAnalyticsRuntimeAsmdefAssetPath + ". GameUpSDK.Runtime tham chiếu assembly tên GameAnalyticsSDK — đợi Unity recompile.";
+            return true;
         }
 
         private static void EnsurePrimaryMediationDefines()
