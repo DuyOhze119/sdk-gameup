@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Runtime.InteropServices;
@@ -120,7 +120,7 @@ namespace GameAnalyticsSDK
             }
         }
 
-#if gameanalytics_admob_enabled
+#if GAMEANALYTICS_ADMOB_ENABLED
         private static void subscribeAdMobImpressions(string adUnitId, GoogleMobileAds.Api.BannerView ad)
         {
             GAAdMobIntegration.ListenForImpressions(adUnitId, ad, AdMobImpressionHandler);
@@ -290,7 +290,7 @@ namespace GameAnalyticsSDK
             }
         }
 
-#if gameanalytics_admob_enabled
+#if GAMEANALYTICS_ADMOB_ENABLED
         private static void subscribeAdMobImpressions(string adUnitId, GoogleMobileAds.Api.BannerView ad)
         {
             GAAdMobIntegration.ListenForImpressions(adUnitId, ad, AdMobImpressionHandler);
@@ -398,7 +398,7 @@ namespace GameAnalyticsSDK
         }
 
         // ----------------------- ADMOB AD IMPRESSIONS ---------------------- //
-#if gameanalytics_admob_enabled
+#if GAMEANALYTICS_ADMOB_ENABLED
         public static void SubscribeAdMobImpressions(string adUnitId, GoogleMobileAds.Api.BannerView bannerView)
         {
 #if UNITY_EDITOR

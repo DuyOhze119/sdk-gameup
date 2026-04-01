@@ -78,6 +78,7 @@ namespace GameUpSDK.Editor
 
         private const string PathGoogleMobileAdsSettings   = "Assets/GoogleMobileAds/Resources/GoogleMobileAdsSettings.asset";
         private const string PathLevelPlayMediationSettings = "Assets/LevelPlay/Resources/LevelPlayMediationSettings.asset";
+        private const string PathGameAnalyticsSettings      = "Assets/Resources/GameAnalytics/Settings.asset";
 
         private int _activeTab;
         private string[] _tabs;
@@ -87,6 +88,7 @@ namespace GameUpSDK.Editor
         private enum SetupTab
         {
             AppsFlyer,
+            GameAnalytics,
             IronSourceMediation,
             AdMobAppOpen,
             FirebaseRemoteConfig,
@@ -128,6 +130,9 @@ namespace GameUpSDK.Editor
         private int _rcLevelStartShowRateApp = 5;
         private bool _rcNoInternetPopupEnable = true;
         private bool _rcEnableBanner = true;
+
+        /// <summary>Dropdown "Platform to add" trong tab Game Analytics (GameAnalytics Settings).</summary>
+        private int _gaAddPlatformDropdownIndex;
 
         private Vector2 _scrollPosition;
         private string _loadErrors;
@@ -263,6 +268,7 @@ namespace GameUpSDK.Editor
             var tabs = new List<SetupTab>
             {
                 SetupTab.AppsFlyer,
+                SetupTab.GameAnalytics,
             };
 
             if (pm == GameUpSDK.AdsManager.PrimaryMediation.LevelPlay)
@@ -287,6 +293,7 @@ namespace GameUpSDK.Editor
                     switch (t)
                     {
                         case SetupTab.AppsFlyer: DrawAppsFlyerSection(); break;
+                        case SetupTab.GameAnalytics: DrawGameAnalyticsSection(); break;
                         case SetupTab.IronSourceMediation: DrawIronSourceSection(); break;
                         case SetupTab.AdMobAppOpen: DrawAdMobSection(); break;
                         case SetupTab.FirebaseRemoteConfig: DrawFirebaseRemoteConfigSection(); break;
@@ -308,8 +315,8 @@ namespace GameUpSDK.Editor
         private static int GetDefaultTabIndexFor(GameUpSDK.AdsManager.PrimaryMediation pm)
         {
             // Mở tab ads theo PrimaryMediation để user cấu hình nhanh nhất.
-            // LevelPlay -> IronSource; AdMob -> AdMob.
-            return pm == GameUpSDK.AdsManager.PrimaryMediation.LevelPlay ? 1 : 1;
+            // LevelPlay -> IronSource; AdMob -> AdMob. (sau AppsFlyer + Game Analytics)
+            return pm == GameUpSDK.AdsManager.PrimaryMediation.LevelPlay ? 2 : 2;
         }
 
         private static string GetTabLabel(SetupTab tab)
@@ -317,6 +324,7 @@ namespace GameUpSDK.Editor
             switch (tab)
             {
                 case SetupTab.AppsFlyer: return "AppsFlyer";
+                case SetupTab.GameAnalytics: return "Game Analytics";
                 case SetupTab.IronSourceMediation: return "IronSource Mediation";
                 case SetupTab.AdMobAppOpen: return "AdMob (App Open)";
                 case SetupTab.FirebaseRemoteConfig: return "Firebase RC";
@@ -356,6 +364,216 @@ namespace GameUpSDK.Editor
             _appsFlyerUtilsSdkKey = EditorGUILayout.TextField("SDK Key", _appsFlyerUtilsSdkKey);
             _appsFlyerUtilsAppId = EditorGUILayout.TextField("App ID (iOS)", _appsFlyerUtilsAppId);
             _appsFlyerUtilsIsDevMode = EditorGUILayout.Toggle("Dev Mode", _appsFlyerUtilsIsDevMode);
+        }
+
+        private static Type _gameAnalyticsSettingsType;
+
+        private static Type GetGameAnalyticsSettingsType()
+        {
+            if (_gameAnalyticsSettingsType != null)
+                return _gameAnalyticsSettingsType;
+
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    var t = asm.GetType("GameAnalyticsSDK.Setup.Settings", false);
+                    if (t != null && typeof(ScriptableObject).IsAssignableFrom(t))
+                    {
+                        _gameAnalyticsSettingsType = t;
+                        break;
+                    }
+                }
+                catch
+                {
+                    // ignore bad assemblies
+                }
+            }
+
+            return _gameAnalyticsSettingsType;
+        }
+
+        private static RuntimePlatform? ParseGameAnalyticsPlatformDisplayName(string displayName)
+        {
+            if (string.IsNullOrEmpty(displayName))
+                return null;
+            if (string.Equals(displayName, "WSA", StringComparison.Ordinal))
+                return RuntimePlatform.WSAPlayerARM;
+            return Enum.TryParse(displayName, out RuntimePlatform p) ? p : (RuntimePlatform?)null;
+        }
+
+        /// <summary>Player Settings &gt; Version (bundleVersion), dùng làm gợi ý build cho GameAnalytics.</summary>
+        private static string GetPlayerSettingsVersionHint()
+        {
+            return PlayerSettings.bundleVersion ?? "";
+        }
+
+        private void DrawGameAnalyticsSection()
+        {
+            EditorGUILayout.LabelField("Game Analytics", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Cấu hình Game Key / Secret Key / Build trên asset:\n" + PathGameAnalyticsSettings,
+                MessageType.None);
+
+            var settingsType = GetGameAnalyticsSettingsType();
+            if (settingsType == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "Không tìm thấy lớp GameAnalyticsSDK.Setup.Settings. Hãy cài package GameAnalytics vào project.",
+                    MessageType.Error);
+                return;
+            }
+
+            var asset = AssetDatabase.LoadAssetAtPath(PathGameAnalyticsSettings, settingsType) as ScriptableObject;
+            if (asset == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "Chưa có Settings.asset tại đường dẫn trên. Tạo từ menu GameAnalytics hoặc thêm file vào Resources/GameAnalytics.",
+                    MessageType.Warning);
+                return;
+            }
+
+            if (GUILayout.Button("Chọn Settings.asset trong Project", GUILayout.Height(22)))
+            {
+                Selection.activeObject = asset;
+                EditorGUIUtility.PingObject(asset);
+            }
+
+            EditorGUILayout.Space(6);
+
+            var so = new SerializedObject(asset);
+            so.Update();
+
+            var usePlayerBuild = so.FindProperty("UsePlayerSettingsBuildNumber");
+            if (usePlayerBuild != null)
+            {
+                EditorGUILayout.PropertyField(
+                    usePlayerBuild,
+                    new GUIContent(
+                        "Auto build từ Player Settings (Android/iOS)",
+                        "Khi bật, runtime gửi Application.version cho Android/iOS (giống inspector GameAnalytics)."));
+            }
+
+            EditorGUILayout.Space(8);
+            EditorGUILayout.LabelField("Game Setup", EditorStyles.boldLabel);
+
+            var getAvailable = settingsType.GetMethod(
+                "GetAvailablePlatforms",
+                BindingFlags.Instance | BindingFlags.Public);
+            var available = getAvailable?.Invoke(asset, null) as string[];
+
+            if (available == null || available.Length == 0)
+            {
+                EditorGUILayout.HelpBox("Không còn platform nào để thêm (hoặc danh sách trống).", MessageType.Info);
+            }
+            else
+            {
+                _gaAddPlatformDropdownIndex = Mathf.Clamp(_gaAddPlatformDropdownIndex, 0, available.Length - 1);
+                _gaAddPlatformDropdownIndex = EditorGUILayout.Popup("Platform to add", _gaAddPlatformDropdownIndex, available);
+                if (GUILayout.Button("Add platform", GUILayout.Height(24)))
+                {
+                    var parsed = ParseGameAnalyticsPlatformDisplayName(available[_gaAddPlatformDropdownIndex]);
+                    if (parsed.HasValue)
+                    {
+                        var add = settingsType.GetMethod("AddPlatform", BindingFlags.Instance | BindingFlags.Public);
+                        add?.Invoke(asset, new object[] { parsed.Value });
+                        EditorUtility.SetDirty(asset);
+                        so.Update();
+
+                        var defaultBuild = GetPlayerSettingsVersionHint();
+                        var buildProp = so.FindProperty("Build");
+                        if (buildProp != null && buildProp.arraySize > 0 && !string.IsNullOrEmpty(defaultBuild))
+                            buildProp.GetArrayElementAtIndex(buildProp.arraySize - 1).stringValue = defaultBuild;
+
+                        so.ApplyModifiedProperties();
+                        EditorUtility.SetDirty(asset);
+                    }
+                }
+            }
+
+            var platforms = so.FindProperty("Platforms");
+            var gameKeys = so.FindProperty("gameKey");
+            var secretKeys = so.FindProperty("secretKey");
+            var builds = so.FindProperty("Build");
+
+            if (platforms == null || gameKeys == null || secretKeys == null || builds == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "SerializedObject không đọc được Platforms/gameKey/secretKey/Build.",
+                    MessageType.Error);
+                return;
+            }
+
+            if (platforms.arraySize != gameKeys.arraySize || platforms.arraySize != secretKeys.arraySize ||
+                platforms.arraySize != builds.arraySize)
+            {
+                EditorGUILayout.HelpBox("Dữ liệu platform trong Settings không đồng bộ — mở inspector GameAnalytics để sửa.", MessageType.Warning);
+            }
+
+            EditorGUILayout.Space(8);
+            EditorGUILayout.LabelField("Platforms", EditorStyles.boldLabel);
+
+            int removeAt = -1;
+            for (int i = 0; i < platforms.arraySize; i++)
+            {
+                var plat = (RuntimePlatform)platforms.GetArrayElementAtIndex(i).intValue;
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.LabelField("Platform", plat.ToString());
+
+                var gk = gameKeys.GetArrayElementAtIndex(i);
+                var sk = secretKeys.GetArrayElementAtIndex(i);
+                var bd = builds.GetArrayElementAtIndex(i);
+
+                EditorGUILayout.PropertyField(gk, new GUIContent("Game Key"));
+                EditorGUILayout.PropertyField(sk, new GUIContent("Secret Key"));
+                EditorGUILayout.PropertyField(bd, new GUIContent("Build version"));
+
+                string hint = GetPlayerSettingsVersionHint();
+                bool autoBuild = usePlayerBuild != null && usePlayerBuild.boolValue &&
+                                 (plat == RuntimePlatform.Android || plat == RuntimePlatform.IPhonePlayer);
+                if (autoBuild)
+                {
+                    EditorGUILayout.HelpBox(
+                        "Đang bật auto: trên build Android/iOS SDK sẽ gửi Application.version (hiện \"" + hint + "\" trong Player Settings). " +
+                        "Giá trị Build version ở trên chủ yếu cho Editor / khi tắt auto.",
+                        MessageType.Info);
+                }
+
+                if (!string.IsNullOrEmpty(hint) &&
+                    !string.Equals((bd.stringValue ?? "").Trim(), hint.Trim(), StringComparison.Ordinal))
+                {
+                    EditorGUILayout.HelpBox(
+                        "Build version khác Player Settings > Version (\"" + hint + "\"). Kiểm tra trước khi release.",
+                        MessageType.Warning);
+                }
+
+                if (GUILayout.Button("Remove platform"))
+                    removeAt = i;
+
+                EditorGUILayout.EndVertical();
+                EditorGUILayout.Space(4);
+            }
+
+            if (removeAt >= 0)
+            {
+                var remove = settingsType.GetMethod("RemovePlatformAtIndex", BindingFlags.Instance | BindingFlags.Public);
+                remove?.Invoke(asset, new object[] { removeAt });
+                EditorUtility.SetDirty(asset);
+                so.Update();
+            }
+
+            if (so.ApplyModifiedProperties())
+                EditorUtility.SetDirty(asset);
+        }
+
+        private static void SaveGameAnalyticsSettingsAsset()
+        {
+            var t = GetGameAnalyticsSettingsType();
+            if (t == null)
+                return;
+            if (AssetDatabase.LoadAssetAtPath(PathGameAnalyticsSettings, t) == null)
+                return;
+            AssetDatabase.SaveAssets();
         }
 
         private void DrawIronSourceSection()
@@ -787,6 +1005,8 @@ namespace GameUpSDK.Editor
             // Các settings asset vẫn lưu như cũ
             if (!SaveGoogleMobileAdsSettings()) errors.Add(PathGoogleMobileAdsSettings);
             if (!SaveLevelPlayMediationSettings()) errors.Add(PathLevelPlayMediationSettings);
+
+            SaveGameAnalyticsSettingsAsset();
 
             if (errors.Count > 0)
                 _saveErrors = "Asset/Prefab not found at:\n" + string.Join("\n", errors);

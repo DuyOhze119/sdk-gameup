@@ -20,7 +20,7 @@ namespace GameAnalyticsSDK.Editor
         private static string gameanalytics_max = "gameanalytics_max_enabled";
         private static string gameanalytics_aequus = "gameanalytics_aequus_enabled";
         private static string gameanalytics_hyperbid = "gameanalytics_hyperbid_enabled";
-        private static string gameanalytics_admob = "gameanalytics_admob_enabled";
+        private static string gameanalytics_admob = "GAMEANALYTICS_ADMOB_ENABLED";
 
 #if UNITY_2018_1_OR_NEWER
         public int callbackOrder
@@ -189,7 +189,7 @@ namespace GameAnalyticsSDK.Editor
         }
 
         /// <summary>
-        /// Sets the scripting define symbol `gameanalytics_admob_enabled` to true if AdMob classes are detected within the Unity project
+        /// Sets the scripting define symbol `GAMEANALYTICS_ADMOB_ENABLED` to true if AdMob classes are detected within the Unity project
         /// </summary>
         private static void UpdateAdMob()
         {

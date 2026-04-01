@@ -1,7 +1,7 @@
 namespace GameUpSDK
 {
     /// <summary>
-    /// Event names and parameter names for game analytics: Firebase, AppsFlyer (MMP); GameAnalytics chỉ mirror level/wave (tiền tố gameup:).
+    /// Event names and parameter names for game analytics: Firebase, AppsFlyer (MMP); GameAnalytics progression (level/wave) map trong <see cref="GameUpAnalytics"/>.
     /// Ad-related events are handled elsewhere.
     /// </summary>
     public static class AnalyticsEvent

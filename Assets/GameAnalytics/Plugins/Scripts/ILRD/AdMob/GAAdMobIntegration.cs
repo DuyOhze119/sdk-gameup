@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using UnityEngine;
 using System.Collections.Generic;
 using GameAnalyticsSDK.Utilities;
 
 public class GAAdMobIntegration
 {
-#if gameanalytics_admob_enabled && !(UNITY_EDITOR)
+#if GAMEANALYTICS_ADMOB_ENABLED && !(UNITY_EDITOR)
 
     [Serializable]
     public class AdMobImpressionData
