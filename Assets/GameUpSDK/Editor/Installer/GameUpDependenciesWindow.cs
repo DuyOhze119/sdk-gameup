@@ -587,9 +587,9 @@ namespace GameUpSDK.Installer
             EditorGUILayout.Space(4);
 
             EditorGUILayout.HelpBox(
-                "Chọn Primary Mediation, rồi dùng nút \"Cài dependency\" trong khung Mediation để cài gom mọi thứ còn thiếu — thứ tự tự động: Facebook → Firebase (kèm EDM) → AdMob hoặc LevelPlay → adapters AdMob (nếu có) → AppsFlyer → GameAnalytics.\n" +
-                "Hoặc bấm \"Cài pack\" từng dòng theo đúng thứ tự hiển thị (cùng pipeline).\n" +
-                "Khi Unity đang compile hoặc đang cài/tải package, các nút cài sẽ bị khóa cho tới khi xong.",
+                "Chỉ dùng nút \"Cài dependency\" trong khung Mediation để cài gom mọi thứ còn thiếu (an toàn nhất) — thứ tự tự động: Facebook → Firebase (kèm EDM) → AdMob hoặc LevelPlay → adapters AdMob (nếu có) → AppsFlyer → GameAnalytics.\n" +
+                "Danh sách bên dưới chỉ để xem trạng thái; không cài từng pack riêng lẻ từ cửa sổ này.\n" +
+                "Khi Unity đang compile hoặc đang cài/tải package, nút Mediation sẽ bị khóa cho tới khi xong.",
                 MessageType.Info);
 
             EditorGUILayout.Space(6);
@@ -836,13 +836,13 @@ namespace GameUpSDK.Installer
             }
             else
             {
-                bool canAuto = CanAutoInstall(pkg);
-                EditorGUI.BeginDisabledGroup(IsInstallOrDownloadBusy());
-                if (canAuto)
+                var hint = new GUIStyle(EditorStyles.miniLabel)
                 {
-                    if (GUILayout.Button("Cài pack", GUILayout.Width(88), GUILayout.Height(24)))
-                        StartSinglePackageInstall(pkg);
-                }
+                    wordWrap = true,
+                    normal = { textColor = new Color(0.55f, 0.55f, 0.55f) },
+                };
+                if (CanAutoInstall(pkg))
+                    GUILayout.Label("← Cài gom (Mediation)", hint, GUILayout.Width(118));
                 else if (pkg.Method == InstallMethod.OpenUrl)
                 {
                     if (GUILayout.Button("Mở trang tải", GUILayout.Width(100), GUILayout.Height(24))
@@ -850,16 +850,7 @@ namespace GameUpSDK.Installer
                         Application.OpenURL(pkg.DownloadUrl);
                 }
                 else
-                {
-                    var manualStyle = new GUIStyle(EditorStyles.miniLabel)
-                    {
-                        wordWrap = true,
-                        normal = { textColor = new Color(0.55f, 0.55f, 0.55f) },
-                    };
-                    GUILayout.Label("Cần file trong Packages~ hoặc URL", manualStyle, GUILayout.Width(118));
-                }
-
-                EditorGUI.EndDisabledGroup();
+                    GUILayout.Label("Cần file Packages~/URL", hint, GUILayout.Width(118));
             }
 
             GUILayout.Space(8);
@@ -1038,19 +1029,6 @@ namespace GameUpSDK.Installer
             {
                 FinishBatch();
             }
-        }
-
-        /// <summary>
-        /// Cài một package — dùng chung <see cref="StartBatchInstall"/> với scope một phần tử (UnityPackage / Git / registry).
-        /// </summary>
-        private void StartSinglePackageInstall(PackageDef pkg)
-        {
-            if (pkg == null || pkg.IsInstalled || !CanAutoInstall(pkg))
-                return;
-            if (IsInstallOrDownloadBusy())
-                return;
-
-            StartBatchInstall(new List<PackageDef> { pkg });
         }
 
         private void EnqueueGitInstall(PackageDef pkg)
