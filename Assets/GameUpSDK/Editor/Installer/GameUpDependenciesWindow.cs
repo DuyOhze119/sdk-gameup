@@ -407,9 +407,6 @@ namespace GameUpSDK.Installer
                 EditorGUILayout.Space(4);
             }
 
-            GameUpInitialSetupSection.Draw(
-                "Sau đó chọn Primary Mediation và cài các package bên dưới.");
-
             DrawHeader();
             DrawMediationInfo();
 
