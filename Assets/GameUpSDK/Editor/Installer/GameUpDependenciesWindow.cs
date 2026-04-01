@@ -587,8 +587,8 @@ namespace GameUpSDK.Installer
             EditorGUILayout.Space(4);
 
             EditorGUILayout.HelpBox(
-                "Cài dependency bằng nút \"Cài pack\" trên từng dòng trong danh sách bên dưới (không cài gom tự động). Danh sách đã sắp đúng thứ tự khuyến nghị — nên cài lần lượt từ trên xuống và chờ Unity compile xong (và EDM/Android Resolver nếu bật) trước khi bấm pack tiếp theo.\n" +
-                "Khi đang compile hoặc đang cài/tải, các nút \"Cài pack\" bị khóa.",
+                "Có thể cài nhanh bằng \"Cài tất cả\" trong khung Mediation (đúng thứ tự khuyến nghị), hoặc cài từng bước bằng \"Cài pack\" trên từng dòng — nên chờ Unity compile (và EDM/Android Resolver nếu bật) giữa các bước khi cài lẻ.\n" +
+                "Khi đang compile hoặc đang cài/tải, nút Mediation và \"Cài pack\" đều bị khóa.",
                 MessageType.Info);
 
             EditorGUILayout.Space(6);
@@ -623,9 +623,9 @@ namespace GameUpSDK.Installer
                 : "Facebook, Firebase, AppsFlyer, GameAnalytics, IronSource LevelPlay.";
 
             EditorGUILayout.HelpBox(
-                "Primary Mediation chỉ chọn bộ pack quảng cáo (AdMob + adapters hay LevelPlay). " +
-                "Installer không còn cài gom một lần — hãy dùng \"Cài pack\" từng dòng trong danh sách phía dưới, theo thứ tự hiển thị.\n" +
-                "Bộ cần cho mediation hiện tại gồm: " + planDesc,
+                "Primary Mediation chọn bộ pack quảng cáo (AdMob + adapters hay LevelPlay). " +
+                "Dùng nút bên dưới để cài một lần mọi mục còn thiếu trong bộ đó (đúng thứ tự), hoặc \"Cài pack\" từng dòng trong danh sách.\n" +
+                "Bộ theo mediation hiện tại: " + planDesc,
                 MessageType.Info);
 
             EditorGUILayout.HelpBox(
@@ -645,7 +645,7 @@ namespace GameUpSDK.Installer
             if (missingAuto.Count > 0)
             {
                 EditorGUILayout.HelpBox(
-                    $"Còn {missingAuto.Count} mục trong bộ mediation có thể bấm \"Cài pack\" ở danh sách bên dưới — làm lần lượt từ trên xuống.",
+                    $"Còn {missingAuto.Count} mục có thể cài tự động — bấm \"Cài tất cả\" hoặc \"Cài pack\" lần lượt từ trên xuống trong danh sách.",
                     MessageType.Warning);
             }
             else
@@ -654,6 +654,19 @@ namespace GameUpSDK.Installer
                     "Theo Primary Mediation, không còn mục nào thiếu mà installer tự cài được (hoặc đã đủ).",
                     MessageType.None);
             }
+
+            EditorGUI.BeginDisabledGroup(IsInteractionLocked() || missingAuto.Count == 0);
+            if (GUILayout.Button(
+                    missingAuto.Count > 0
+                        ? $"⬇ Cài tất cả còn thiếu ({missingAuto.Count}) — theo thứ tự khuyến nghị"
+                        : "✓ Đã đủ package (tự động) cho Primary Mediation",
+                    GUILayout.Height(28)))
+            {
+                if (missingAuto.Count > 0)
+                    StartBatchInstall(planned);
+            }
+
+            EditorGUI.EndDisabledGroup();
 
             EditorGUILayout.HelpBox(
                 "Primary Mediation lưu bằng Scripting Define Symbols (`" + GUDefinetion.PrimaryMediationLevelPlay + "` / `" + GUDefinetion.PrimaryMediationAdMob + "`) — phù hợp khi GameUp SDK cài dạng UPM package (không tạo asset trong Assets/).",
