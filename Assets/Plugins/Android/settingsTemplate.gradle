@@ -28,10 +28,10 @@ dependencyResolutionManagement {
             url "https://android-sdk.is.com/" // Assets/GoogleMobileAds/Mediation/IronSource/Editor/IronSourceMediationDependencies.xml:24
         }
         maven {
-            url "https://repo.maven.apache.org/maven2/" // Assets/GoogleMobileAds/Mediation/LiftoffMonetize/Editor/LiftoffMonetizeMediationDependencies.xml:24, Assets/GoogleMobileAds/Mediation/UnityAds/Editor/UnityMediationDependencies.xml:25, Assets/GoogleMobileAds/Mediation/UnityAds/Editor/UnityMediationDependencies.xml:33
+            url "https://repo.maven.apache.org/maven2/" // Assets/GoogleMobileAds/Mediation/UnityAds/Editor/UnityMediationDependencies.xml:25, Assets/GoogleMobileAds/Mediation/UnityAds/Editor/UnityMediationDependencies.xml:33
         }
         maven {
-            url "https://dl.google.com/dl/android/maven2/" // Assets/GoogleMobileAds/Mediation/IronSource/Editor/IronSourceMediationDependencies.xml:24, Assets/GoogleMobileAds/Mediation/LiftoffMonetize/Editor/LiftoffMonetizeMediationDependencies.xml:24, Assets/GoogleMobileAds/Mediation/UnityAds/Editor/UnityMediationDependencies.xml:25
+            url "https://dl.google.com/dl/android/maven2/" // Assets/GoogleMobileAds/Mediation/IronSource/Editor/IronSourceMediationDependencies.xml:24, Assets/GoogleMobileAds/Mediation/UnityAds/Editor/UnityMediationDependencies.xml:25
         }
         mavenLocal()
 // Android Resolver Repos End

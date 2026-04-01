@@ -12,10 +12,11 @@ dependencies {
     implementation 'com.appsflyer:unity-wrapper:6.17.81' // Assets/AppsFlyer/Editor/AppsFlyerDependencies.xml:6
     implementation 'com.google.ads.mediation:ironsource:9.3.0.1' // Assets/GoogleMobileAds/Mediation/IronSource/Editor/IronSourceMediationDependencies.xml:24
     implementation 'com.google.ads.mediation:unity:4.16.6.0' // Assets/GoogleMobileAds/Mediation/UnityAds/Editor/UnityMediationDependencies.xml:25
-    implementation 'com.google.ads.mediation:vungle:7.7.1.0' // Assets/GoogleMobileAds/Mediation/LiftoffMonetize/Editor/LiftoffMonetizeMediationDependencies.xml:24
     implementation 'com.google.android.gms:play-services-ads:24.9.0' // Assets/LevelPlay/Editor/ISAdMobAdapterDependencies.xml:8
     implementation 'com.google.android.gms:play-services-ads-identifier:18.1.0' // Assets/LevelPlay/Editor/IronSourceSDKDependencies.xml:12
+    implementation 'com.google.android.gms:play-services-appset:16.0.2' // Assets/GameAnalytics/Editor/Android/Dependencies.xml:4
     implementation 'com.google.android.gms:play-services-base:18.10.0' // Assets/Firebase/Editor/AppDependencies.xml:20
+    implementation 'com.google.android.instantapps:instantapps:1.1.0' // Assets/GameAnalytics/Editor/Android/Dependencies.xml:3
     implementation 'com.google.android.ump:user-messaging-platform:3.2.0' // Assets/GoogleMobileAds/Editor/GoogleUmpDependencies.xml:7
     implementation 'com.google.firebase:firebase-analytics:23.0.0' // Assets/Firebase/Editor/RemoteConfigDependencies.xml:18
     implementation 'com.google.firebase:firebase-analytics-unity:13.7.0' // Assets/Firebase/Editor/AnalyticsDependencies.xml:21
