@@ -100,7 +100,7 @@ namespace GameUpSDK.Installer
 
         private static void SyncDefines()
         {
-            GameUpRuntimeAsmdefGameAnalyticsRefSync.SyncGameAnalyticsReference();
+            GameUpGameAnalyticsAsmdefBootstrap.TryEnsureRuntimeAsmdef(out _);
             EnsurePrimaryMediationDefines();
 
             bool levelPlayInstalled = IsAssemblyLoaded("Unity.LevelPlay");
