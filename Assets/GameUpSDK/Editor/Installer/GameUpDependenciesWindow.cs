@@ -587,9 +587,8 @@ namespace GameUpSDK.Installer
             EditorGUILayout.Space(4);
 
             EditorGUILayout.HelpBox(
-                "Chỉ dùng nút \"Cài dependency\" trong khung Mediation để cài gom mọi thứ còn thiếu (an toàn nhất) — thứ tự tự động: Facebook → Firebase (kèm EDM) → AdMob hoặc LevelPlay → adapters AdMob (nếu có) → AppsFlyer → GameAnalytics.\n" +
-                "Danh sách bên dưới chỉ để xem trạng thái; không cài từng pack riêng lẻ từ cửa sổ này.\n" +
-                "Khi Unity đang compile hoặc đang cài/tải package, nút Mediation sẽ bị khóa cho tới khi xong.",
+                "Cài dependency bằng nút \"Cài pack\" trên từng dòng trong danh sách bên dưới (không cài gom tự động). Danh sách đã sắp đúng thứ tự khuyến nghị — nên cài lần lượt từ trên xuống và chờ Unity compile xong (và EDM/Android Resolver nếu bật) trước khi bấm pack tiếp theo.\n" +
+                "Khi đang compile hoặc đang cài/tải, các nút \"Cài pack\" bị khóa.",
                 MessageType.Info);
 
             EditorGUILayout.Space(6);
@@ -620,36 +619,41 @@ namespace GameUpSDK.Installer
             var missingManual = planned.Where(p => !p.IsInstalled && !CanAutoInstall(p)).ToList();
 
             string planDesc = pm == AdsManager.PrimaryMediation.AdMob
-                ? "Facebook SDK, Firebase, AppsFlyer, GameAnalytics, Google Mobile Ads, AdMob Mediation Adapters."
-                : "Facebook SDK, Firebase, AppsFlyer, GameAnalytics, IronSource LevelPlay SDK.";
+                ? "Facebook, Firebase, AppsFlyer, GameAnalytics, Google Mobile Ads, AdMob Mediation Adapters."
+                : "Facebook, Firebase, AppsFlyer, GameAnalytics, IronSource LevelPlay.";
 
             EditorGUILayout.HelpBox(
-                "Một lần bấm sẽ cài (nếu chưa có): " + planDesc,
-                MessageType.None);
+                "Primary Mediation chỉ chọn bộ pack quảng cáo (AdMob + adapters hay LevelPlay). " +
+                "Installer không còn cài gom một lần — hãy dùng \"Cài pack\" từng dòng trong danh sách phía dưới, theo thứ tự hiển thị.\n" +
+                "Bộ cần cho mediation hiện tại gồm: " + planDesc,
+                MessageType.Info);
 
             EditorGUILayout.HelpBox(
-                "Thứ tự cài được áp dụng tự động (tránh xung EDM/Android resolver): Facebook → Firebase → mediation đã chọn → adapters AdMob (chỉ khi dùng AdMob) → AppsFlyer → GameAnalytics.",
+                "Thứ tự nên cài: (1) Facebook → (2) Firebase (kèm EDM) — chờ compile/resolve xong — → " +
+                "(3) Google Mobile Ads hoặc LevelPlay (trùng với Primary Mediation) → " +
+                "(4) AdMob Mediation adapters (chỉ khi dùng AdMob) → (5) AppsFlyer → (6) GameAnalytics. " +
+                "Các mục tùy chọn có thể bỏ qua nếu không dùng.",
                 MessageType.None);
 
             if (missingManual.Count > 0)
             {
                 EditorGUILayout.HelpBox(
-                    "Có package trong bộ này không cài tự động được (thiếu file trong Packages~ và không có URL tải). Cần tải thủ công theo mô tả từng mục trong danh sách bên dưới.",
+                    "Có package không cài tự động được (thiếu file trong Packages~ và không có URL tải). Cần tải/import thủ công theo mô tả từng dòng.",
                     MessageType.Warning);
             }
 
-            EditorGUI.BeginDisabledGroup(IsInteractionLocked() || missingAuto.Count == 0);
-            if (GUILayout.Button(
-                    missingAuto.Count > 0
-                        ? $"⬇ Cài dependency theo Primary Mediation ({missingAuto.Count} chưa có)"
-                        : "✓ Đã đủ package (tự động) cho Primary Mediation",
-                    GUILayout.Height(28)))
+            if (missingAuto.Count > 0)
             {
-                if (missingAuto.Count > 0)
-                    StartBatchInstall(planned);
+                EditorGUILayout.HelpBox(
+                    $"Còn {missingAuto.Count} mục trong bộ mediation có thể bấm \"Cài pack\" ở danh sách bên dưới — làm lần lượt từ trên xuống.",
+                    MessageType.Warning);
             }
-
-            EditorGUI.EndDisabledGroup();
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    "Theo Primary Mediation, không còn mục nào thiếu mà installer tự cài được (hoặc đã đủ).",
+                    MessageType.None);
+            }
 
             EditorGUILayout.HelpBox(
                 "Primary Mediation lưu bằng Scripting Define Symbols (`" + GUDefinetion.PrimaryMediationLevelPlay + "` / `" + GUDefinetion.PrimaryMediationAdMob + "`) — phù hợp khi GameUp SDK cài dạng UPM package (không tạo asset trong Assets/).",
@@ -805,7 +809,7 @@ namespace GameUpSDK.Installer
                 EditorGUILayout.HelpBox(pkg.InstallError, MessageType.Error);
             EditorGUILayout.EndVertical();
 
-            // Trạng thái (cài gom qua nút trong Mediation Settings)
+            // Trạng thái / Cài pack (từng dòng, không cài gom)
             GUILayout.Space(4);
             if (pkg.IsInstalled)
             {
@@ -836,13 +840,13 @@ namespace GameUpSDK.Installer
             }
             else
             {
-                var hint = new GUIStyle(EditorStyles.miniLabel)
+                bool canAuto = CanAutoInstall(pkg);
+                EditorGUI.BeginDisabledGroup(IsInstallOrDownloadBusy());
+                if (canAuto)
                 {
-                    wordWrap = true,
-                    normal = { textColor = new Color(0.55f, 0.55f, 0.55f) },
-                };
-                if (CanAutoInstall(pkg))
-                    GUILayout.Label("← Cài gom (Mediation)", hint, GUILayout.Width(118));
+                    if (GUILayout.Button("Cài pack", GUILayout.Width(88), GUILayout.Height(24)))
+                        StartSinglePackageInstall(pkg);
+                }
                 else if (pkg.Method == InstallMethod.OpenUrl)
                 {
                     if (GUILayout.Button("Mở trang tải", GUILayout.Width(100), GUILayout.Height(24))
@@ -850,7 +854,16 @@ namespace GameUpSDK.Installer
                         Application.OpenURL(pkg.DownloadUrl);
                 }
                 else
-                    GUILayout.Label("Cần file Packages~/URL", hint, GUILayout.Width(118));
+                {
+                    var manualStyle = new GUIStyle(EditorStyles.miniLabel)
+                    {
+                        wordWrap = true,
+                        normal = { textColor = new Color(0.55f, 0.55f, 0.55f) },
+                    };
+                    GUILayout.Label("Cần file Packages~/URL", manualStyle, GUILayout.Width(118));
+                }
+
+                EditorGUI.EndDisabledGroup();
             }
 
             GUILayout.Space(8);
@@ -1029,6 +1042,19 @@ namespace GameUpSDK.Installer
             {
                 FinishBatch();
             }
+        }
+
+        /// <summary>
+        /// Cài một package — dùng chung <see cref="StartBatchInstall"/> với scope một phần tử.
+        /// </summary>
+        private void StartSinglePackageInstall(PackageDef pkg)
+        {
+            if (pkg == null || pkg.IsInstalled || !CanAutoInstall(pkg))
+                return;
+            if (IsInstallOrDownloadBusy())
+                return;
+
+            StartBatchInstall(new List<PackageDef> { pkg });
         }
 
         private void EnqueueGitInstall(PackageDef pkg)
