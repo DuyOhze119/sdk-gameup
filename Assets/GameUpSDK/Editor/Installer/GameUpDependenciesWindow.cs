@@ -263,6 +263,7 @@ namespace GameUpSDK.Installer
         // Kept for backward compat with OnDisable / PollDownloadQueue references — sẽ không dùng nữa
         private UnityWebRequest _activeDownload;
         private PackageDef _downloadingPkg;
+        private bool _foldoutUgUiPackageCacheHelp;
         private const string LevelPlayDepsDefine = "LEVELPLAY_DEPENDENCIES_INSTALLED";
         private const string AdMobDepsDefine = "ADMOB_DEPENDENCIES_INSTALLED";
         private const string FirebaseDepsDefine = "FIREBASE_DEPENDENCIES_INSTALLED";
@@ -281,6 +282,72 @@ namespace GameUpSDK.Installer
             if (win.position.width < 560)
                 win.position = new Rect(win.position.x, win.position.y, 620, 580);
             win.RefreshStatus();
+        }
+
+        /// <summary>
+        /// Xóa <c>Library/PackageCache</c> và <c>Library/ScriptAssemblies</c> để Unity tải lại
+        /// <c>com.unity.ugui</c> khớp với bản Editor (tránh lỗi GraphicRaycaster / Dropdown / ListPool).
+        /// </summary>
+        [MenuItem("GameUp SDK/Troubleshooting/Fix Unity UI package cache (com.unity.ugui errors)…", false, 50)]
+        public static void MenuRepairUnityPackageCache()
+        {
+            RepairUnityPackageCacheWithConfirmation();
+        }
+
+        /// <summary>
+        /// Hiển thị hộp thoại xác nhận rồi xóa cache; dùng chung cho menu và nút trong cửa sổ Setup Dependencies.
+        /// </summary>
+        public static void RepairUnityPackageCacheWithConfirmation()
+        {
+            if (!EditorUtility.DisplayDialog(
+                    "GameUp SDK — Sửa cache gói Unity UI",
+                    "Sẽ xóa thư mục:\n• Library/PackageCache\n• Library/ScriptAssemblies\n\n" +
+                    "Unity sẽ tải lại các gói (gồm com.unity.ugui) cho khớp với phiên bản Editor hiện tại. " +
+                    "Dùng khi Console báo lỗi compile trong PackageCache (vd. GraphicRaycaster, Dropdown, ListPool).\n\n" +
+                    "Đóng các ứng dụng khác đang giữ file trong Library (hiếm). Tiếp tục?",
+                    "Xóa cache",
+                    "Hủy"))
+                return;
+
+            if (!TryDeleteUnityLibraryPackageCaches(out string err))
+            {
+                EditorUtility.DisplayDialog("GameUp SDK — Không xóa được cache", err, "OK");
+                return;
+            }
+
+            EditorUtility.DisplayDialog(
+                "GameUp SDK — Đã xóa cache",
+                "Đã xóa PackageCache và ScriptAssemblies. Unity sẽ resolve package và compile lại.\n\n" +
+                "Nếu vẫn lỗi: đóng Unity hoàn toàn, xóa cả thư mục Library, mở lại project bằng đúng Unity trong ProjectSettings/ProjectVersion.txt.",
+                "OK");
+
+            AssetDatabase.Refresh();
+            Client.Resolve();
+            CompilationPipeline.RequestScriptCompilation();
+        }
+
+        /// <summary>Xóa PackageCache + ScriptAssemblies; trả false và message nếu thất bại.</summary>
+        internal static bool TryDeleteUnityLibraryPackageCaches(out string errorMessage)
+        {
+            errorMessage = null;
+            try
+            {
+                string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+                string packageCache = Path.Combine(projectRoot, "Library", "PackageCache");
+                string scriptAssemblies = Path.Combine(projectRoot, "Library", "ScriptAssemblies");
+
+                if (Directory.Exists(packageCache))
+                    FileUtil.DeleteFileOrDirectory(packageCache);
+                if (Directory.Exists(scriptAssemblies))
+                    FileUtil.DeleteFileOrDirectory(scriptAssemblies);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = ex.Message;
+                return false;
+            }
         }
 
         /// <summary>
@@ -434,6 +501,7 @@ namespace GameUpSDK.Installer
 
             DrawHeader();
             DrawMediationInfo();
+            DrawUgUiPackageCacheTroubleshootFoldout();
 
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
             DrawPackageList();
@@ -555,6 +623,29 @@ namespace GameUpSDK.Installer
             );
 
             EditorGUILayout.EndVertical();
+        }
+
+        private void DrawUgUiPackageCacheTroubleshootFoldout()
+        {
+            EditorGUILayout.Space(4);
+            _foldoutUgUiPackageCacheHelp = EditorGUILayout.Foldout(
+                _foldoutUgUiPackageCacheHelp,
+                "Gỡ lỗi: lỗi compile trong com.unity.ugui (PackageCache)",
+                true);
+
+            if (!_foldoutUgUiPackageCacheHelp)
+                return;
+
+            EditorGUILayout.HelpBox(
+                "Nếu Console báo lỗi trong Library/PackageCache/com.unity.ugui (vd. GraphicRaycaster, Dropdown, ListPool): " +
+                "đó thường do cache gói Unity lệch với bản Editor — không phải do mã GameUp SDK. " +
+                "Mở project luôn bằng đúng phiên bản Unity trong ProjectSettings/ProjectVersion.txt.",
+                MessageType.Warning);
+
+            EditorGUI.BeginDisabledGroup(IsInstallOrDownloadBusy());
+            if (GUILayout.Button("Xóa Package Cache + ScriptAssemblies (tải lại gói Unity UI)", GUILayout.Height(26)))
+                RepairUnityPackageCacheWithConfirmation();
+            EditorGUI.EndDisabledGroup();
         }
 
         /// <summary>Firebase + AppsFlyer + bộ mediation theo lựa chọn (AdMob: GMA + adapters; LevelPlay: LevelPlay).</summary>
