@@ -44,6 +44,12 @@ namespace GameUpSDK.Installer
             /// <summary>Tên assembly để detect xem package đã cài chưa</summary>
             public string AssemblyName;
 
+            /// <summary>
+            /// Nếu set: coi là đã cài khi tìm thấy type này trong bất kỳ assembly đã load (vd GameAnalytics .unitypackage → Assembly-CSharp).
+            /// Vẫn kết hợp với <see cref="AssemblyName"/> nếu có assembly UPM riêng.
+            /// </summary>
+            public string InstalledTypeFullName;
+
             public InstallMethod Method;
 
             // Git URL (dùng khi Method == GitUrl)
@@ -154,6 +160,22 @@ namespace GameUpSDK.Installer
                 DownloadUrl      = "https://github.com/AppsFlyerSDK/appsflyer-unity-plugin/releases",
                 DownloadLabel    = "Tải AppsFlyer SDK →",
             },
+            new PackageDef
+            {
+                DisplayName = "GameAnalytics SDK",
+                Description = "Tùy chọn. Analytics sản phẩm (funnels, progression). GameUpAnalytics gửi design event (tiền tố gameup:) khi bật define GAMEANALYTICS_DEPENDENCIES_INSTALLED. Cần GameObject GameAnalytics + keys trong scene (Window → GameAnalytics).",
+                Required = false,
+                AssemblyName = "GameAnalyticsSDK",
+                InstalledTypeFullName = "GameAnalyticsSDK.GameAnalytics",
+                Method = InstallMethod.UnityPackage,
+                BundledFileNames = new[] { "GameAnalytics/GA_SDK_UNITY_7.10.6.unitypackage" },
+                HostedUrls = new[]
+                {
+                    "https://download.gameanalytics.com/unity/7.10.6/GA_SDK_UNITY.unitypackage",
+                },
+                DownloadUrl = "https://docs.gameanalytics.com/event-tracking-and-integrations/sdks-and-collection-api/game-engine-sdks/unity/",
+                DownloadLabel = "GameAnalytics Unity SDK →",
+            },
 
             new PackageDef
             {
@@ -221,6 +243,7 @@ namespace GameUpSDK.Installer
         private const string AdMobDepsDefine = "ADMOB_DEPENDENCIES_INSTALLED";
         private const string FirebaseDepsDefine = "FIREBASE_DEPENDENCIES_INSTALLED";
         private const string AppsFlyerDepsDefine = "APPSFLYER_DEPENDENCIES_INSTALLED";
+        private const string GameAnalyticsDepsDefine = "GAMEANALYTICS_DEPENDENCIES_INSTALLED";
 
         // ─── Static helpers ───────────────────────────────────────────────────────
 
@@ -442,7 +465,7 @@ namespace GameUpSDK.Installer
             EditorGUILayout.Space(4);
 
             EditorGUILayout.HelpBox(
-                "Chọn Primary Mediation, rồi dùng nút \"Cài dependency\" trong khung Mediation để cài một lần: Firebase, AppsFlyer và bộ quảng cáo tương ứng (đã có thì bỏ qua).\n" +
+                "Chọn Primary Mediation, rồi dùng nút \"Cài dependency\" trong khung Mediation để cài một lần: Firebase, AppsFlyer, GameAnalytics (tùy chọn) và bộ quảng cáo tương ứng (đã có thì bỏ qua).\n" +
                 "Khi Unity đang compile hoặc đang cài package, các nút sẽ bị khóa cho tới khi xong.",
                 MessageType.Info);
 
@@ -474,8 +497,8 @@ namespace GameUpSDK.Installer
             var missingManual = planned.Where(p => !p.IsInstalled && !CanAutoInstall(p)).ToList();
 
             string planDesc = pm == AdsManager.PrimaryMediation.AdMob
-                ? "Firebase, AppsFlyer, Google Mobile Ads, AdMob Mediation Adapters."
-                : "Firebase, AppsFlyer, IronSource LevelPlay SDK.";
+                ? "Firebase, AppsFlyer, GameAnalytics, Google Mobile Ads, AdMob Mediation Adapters."
+                : "Firebase, AppsFlyer, GameAnalytics, IronSource LevelPlay SDK.";
 
             EditorGUILayout.HelpBox(
                 "Một lần bấm sẽ cài (nếu chưa có): " + planDesc,
@@ -523,6 +546,7 @@ namespace GameUpSDK.Installer
 
             AddByAssembly("Firebase.App");
             AddByAssembly("AppsFlyer");
+            AddByAssembly("GameAnalyticsSDK");
 
             if (mediation == AdsManager.PrimaryMediation.AdMob)
             {
@@ -1286,7 +1310,7 @@ namespace GameUpSDK.Installer
 
             foreach (var pkg in s_packages)
             {
-                pkg.IsInstalled = IsAssemblyLoaded(pkg.AssemblyName);
+                pkg.IsInstalled = IsPackageInstalled(pkg);
                 pkg.IsInstalling = false;
                 pkg.InstallError = null;
             }
@@ -1319,11 +1343,18 @@ namespace GameUpSDK.Installer
             else if (!appsFlyerInstalled && HasDefine(AppsFlyerDepsDefine))
                 SetDefine(AppsFlyerDepsDefine, false);
 
+            // GameAnalytics: UPM (assembly GameAnalyticsSDK) hoặc .unitypackage cổ điển (type trong Assembly-CSharp)
+            bool gameAnalyticsInstalled = IsGameAnalyticsSdkPresent();
+            if (gameAnalyticsInstalled && !HasDefine(GameAnalyticsDepsDefine))
+                SetDefine(GameAnalyticsDepsDefine, true);
+            else if (!gameAnalyticsInstalled && HasDefine(GameAnalyticsDepsDefine))
+                SetDefine(GameAnalyticsDepsDefine, false);
+
             // Tự động set/clear define khi trạng thái thay đổi
             // GAMEUP_SDK_DEPS_READY chỉ còn ý nghĩa "SDK enabled" (backward compat).
-            // Bật khi có (Firebase hoặc AppsFlyer) AND (AdMob hoặc LevelPlay).
+            // Bật khi có (Firebase hoặc AppsFlyer hoặc GameAnalytics) AND (AdMob hoặc LevelPlay).
             // Không dùng define này để include SDK bên thứ 3 nữa.
-            bool hasAnalytics = firebaseInstalled || appsFlyerInstalled;
+            bool hasAnalytics = firebaseInstalled || appsFlyerInstalled || gameAnalyticsInstalled;
             bool hasMediation = admobInstalled || levelPlayInstalled;
             bool sdkEnabled = hasAnalytics && hasMediation;
             if (sdkEnabled && !IsDepsReadyDefined())
@@ -1351,6 +1382,42 @@ namespace GameUpSDK.Installer
             {
                 if (string.Equals(asm.GetName().Name, assemblyName, StringComparison.OrdinalIgnoreCase))
                     return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsPackageInstalled(PackageDef pkg)
+        {
+            bool byAssembly = !string.IsNullOrEmpty(pkg.AssemblyName) && IsAssemblyLoaded(pkg.AssemblyName);
+            bool byType = !string.IsNullOrEmpty(pkg.InstalledTypeFullName) &&
+                          IsTypeInAnyLoadedAssembly(pkg.InstalledTypeFullName);
+            if (!string.IsNullOrEmpty(pkg.InstalledTypeFullName))
+                return byAssembly || byType;
+            return byAssembly;
+        }
+
+        /// <summary>UPM có .asmdef GameAnalyticsSDK; .unitypackage chuẩn GA nằm trong Assembly-CSharp.</summary>
+        internal static bool IsGameAnalyticsSdkPresent()
+        {
+            return IsAssemblyLoaded("GameAnalyticsSDK") ||
+                   IsTypeInAnyLoadedAssembly("GameAnalyticsSDK.GameAnalytics");
+        }
+
+        private static bool IsTypeInAnyLoadedAssembly(string fullTypeName)
+        {
+            if (string.IsNullOrEmpty(fullTypeName)) return false;
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    if (asm.GetType(fullTypeName, throwOnError: false, ignoreCase: false) != null)
+                        return true;
+                }
+                catch
+                {
+                    /* một số dynamic assembly */
+                }
             }
 
             return false;

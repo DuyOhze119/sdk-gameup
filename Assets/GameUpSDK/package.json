@@ -1,23 +1,35 @@
 {
   "name": "com.ohze.gameup.sdk",
   "displayName": "GameUp SDK",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "unity": "2022.3",
-  "description": "GameUp SDK – Ads (IronSource/LevelPlay + AdMob App Open), Analytics (Firebase + AppsFlyer).\n\nSau khi cài đặt, cửa sổ Setup Dependencies sẽ tự động mở để hướng dẫn cài đặt các package phụ thuộc.",
-  "author": {
-    "name": "Ohze GameUp",
-    "url": "https://github.com/DuyOhze119/sdk-gameup"
-  },
+  "unityRelease": "0f1",
+  "description": "GameUp SDK — quảng cáo (IronSource LevelPlay / AdMob, App Open), analytics (Firebase, AppsFlyer), tùy chọn GameAnalytics cho tiến trình level & wave.\n\nSau khi cài, cửa sổ Setup Dependencies hướng dẫn Firebase, AppsFlyer, GameAnalytics, mediation và đồng bộ Scripting Define Symbols.",
   "keywords": [
     "gameup",
     "ads",
     "analytics",
     "ironsource",
-    "levplay",
+    "levelplay",
+    "admob",
     "firebase",
     "appsflyer",
-    "admob"
+    "gameanalytics",
+    "mediation",
+    "mmp"
   ],
+  "author": {
+    "name": "Ohze GameUp",
+    "url": "https://github.com/DuyOhze119/sdk-gameup"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DuyOhze119/sdk-gameup.git",
+    "revision": "main",
+    "directory": "Assets/GameUpSDK"
+  },
+  "documentationUrl": "https://github.com/DuyOhze119/sdk-gameup/blob/main/README.md",
+  "changelogUrl": "https://raw.githubusercontent.com/DuyOhze119/sdk-gameup/main/Assets/GameUpSDK/CHANGELOG.md",
   "dependencies": {
     "com.unity.services.core": "1.12.0"
   }

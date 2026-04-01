@@ -27,6 +27,7 @@ namespace GameUpSDK.Installer
         private const string AdMobDepsDefine = "ADMOB_DEPENDENCIES_INSTALLED";
         private const string FirebaseDepsDefine = "FIREBASE_DEPENDENCIES_INSTALLED";
         private const string AppsFlyerDepsDefine = "APPSFLYER_DEPENDENCIES_INSTALLED";
+        private const string GameAnalyticsDepsDefine = "GAMEANALYTICS_DEPENDENCIES_INSTALLED";
 
         private const string SessionThrottleKey = "GameUpSDK_DefinesAutoSync_Throttled";
 
@@ -105,14 +106,16 @@ namespace GameUpSDK.Installer
             bool admobInstalled = IsAssemblyLoaded("GoogleMobileAds");
             bool firebaseInstalled = IsAssemblyLoaded("Firebase.App");
             bool appsFlyerInstalled = IsAssemblyLoaded("AppsFlyer");
+            bool gameAnalyticsInstalled = GameUpDependenciesWindow.IsGameAnalyticsSdkPresent();
 
             SetDefine(LevelPlayDepsDefine, levelPlayInstalled);
             SetDefine(AdMobDepsDefine, admobInstalled);
             SetDefine(FirebaseDepsDefine, firebaseInstalled);
             SetDefine(AppsFlyerDepsDefine, appsFlyerInstalled);
+            SetDefine(GameAnalyticsDepsDefine, gameAnalyticsInstalled);
 
-            // Backward compat: bật khi có (Firebase hoặc AppsFlyer) AND (AdMob hoặc LevelPlay)
-            bool hasAnalytics = firebaseInstalled || appsFlyerInstalled;
+            // Backward compat: bật khi có (Firebase hoặc AppsFlyer hoặc GameAnalytics) AND (AdMob hoặc LevelPlay)
+            bool hasAnalytics = firebaseInstalled || appsFlyerInstalled || gameAnalyticsInstalled;
             bool hasMediation = admobInstalled || levelPlayInstalled;
             bool sdkEnabled = hasAnalytics && hasMediation;
             GameUpDependenciesWindow.SetDepsReadyDefine(sdkEnabled);

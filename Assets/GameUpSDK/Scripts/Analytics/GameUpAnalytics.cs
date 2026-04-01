@@ -10,11 +10,30 @@ using AppsFlyerSDK;
 namespace GameUpSDK
 {
     /// <summary>
-    /// Game analytics only: logs to Firebase (game events) and/or AppsFlyer (MMP events).
-    /// Ad-related logging is handled in Ads flow. Same-purpose events (e.g. level complete) log to both in one call.
+    /// Game analytics: Firebase và/hoặc AppsFlyer (MMP). GameAnalytics chỉ dùng cho tiến trình chơi — level và wave (design event <c>gameup:</c>).
+    /// GameAnalytics cần GameObject + keys; xem <see href="https://docs.gameanalytics.com/event-tracking-and-integrations/sdks-and-collection-api/game-engine-sdks/unity/">GA Unity docs</see>.
     /// </summary>
     public static class GameUpAnalytics
     {
+        private const string GameAnalyticsEventPrefix = "gameup:";
+
+        /// <summary>Chỉ progression (level/wave): design event <c>gameup:{eventName}</c>.</summary>
+        private static void LogGameAnalyticsProgression(string eventName, string paramName = null, string paramValue = null)
+        {
+            if (string.IsNullOrEmpty(eventName)) return;
+            Dictionary<string, string> d = null;
+            if (!string.IsNullOrEmpty(paramName))
+                d = new Dictionary<string, string> { [paramName] = paramValue ?? "" };
+            GameAnalyticsMirror.LogDesign(GameAnalyticsEventPrefix + eventName, 0f, d);
+        }
+
+        /// <summary>Chỉ progression: <paramref name="value"/> thường là score hoặc time (float).</summary>
+        private static void LogGameAnalyticsProgressionParams(string eventName, Dictionary<string, string> param, float value = 0f)
+        {
+            if (string.IsNullOrEmpty(eventName)) return;
+            GameAnalyticsMirror.LogDesign(GameAnalyticsEventPrefix + eventName, value, param);
+        }
+
         private static void LogFirebase(string eventName, string paramName = null, string paramValue = null)
         {
             if (string.IsNullOrEmpty(eventName)) return;
@@ -40,8 +59,17 @@ namespace GameUpSDK
         // ---------- Firebase: Virtual currency ----------
 
         /// <summary> start_level_1 - khi bắt đầu level 1 </summary>
-        public static void LogStartLevel1() => LogFirebase(AnalyticsEvent.StartLevel1);
-        public static void LogCompleteLevel1() => LogFirebase(AnalyticsEvent.CompleteLevel1);
+        public static void LogStartLevel1()
+        {
+            LogFirebase(AnalyticsEvent.StartLevel1);
+            LogGameAnalyticsProgression(AnalyticsEvent.StartLevel1);
+        }
+
+        public static void LogCompleteLevel1()
+        {
+            LogFirebase(AnalyticsEvent.CompleteLevel1);
+            LogGameAnalyticsProgression(AnalyticsEvent.CompleteLevel1);
+        }
 
         /// <summary> earn_virtual_currency: virtual_currency_name, value, source </summary>
         public static void LogEarnVirtualCurrency(string virtualCurrencyName, string value, string source)
@@ -78,37 +106,46 @@ namespace GameUpSDK
         /// <summary> level_start: level (từ 1), index (lần bắt đầu thứ bao nhiêu) </summary>
         public static void LogLevelStart(int level, int index)
         {
-            LogFirebaseParams(AnalyticsEvent.LevelStart, new Dictionary<string, string>
+            var p = new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamLevel] = level.ToString(),
                 [AnalyticsEvent.ParamIndex] = index.ToString()
-            });
+            };
+            LogFirebaseParams(AnalyticsEvent.LevelStart, p);
+            LogGameAnalyticsProgressionParams(AnalyticsEvent.LevelStart, p);
         }
 
         /// <summary> level_fail: level, index, time </summary>
         public static void LogLevelFail(int level, int index, float timeSeconds)
         {
-            LogFirebaseParams(AnalyticsEvent.LevelFail, new Dictionary<string, string>
+            var p = new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamLevel] = level.ToString(),
                 [AnalyticsEvent.ParamIndex] = index.ToString(),
                 [AnalyticsEvent.ParamTime] = timeSeconds.ToString("F0")
-            });
+            };
+            LogFirebaseParams(AnalyticsEvent.LevelFail, p);
+            LogGameAnalyticsProgressionParams(AnalyticsEvent.LevelFail, p, timeSeconds);
         }
 
         /// <summary> level_complete (Firebase) + af_level_achieved (AppsFlyer): level, index, time; optional af_score. </summary>
         public static void LogLevelComplete(int level, int index, float timeSeconds, int? score = null)
         {
-            LogFirebaseParams(AnalyticsEvent.LevelComplete, new Dictionary<string, string>
+            var fb = new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamLevel] = level.ToString(),
                 [AnalyticsEvent.ParamIndex] = index.ToString(),
                 [AnalyticsEvent.ParamTime] = timeSeconds.ToString("F0")
-            });
+            };
+            LogFirebaseParams(AnalyticsEvent.LevelComplete, fb);
 
             var af = new Dictionary<string, string> { [AnalyticsEvent.ParamAfLevel] = level.ToString() };
             if (score.HasValue) af[AnalyticsEvent.ParamAfScore] = score.Value.ToString();
             LogAppsFlyer(AnalyticsEvent.AfLevelAchieved, af);
+
+            var ga = new Dictionary<string, string>(fb);
+            if (score.HasValue) ga[AnalyticsEvent.ParamAfScore] = score.Value.ToString();
+            LogGameAnalyticsProgressionParams(AnalyticsEvent.LevelComplete, ga, score ?? 0f);
         }
 
         // ---------- Firebase: Button ----------
@@ -121,31 +158,37 @@ namespace GameUpSDK
         /// <summary> wave_start: level, wave </summary>
         public static void LogWaveStart(int level, int wave)
         {
-            LogFirebaseParams(AnalyticsEvent.WaveStart, new Dictionary<string, string>
+            var p = new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamLevel] = level.ToString(),
                 [AnalyticsEvent.ParamWave] = wave.ToString()
-            });
+            };
+            LogFirebaseParams(AnalyticsEvent.WaveStart, p);
+            LogGameAnalyticsProgressionParams(AnalyticsEvent.WaveStart, p);
         }
 
         /// <summary> wave_fail: level, wave </summary>
         public static void LogWaveFail(int level, int wave)
         {
-            LogFirebaseParams(AnalyticsEvent.WaveFail, new Dictionary<string, string>
+            var p = new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamLevel] = level.ToString(),
                 [AnalyticsEvent.ParamWave] = wave.ToString()
-            });
+            };
+            LogFirebaseParams(AnalyticsEvent.WaveFail, p);
+            LogGameAnalyticsProgressionParams(AnalyticsEvent.WaveFail, p);
         }
 
         /// <summary> wave_complete: level, wave </summary>
         public static void LogWaveComplete(int level, int wave)
         {
-            LogFirebaseParams(AnalyticsEvent.WaveComplete, new Dictionary<string, string>
+            var p = new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamLevel] = level.ToString(),
                 [AnalyticsEvent.ParamWave] = wave.ToString()
-            });
+            };
+            LogFirebaseParams(AnalyticsEvent.WaveComplete, p);
+            LogGameAnalyticsProgressionParams(AnalyticsEvent.WaveComplete, p);
         }
 
         // ---------- AppsFlyer only ----------

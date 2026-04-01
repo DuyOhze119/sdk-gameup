@@ -8,6 +8,7 @@ namespace GameUpSDK
         // Per-provider dependency defines (được set tự động bởi GameUpDependenciesWindow).
         public const string FirebaseDepsInstalled = "FIREBASE_DEPENDENCIES_INSTALLED";
         public const string AppsFlyerDepsInstalled = "APPSFLYER_DEPENDENCIES_INSTALLED";
+        public const string GameAnalyticsDepsInstalled = "GAMEANALYTICS_DEPENDENCIES_INSTALLED";
         public const string AdMobDepsInstalled = "ADMOB_DEPENDENCIES_INSTALLED";
         public const string LevelPlayDepsInstalled = "LEVELPLAY_DEPENDENCIES_INSTALLED";
 
