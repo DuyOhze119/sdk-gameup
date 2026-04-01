@@ -79,6 +79,12 @@ namespace GameUpSDK.Installer
             public string DownloadUrl;
             public string DownloadLabel;
 
+            /// <summary>
+            /// Đường dẫn asset (vd Assets/FacebookSDK/Examples) sẽ xóa ngay sau khi import .unitypackage
+            /// (bỏ sample/examples gây lỗi compile hoặc không cần trong production).
+            /// </summary>
+            public string[] DeleteAssetPathsAfterImport;
+
             // ── Runtime state ──
             public bool IsInstalled;
             public bool IsInstalling;
@@ -91,6 +97,24 @@ namespace GameUpSDK.Installer
 
         private static readonly PackageDef[] s_packages =
         {
+            new PackageDef
+            {
+                DisplayName = "Facebook Unity SDK 18.0.0",
+                Description =
+                    "Bắt buộc. Facebook SDK cho Unity (login, sharing, v.v.). Khi cài qua installer, thư mục Examples sẽ tự bỏ để tránh lỗi.",
+                Required = true,
+                // Facebook.Unity.dll thường tắt trên Editor; assembly Editor luôn load khi đã import SDK.
+                AssemblyName = "Facebook.Unity.Editor",
+                Method = InstallMethod.UnityPackage,
+                BundledFileNames = new[] { "Facebook/facebook-unity-sdk-18.0.0.unitypackage" },
+                HostedUrls = new[]
+                {
+                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/facebook-unity-sdk-18.0.0.unitypackage",
+                },
+                DownloadUrl = "https://developers.facebook.com/docs/unity/downloads/",
+                DownloadLabel = "Tải Facebook Unity SDK →",
+                DeleteAssetPathsAfterImport = new[] { "Assets/FacebookSDK/Examples" },
+            },
             new PackageDef
             {
                 DisplayName = "Firebase SDK  (Analytics + Crashlytics + Remote Config)",
@@ -244,6 +268,7 @@ namespace GameUpSDK.Installer
         private const string FirebaseDepsDefine = "FIREBASE_DEPENDENCIES_INSTALLED";
         private const string AppsFlyerDepsDefine = "APPSFLYER_DEPENDENCIES_INSTALLED";
         private const string GameAnalyticsDepsDefine = "GAMEANALYTICS_DEPENDENCIES_INSTALLED";
+        private const string FacebookDepsDefine = "FACEBOOK_DEPENDENCIES_INSTALLED";
 
         // ─── Static helpers ───────────────────────────────────────────────────────
 
@@ -266,7 +291,7 @@ namespace GameUpSDK.Installer
         {
             return s_packages
                 .Where(p => p.Required)
-                .All(p => IsAssemblyLoaded(p.AssemblyName));
+                .All(IsPackageInstalled);
         }
 
         // ─── Lifecycle ────────────────────────────────────────────────────────────
@@ -465,7 +490,7 @@ namespace GameUpSDK.Installer
             EditorGUILayout.Space(4);
 
             EditorGUILayout.HelpBox(
-                "Chọn Primary Mediation, rồi dùng nút \"Cài dependency\" trong khung Mediation để cài một lần: Firebase, AppsFlyer, GameAnalytics (tùy chọn) và bộ quảng cáo tương ứng (đã có thì bỏ qua).\n" +
+                "Chọn Primary Mediation, rồi dùng nút \"Cài dependency\" trong khung Mediation để cài một lần: Facebook SDK (bắt buộc), Firebase, AppsFlyer, GameAnalytics (tùy chọn) và bộ quảng cáo tương ứng (đã có thì bỏ qua).\n" +
                 "Khi Unity đang compile hoặc đang cài package, các nút sẽ bị khóa cho tới khi xong.",
                 MessageType.Info);
 
@@ -497,8 +522,8 @@ namespace GameUpSDK.Installer
             var missingManual = planned.Where(p => !p.IsInstalled && !CanAutoInstall(p)).ToList();
 
             string planDesc = pm == AdsManager.PrimaryMediation.AdMob
-                ? "Firebase, AppsFlyer, GameAnalytics, Google Mobile Ads, AdMob Mediation Adapters."
-                : "Firebase, AppsFlyer, GameAnalytics, IronSource LevelPlay SDK.";
+                ? "Facebook SDK, Firebase, AppsFlyer, GameAnalytics, Google Mobile Ads, AdMob Mediation Adapters."
+                : "Facebook SDK, Firebase, AppsFlyer, GameAnalytics, IronSource LevelPlay SDK.";
 
             EditorGUILayout.HelpBox(
                 "Một lần bấm sẽ cài (nếu chưa có): " + planDesc,
@@ -544,6 +569,7 @@ namespace GameUpSDK.Installer
                     list.Add(p);
             }
 
+            AddByAssembly("Facebook.Unity.Editor");
             AddByAssembly("Firebase.App");
             AddByAssembly("AppsFlyer");
             AddByAssembly("GameAnalyticsSDK");
@@ -1020,6 +1046,26 @@ namespace GameUpSDK.Installer
             return Path.Combine(Application.dataPath, "GameUpSDK", "Packages~");
         }
 
+        /// <summary>Xóa asset/thư mục sau import .unitypackage (vd bỏ Facebook SDK Examples).</summary>
+        private static void ApplyPostImportCleanup(PackageDef pkg)
+        {
+            if (pkg?.DeleteAssetPathsAfterImport == null || pkg.DeleteAssetPathsAfterImport.Length == 0)
+                return;
+
+            foreach (string assetPath in pkg.DeleteAssetPathsAfterImport)
+            {
+                if (string.IsNullOrWhiteSpace(assetPath))
+                    continue;
+
+                if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) == null
+                    && !AssetDatabase.IsValidFolder(assetPath))
+                    continue;
+
+                if (!AssetDatabase.DeleteAsset(assetPath))
+                    Debug.LogWarning($"[GameUpSDK] Không xóa được sau import: {assetPath}");
+            }
+        }
+
         /// <summary>
         /// Import tất cả file .unitypackage của một package.
         /// interactive=false để không hiện dialog xác nhận cho từng file.
@@ -1044,6 +1090,8 @@ namespace GameUpSDK.Installer
                     Debug.LogError($"[GameUpSDK] Import {Path.GetFileName(path)} thất bại: {ex.Message}");
                 }
             }
+
+            ApplyPostImportCleanup(pkg);
 
             // Ép Unity re-scan assets/dll sau khi import để giảm độ trễ load assemblies.
             // (ImportPackage chạy async; refresh thêm nhịp sau giúp state ổn định nhanh hơn.)
@@ -1314,6 +1362,13 @@ namespace GameUpSDK.Installer
                 pkg.IsInstalling = false;
                 pkg.InstallError = null;
             }
+
+            // Auto set/clear Facebook define (Editor assembly = SDK đã import)
+            bool facebookInstalled = IsAssemblyLoaded("Facebook.Unity.Editor");
+            if (facebookInstalled && !HasDefine(FacebookDepsDefine))
+                SetDefine(FacebookDepsDefine, true);
+            else if (!facebookInstalled && HasDefine(FacebookDepsDefine))
+                SetDefine(FacebookDepsDefine, false);
 
             // Auto set/clear LevelPlay define theo trạng thái package
             bool levelPlayInstalled = IsAssemblyLoaded("Unity.LevelPlay");

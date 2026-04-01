@@ -29,6 +29,7 @@ namespace GameUpSDK.Installer
         private const string FirebaseDepsDefine = "FIREBASE_DEPENDENCIES_INSTALLED";
         private const string AppsFlyerDepsDefine = "APPSFLYER_DEPENDENCIES_INSTALLED";
         private const string GameAnalyticsDepsDefine = "GAMEANALYTICS_DEPENDENCIES_INSTALLED";
+        private const string FacebookDepsDefine = "FACEBOOK_DEPENDENCIES_INSTALLED";
 
         private const string SessionThrottleKey = "GameUpSDK_DefinesAutoSync_Throttled";
 
@@ -137,12 +138,14 @@ namespace GameUpSDK.Installer
             bool firebaseInstalled = IsAssemblyLoaded("Firebase.App");
             bool appsFlyerInstalled = IsAssemblyLoaded("AppsFlyer");
             bool gameAnalyticsInstalled = GameUpDependenciesWindow.IsGameAnalyticsSdkPresent();
+            bool facebookInstalled = IsAssemblyLoaded("Facebook.Unity.Editor");
 
             SetDefine(LevelPlayDepsDefine, levelPlayInstalled);
             SetDefine(AdMobDepsDefine, admobInstalled);
             SetDefine(FirebaseDepsDefine, firebaseInstalled);
             SetDefine(AppsFlyerDepsDefine, appsFlyerInstalled);
             SetDefine(GameAnalyticsDepsDefine, gameAnalyticsInstalled);
+            SetDefine(FacebookDepsDefine, facebookInstalled);
 
             // Backward compat: bật khi có (Firebase hoặc AppsFlyer hoặc GameAnalytics) AND (AdMob hoặc LevelPlay)
             bool hasAnalytics = firebaseInstalled || appsFlyerInstalled || gameAnalyticsInstalled;

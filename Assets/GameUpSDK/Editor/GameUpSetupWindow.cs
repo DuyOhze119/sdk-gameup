@@ -79,6 +79,8 @@ namespace GameUpSDK.Editor
         private const string PathGoogleMobileAdsSettings   = "Assets/GoogleMobileAds/Resources/GoogleMobileAdsSettings.asset";
         private const string PathLevelPlayMediationSettings = "Assets/LevelPlay/Resources/LevelPlayMediationSettings.asset";
         private const string PathGameAnalyticsSettings      = "Assets/Resources/GameAnalytics/Settings.asset";
+        /// <summary>Đồng bộ với Facebook.Unity.Settings.FacebookSettings (SDK 18.x).</summary>
+        private const string PathFacebookSettings = "Assets/FacebookSDK/SDK/Resources/FacebookSettings.asset";
 
         private int _activeTab;
         private string[] _tabs;
@@ -87,12 +89,19 @@ namespace GameUpSDK.Editor
 
         private enum SetupTab
         {
+            Facebook,
             AppsFlyer,
             GameAnalytics,
             IronSourceMediation,
             AdMobAppOpen,
             FirebaseRemoteConfig,
         }
+
+        // FacebookSettings.asset (appLabels[0], appIds[0], clientTokens[0], androidKeystorePath)
+        private string _facebookAppLabel = "";
+        private string _facebookAppId = "";
+        private string _facebookClientToken = "";
+        private string _facebookAndroidKeystorePath = "";
 
         // AppsFlyer (AppsFlyerObjectScript on AppsFlyerObject.prefab: devKey, appID)
         private string _appsFlyerDevKey = "";
@@ -267,6 +276,7 @@ namespace GameUpSDK.Editor
 
             var tabs = new List<SetupTab>
             {
+                SetupTab.Facebook,
                 SetupTab.AppsFlyer,
                 SetupTab.GameAnalytics,
             };
@@ -292,6 +302,7 @@ namespace GameUpSDK.Editor
                 {
                     switch (t)
                     {
+                        case SetupTab.Facebook: DrawFacebookSection(); break;
                         case SetupTab.AppsFlyer: DrawAppsFlyerSection(); break;
                         case SetupTab.GameAnalytics: DrawGameAnalyticsSection(); break;
                         case SetupTab.IronSourceMediation: DrawIronSourceSection(); break;
@@ -315,14 +326,15 @@ namespace GameUpSDK.Editor
         private static int GetDefaultTabIndexFor(GameUpSDK.AdsManager.PrimaryMediation pm)
         {
             // Mở tab ads theo PrimaryMediation để user cấu hình nhanh nhất.
-            // LevelPlay -> IronSource; AdMob -> AdMob. (sau AppsFlyer + Game Analytics)
-            return pm == GameUpSDK.AdsManager.PrimaryMediation.LevelPlay ? 2 : 2;
+            // LevelPlay -> IronSource; AdMob -> AdMob. (sau Facebook + AppsFlyer + Game Analytics)
+            return pm == GameUpSDK.AdsManager.PrimaryMediation.LevelPlay ? 3 : 3;
         }
 
         private static string GetTabLabel(SetupTab tab)
         {
             switch (tab)
             {
+                case SetupTab.Facebook: return "Facebook";
                 case SetupTab.AppsFlyer: return "AppsFlyer";
                 case SetupTab.GameAnalytics: return "Game Analytics";
                 case SetupTab.IronSourceMediation: return "IronSource Mediation";
@@ -348,6 +360,276 @@ namespace GameUpSDK.Editor
                 EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
                 Debug.Log("[GameUpSDK] Đã thêm SDK vào scene hiện tại.");
             }
+        }
+
+        private static Type _facebookSettingsType;
+
+        private static Type GetFacebookSettingsType()
+        {
+            if (_facebookSettingsType != null)
+                return _facebookSettingsType;
+
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    var t = asm.GetType("Facebook.Unity.Settings.FacebookSettings", false);
+                    if (t != null && typeof(ScriptableObject).IsAssignableFrom(t))
+                    {
+                        _facebookSettingsType = t;
+                        break;
+                    }
+                }
+                catch
+                {
+                    // ignore
+                }
+            }
+
+            return _facebookSettingsType;
+        }
+
+        private static string GetFacebookSettingsAssetPath()
+        {
+            var t = GetFacebookSettingsType();
+            if (t == null)
+                return PathFacebookSettings;
+
+            try
+            {
+                var pathField = t.GetField("FacebookSettingsPath", BindingFlags.Public | BindingFlags.Static);
+                var nameField = t.GetField("FacebookSettingsAssetName", BindingFlags.Public | BindingFlags.Static);
+                var extField = t.GetField("FacebookSettingsAssetExtension", BindingFlags.Public | BindingFlags.Static);
+                string rel = (pathField?.GetValue(null) as string ?? "FacebookSDK/SDK/Resources").Replace('\\', '/').Trim('/');
+                string name = nameField?.GetValue(null) as string ?? "FacebookSettings";
+                string ext = extField?.GetValue(null) as string ?? ".asset";
+                return $"Assets/{rel}/{name}{ext}".Replace("//", "/");
+            }
+            catch
+            {
+                return PathFacebookSettings;
+            }
+        }
+
+        private static void TryFacebookManifestRegenerate()
+        {
+            try
+            {
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Type t;
+                    try
+                    {
+                        t = asm.GetType("Facebook.Unity.Editor.ManifestMod", false);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    if (t == null)
+                        continue;
+                    var m = t.GetMethod("GenerateManifest", BindingFlags.Static | BindingFlags.Public);
+                    m?.Invoke(null, null);
+                    return;
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        private void LoadFacebookSettings()
+        {
+            var settingsType = GetFacebookSettingsType();
+            if (settingsType == null)
+                return;
+
+            string path = GetFacebookSettingsAssetPath();
+            var asset = AssetDatabase.LoadAssetAtPath(path, settingsType) as ScriptableObject;
+            if (asset == null)
+            {
+                _facebookAppLabel = "";
+                _facebookAppId = "";
+                _facebookClientToken = "";
+                _facebookAndroidKeystorePath = "";
+                return;
+            }
+
+            var so = new SerializedObject(asset);
+            var appLabels = so.FindProperty("appLabels");
+            var appIds = so.FindProperty("appIds");
+            var clientTokens = so.FindProperty("clientTokens");
+            var keystore = so.FindProperty("androidKeystorePath");
+
+            _facebookAppLabel = appLabels != null && appLabels.arraySize > 0
+                ? appLabels.GetArrayElementAtIndex(0).stringValue ?? ""
+                : "";
+            _facebookAppId = appIds != null && appIds.arraySize > 0
+                ? appIds.GetArrayElementAtIndex(0).stringValue ?? ""
+                : "";
+            _facebookClientToken = clientTokens != null && clientTokens.arraySize > 0
+                ? clientTokens.GetArrayElementAtIndex(0).stringValue ?? ""
+                : "";
+            _facebookAndroidKeystorePath = keystore != null ? keystore.stringValue ?? "" : "";
+        }
+
+        private static void EnsureFacebookListSize(SerializedObject so, string listName, int minSize)
+        {
+            var p = so.FindProperty(listName);
+            if (p == null || p.isArray == false)
+                return;
+            if (p.arraySize >= minSize)
+                return;
+            p.arraySize = minSize;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private bool TryCreateFacebookSettingsAsset()
+        {
+            var settingsType = GetFacebookSettingsType();
+            if (settingsType == null)
+                return false;
+
+            string path = GetFacebookSettingsAssetPath();
+            if (AssetDatabase.LoadAssetAtPath(path, settingsType) != null)
+                return true;
+
+            var pathField = settingsType.GetField("FacebookSettingsPath", BindingFlags.Public | BindingFlags.Static);
+            string rel = (pathField?.GetValue(null) as string ?? "FacebookSDK/SDK/Resources")
+                .Replace('\\', Path.DirectorySeparatorChar);
+            string diskPath = Path.Combine(Application.dataPath, rel);
+            if (!Directory.Exists(diskPath))
+                Directory.CreateDirectory(diskPath);
+
+            var instance = ScriptableObject.CreateInstance(settingsType);
+            AssetDatabase.CreateAsset(instance, path);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            TryFacebookManifestRegenerate();
+            LoadFacebookSettings();
+            return true;
+        }
+
+        private bool SaveFacebookSettingsAsset()
+        {
+            var settingsType = GetFacebookSettingsType();
+            if (settingsType == null)
+                return true;
+
+            string path = GetFacebookSettingsAssetPath();
+            var asset = AssetDatabase.LoadAssetAtPath(path, settingsType) as ScriptableObject;
+            if (asset == null)
+                return true;
+
+            var so = new SerializedObject(asset);
+            EnsureFacebookListSize(so, "appLabels", 1);
+            EnsureFacebookListSize(so, "appIds", 1);
+            EnsureFacebookListSize(so, "clientTokens", 1);
+            so.Update();
+
+            var appLabels = so.FindProperty("appLabels");
+            var appIds = so.FindProperty("appIds");
+            var clientTokens = so.FindProperty("clientTokens");
+            var keystore = so.FindProperty("androidKeystorePath");
+
+            if (appLabels != null && appLabels.arraySize > 0)
+                appLabels.GetArrayElementAtIndex(0).stringValue = _facebookAppLabel ?? "";
+            if (appIds != null && appIds.arraySize > 0)
+                appIds.GetArrayElementAtIndex(0).stringValue = _facebookAppId ?? "";
+            if (clientTokens != null && clientTokens.arraySize > 0)
+                clientTokens.GetArrayElementAtIndex(0).stringValue = _facebookClientToken ?? "";
+            if (keystore != null)
+                keystore.stringValue = _facebookAndroidKeystorePath ?? "";
+
+            so.ApplyModifiedProperties();
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssets();
+            TryFacebookManifestRegenerate();
+            return true;
+        }
+
+        private void DrawFacebookSection()
+        {
+            EditorGUILayout.LabelField("Facebook Settings", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Cấu hình asset: " + PathFacebookSettings + " (giống menu Facebook → Edit Settings).",
+                MessageType.None);
+
+            var settingsType = GetFacebookSettingsType();
+            if (settingsType == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "Chưa có Facebook Unity SDK trong project. Cài Facebook SDK 18.x qua cửa sổ Setup Dependencies.",
+                    MessageType.Warning);
+                if (GUILayout.Button("Mở GameUp SDK — Setup Dependencies", GUILayout.Height(28)))
+                    GameUpSDK.Installer.GameUpDependenciesWindow.ShowWindow();
+                return;
+            }
+
+            string path = GetFacebookSettingsAssetPath();
+            var asset = AssetDatabase.LoadAssetAtPath(path, settingsType) as ScriptableObject;
+
+            if (asset == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "Chưa có FacebookSettings.asset. Tạo file giống khi chọn Facebook → Edit Settings trên menu.",
+                    MessageType.Warning);
+                if (GUILayout.Button("Tạo FacebookSettings.asset", GUILayout.Height(28)))
+                {
+                    if (TryCreateFacebookSettingsAsset())
+                        Debug.Log("[GameUpSDK] Đã tạo " + path);
+                }
+
+                if (GUILayout.Button("Mở GameUp SDK — Setup Dependencies", GUILayout.Height(24)))
+                    GameUpSDK.Installer.GameUpDependenciesWindow.ShowWindow();
+                return;
+            }
+
+            if (GUILayout.Button("Chọn FacebookSettings trong Project", GUILayout.Height(22)))
+            {
+                Selection.activeObject = asset;
+                EditorGUIUtility.PingObject(asset);
+            }
+
+            EditorGUILayout.Space(6);
+            EditorGUILayout.LabelField("App #1 (game chính)", EditorStyles.miniBoldLabel);
+
+            EditorGUILayout.BeginHorizontal();
+            _facebookAppLabel = EditorGUILayout.TextField(
+                new GUIContent("App Name", "Nên trùng tên game; có thể đồng bộ từ Player Settings > Product Name."),
+                _facebookAppLabel);
+            if (GUILayout.Button("= Product Name", GUILayout.Width(110)))
+                _facebookAppLabel = PlayerSettings.productName ?? "";
+            EditorGUILayout.EndHorizontal();
+
+            _facebookAppId = EditorGUILayout.TextField(
+                new GUIContent("Facebook App Id", "developers.facebook.com → App → Settings."),
+                _facebookAppId);
+            _facebookClientToken = EditorGUILayout.TextField(
+                new GUIContent("Client Token", "App → Settings → Advanced."),
+                _facebookClientToken);
+
+            EditorGUILayout.Space(8);
+            EditorGUILayout.LabelField("Android", EditorStyles.miniBoldLabel);
+            EditorGUILayout.BeginHorizontal();
+            _facebookAndroidKeystorePath = EditorGUILayout.TextField(
+                new GUIContent("Android Keystore Path", "Để trống nếu dùng keystore mặc định của Unity."),
+                _facebookAndroidKeystorePath);
+            if (GUILayout.Button("Browse…", GUILayout.Width(72)))
+            {
+                string picked = EditorUtility.OpenFilePanel("Chọn keystore", "", "keystore,jks,ks");
+                if (!string.IsNullOrEmpty(picked))
+                    _facebookAndroidKeystorePath = picked;
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space(6);
+            EditorGUILayout.HelpBox(
+                "Bấm \"Save Configuration\" ở cuối cửa sổ để ghi các trường trên vào FacebookSettings.asset.",
+                MessageType.Info);
         }
 
         private void DrawAppsFlyerSection()
@@ -640,6 +922,7 @@ namespace GameUpSDK.Editor
             if (!LoadAdMob()) errors.Add("Prefab not found at: " + PathAdMob);
             LoadGoogleMobileAdsSettings();
             LoadLevelPlayMediationSettings();
+            LoadFacebookSettings();
             _loadErrors = errors.Count > 0 ? string.Join("\n", errors) : null;
         }
 
@@ -713,6 +996,7 @@ namespace GameUpSDK.Editor
 
             LoadGoogleMobileAdsSettings();
             LoadLevelPlayMediationSettings();
+            LoadFacebookSettings();
 
             _loadErrors = errors.Count > 0 ? string.Join("\n", errors) : null;
         }
@@ -1007,6 +1291,7 @@ namespace GameUpSDK.Editor
             if (!SaveLevelPlayMediationSettings()) errors.Add(PathLevelPlayMediationSettings);
 
             SaveGameAnalyticsSettingsAsset();
+            SaveFacebookSettingsAsset();
 
             if (errors.Count > 0)
                 _saveErrors = "Asset/Prefab not found at:\n" + string.Join("\n", errors);
