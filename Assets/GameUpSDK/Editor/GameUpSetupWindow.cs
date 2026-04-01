@@ -5,6 +5,7 @@ using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 using UnityEditor.SceneManagement;
+using GameUpSDK.Installer;
 
 namespace GameUpSDK.Editor
 {
@@ -162,6 +163,9 @@ namespace GameUpSDK.Editor
         private void OnGUI()
         {
             _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
+
+            GameUpInitialSetupSection.Draw(
+                "Tiếp theo: cấu hình các tab bên dưới → Save Configuration → Tạo SDK trong Scene hiện tại.");
 
             if (!string.IsNullOrEmpty(_loadErrors))
             {
