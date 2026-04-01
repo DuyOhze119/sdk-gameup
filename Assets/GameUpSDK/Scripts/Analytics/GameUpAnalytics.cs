@@ -49,13 +49,13 @@ namespace GameUpSDK
         public static void LogStartLevel1()
         {
             LogFirebase(AnalyticsEvent.StartLevel1);
-            GameAnalyticsUtils.LogProgression(GameAnalyticsUtils.GaProgressionStatus.Start, GameAnalyticsProgressionWorld, "1");
+            GameAnalyticsUtils.LogProgression(GaProgressionStatus.Start, GameAnalyticsProgressionWorld, "1");
         }
 
         public static void LogCompleteLevel1()
         {
             LogFirebase(AnalyticsEvent.CompleteLevel1);
-            GameAnalyticsUtils.LogProgression(GameAnalyticsUtils.GaProgressionStatus.Complete, GameAnalyticsProgressionWorld, "1");
+            GameAnalyticsUtils.LogProgression(GaProgressionStatus.Complete, GameAnalyticsProgressionWorld, "1");
         }
 
         /// <summary> earn_virtual_currency: virtual_currency_name, value, source </summary>
@@ -100,7 +100,7 @@ namespace GameUpSDK
             };
             LogFirebaseParams(AnalyticsEvent.LevelStart, p);
             GameAnalyticsUtils.LogProgression(
-                GameAnalyticsUtils.GaProgressionStatus.Start,
+                GaProgressionStatus.Start,
                 GameAnalyticsProgressionWorld,
                 level.ToString(),
                 stringFields: p);
@@ -117,7 +117,7 @@ namespace GameUpSDK
             };
             LogFirebaseParams(AnalyticsEvent.LevelFail, p);
             GameAnalyticsUtils.LogProgression(
-                GameAnalyticsUtils.GaProgressionStatus.Fail,
+                GaProgressionStatus.Fail,
                 GameAnalyticsProgressionWorld,
                 level.ToString(),
                 stringFields: p);
@@ -142,14 +142,14 @@ namespace GameUpSDK
             if (score.HasValue) ga[AnalyticsEvent.ParamAfScore] = score.Value.ToString();
             if (score.HasValue)
                 GameAnalyticsUtils.LogProgression(
-                    GameAnalyticsUtils.GaProgressionStatus.Complete,
+                    GaProgressionStatus.Complete,
                     GameAnalyticsProgressionWorld,
                     level.ToString(),
                     score: score.Value,
                     stringFields: ga);
             else
                 GameAnalyticsUtils.LogProgression(
-                    GameAnalyticsUtils.GaProgressionStatus.Complete,
+                    GaProgressionStatus.Complete,
                     GameAnalyticsProgressionWorld,
                     level.ToString(),
                     stringFields: ga);
@@ -172,7 +172,7 @@ namespace GameUpSDK
             };
             LogFirebaseParams(AnalyticsEvent.WaveStart, p);
             GameAnalyticsUtils.LogProgression(
-                GameAnalyticsUtils.GaProgressionStatus.Start,
+                GaProgressionStatus.Start,
                 GameAnalyticsProgressionWorld,
                 level.ToString(),
                 GaWavePart(wave),
@@ -189,7 +189,7 @@ namespace GameUpSDK
             };
             LogFirebaseParams(AnalyticsEvent.WaveFail, p);
             GameAnalyticsUtils.LogProgression(
-                GameAnalyticsUtils.GaProgressionStatus.Fail,
+                GaProgressionStatus.Fail,
                 GameAnalyticsProgressionWorld,
                 level.ToString(),
                 GaWavePart(wave),
@@ -206,7 +206,7 @@ namespace GameUpSDK
             };
             LogFirebaseParams(AnalyticsEvent.WaveComplete, p);
             GameAnalyticsUtils.LogProgression(
-                GameAnalyticsUtils.GaProgressionStatus.Complete,
+                GaProgressionStatus.Complete,
                 GameAnalyticsProgressionWorld,
                 level.ToString(),
                 GaWavePart(wave),

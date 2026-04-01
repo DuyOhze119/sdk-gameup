@@ -13,13 +13,6 @@ namespace GameUpSDK
     /// </summary>
     internal static class GameAnalyticsUtils
     {
-        internal enum GaProgressionStatus
-        {
-            Start = 1,
-            Complete = 2,
-            Fail = 3
-        }
-
 #if GAMEANALYTICS_DEPENDENCIES_INSTALLED
         private static GAProgressionStatus ToGa(GaProgressionStatus status) => (GAProgressionStatus)(int)status;
 
