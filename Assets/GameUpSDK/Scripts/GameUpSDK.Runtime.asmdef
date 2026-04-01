@@ -1,19 +1,20 @@
 {
-    "name": "GameUpSDK.Runtime",
-    "rootNamespace": "GameUpSDK",
-    "references": [
-        "GUID:760a4c7888534400e882b82c5b3fba06",
-        "GUID:2a37df438292d4903b4e5159c5de3bf9",
-        "GUID:86fc4e5d20f274576ac807a53a6cfce2",
-        "GUID:74931d642c29b4d328cd67584785aca9"
-    ],
-    "includePlatforms": [],
-    "excludePlatforms": [],
-    "allowUnsafeCode": false,
-    "overrideReferences": false,
-    "precompiledReferences": [],
-    "autoReferenced": true,
-    "defineConstraints": [],
-    "versionDefines": [],
-    "noEngineReferences": false
+  "name": "GameUpSDK.Runtime",
+  "rootNamespace": "GameUpSDK",
+  "references": [
+    "GUID:760a4c7888534400e882b82c5b3fba06",
+    "GUID:2a37df438292d4903b4e5159c5de3bf9",
+    "GUID:86fc4e5d20f274576ac807a53a6cfce2",
+    "GUID:74931d642c29b4d328cd67584785aca9",
+    "GUID:e7a3f2b81d5c4a9e8f1b2c3d4e5f6789"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
 }
