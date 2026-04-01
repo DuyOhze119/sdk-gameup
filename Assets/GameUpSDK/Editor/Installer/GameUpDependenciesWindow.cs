@@ -85,6 +85,12 @@ namespace GameUpSDK.Installer
             /// </summary>
             public string[] DeleteAssetPathsAfterImport;
 
+            /// <summary>
+            /// Thứ tự cài khuyến nghị (số nhỏ trước): Facebook → Firebase (EDM) → AdMob/LevelPlay → adapters AdMob → AppsFlyer → GameAnalytics.
+            /// Batch install, import sau download và danh sách UI đều sort theo trường này.
+            /// </summary>
+            public int InstallPriority;
+
             // ── Runtime state ──
             public bool IsInstalled;
             public bool IsInstalling;
@@ -114,6 +120,7 @@ namespace GameUpSDK.Installer
                 DownloadUrl = "https://developers.facebook.com/docs/unity/downloads/",
                 DownloadLabel = "Tải Facebook Unity SDK →",
                 DeleteAssetPathsAfterImport = new[] { "Assets/FacebookSDK/Examples" },
+                InstallPriority = 10,
             },
             new PackageDef
             {
@@ -136,6 +143,7 @@ namespace GameUpSDK.Installer
                 },
                 DownloadUrl = "https://firebase.google.com/docs/unity/setup",
                 DownloadLabel = "Tải Firebase Unity SDK →",
+                InstallPriority = 20,
             },
             new PackageDef
             {
@@ -151,6 +159,7 @@ namespace GameUpSDK.Installer
                 },
                 DownloadUrl = "https://github.com/googlesamples/unity-admob-sdk/releases",
                 DownloadLabel = "Tải AdMob Plugin →",
+                InstallPriority = 30,
             },
             new PackageDef
             {
@@ -166,6 +175,7 @@ namespace GameUpSDK.Installer
                 },
                 DownloadUrl = "https://developers.is.com/ironsource-mobile/unity/unity-plugin/",
                 DownloadLabel = "Tải IronSource SDK →",
+                InstallPriority = 30,
             },
             new PackageDef
             {
@@ -183,6 +193,7 @@ namespace GameUpSDK.Installer
                 },
                 DownloadUrl      = "https://github.com/AppsFlyerSDK/appsflyer-unity-plugin/releases",
                 DownloadLabel    = "Tải AppsFlyer SDK →",
+                InstallPriority = 45,
             },
             new PackageDef
             {
@@ -199,6 +210,7 @@ namespace GameUpSDK.Installer
                 },
                 DownloadUrl = "https://docs.gameanalytics.com/event-tracking-and-integrations/sdks-and-collection-api/game-engine-sdks/unity/",
                 DownloadLabel = "GameAnalytics Unity SDK →",
+                InstallPriority = 46,
             },
 
             new PackageDef
@@ -224,6 +236,7 @@ namespace GameUpSDK.Installer
                 },
                 DownloadUrl      = "https://firebase.google.com/docs/unity/setup",
                 DownloadLabel    = "Admob Mediation Adapter →",
+                InstallPriority = 35,
             },
         };
 
@@ -272,6 +285,22 @@ namespace GameUpSDK.Installer
         private const string FacebookDepsDefine = "FACEBOOK_DEPENDENCIES_INSTALLED";
 
         // ─── Static helpers ───────────────────────────────────────────────────────
+
+        private static int PackageIndexInCatalog(PackageDef pkg)
+        {
+            for (int i = 0; i < s_packages.Length; i++)
+            {
+                if (ReferenceEquals(s_packages[i], pkg))
+                    return i;
+            }
+
+            return int.MaxValue;
+        }
+
+        private static IEnumerable<PackageDef> OrderedInstallSequence(IEnumerable<PackageDef> items)
+        {
+            return items.OrderBy(p => p.InstallPriority).ThenBy(PackageIndexInCatalog);
+        }
 
         [MenuItem("GameUp SDK/Setup Dependencies")]
         public static void ShowWindow()
@@ -558,7 +587,8 @@ namespace GameUpSDK.Installer
             EditorGUILayout.Space(4);
 
             EditorGUILayout.HelpBox(
-                "Chọn Primary Mediation, rồi dùng nút \"Cài dependency\" trong khung Mediation để cài gom mọi thứ còn thiếu theo mediation — hoặc cuộn xuống danh sách và bấm \"Cài pack\" từng dòng nếu muốn cài lần lượt (cùng pipeline, dễ khoanh vùng lỗi).\n" +
+                "Chọn Primary Mediation, rồi dùng nút \"Cài dependency\" trong khung Mediation để cài gom mọi thứ còn thiếu — thứ tự tự động: Facebook → Firebase (kèm EDM) → AdMob hoặc LevelPlay → adapters AdMob (nếu có) → AppsFlyer → GameAnalytics.\n" +
+                "Hoặc bấm \"Cài pack\" từng dòng theo đúng thứ tự hiển thị (cùng pipeline).\n" +
                 "Khi Unity đang compile hoặc đang cài/tải package, các nút cài sẽ bị khóa cho tới khi xong.",
                 MessageType.Info);
 
@@ -595,6 +625,10 @@ namespace GameUpSDK.Installer
 
             EditorGUILayout.HelpBox(
                 "Một lần bấm sẽ cài (nếu chưa có): " + planDesc,
+                MessageType.None);
+
+            EditorGUILayout.HelpBox(
+                "Thứ tự cài được áp dụng tự động (tránh xung EDM/Android resolver): Facebook → Firebase → mediation đã chọn → adapters AdMob (chỉ khi dùng AdMob) → AppsFlyer → GameAnalytics.",
                 MessageType.None);
 
             if (missingManual.Count > 0)
@@ -648,7 +682,7 @@ namespace GameUpSDK.Installer
             EditorGUI.EndDisabledGroup();
         }
 
-        /// <summary>Firebase + AppsFlyer + bộ mediation theo lựa chọn (AdMob: GMA + adapters; LevelPlay: LevelPlay).</summary>
+        /// <summary>Firebase + AppsFlyer + bộ mediation theo lựa chọn (AdMob: GMA + adapters; LevelPlay: LevelPlay), đã sort <see cref="PackageDef.InstallPriority"/>.</summary>
         private static List<PackageDef> GetPackagesForSdkSetup(AdsManager.PrimaryMediation mediation)
         {
             var list = new List<PackageDef>();
@@ -675,7 +709,7 @@ namespace GameUpSDK.Installer
                 AddByAssembly("Unity.LevelPlay");
             }
 
-            return list;
+            return OrderedInstallSequence(list).ToList();
         }
 
         private static AdsManager.PrimaryMediation GetPrimaryMediationFromDefines()
@@ -705,7 +739,7 @@ namespace GameUpSDK.Installer
         {
             bool drewRequired = false, drewOptional = false;
 
-            foreach (var pkg in s_packages)
+            foreach (var pkg in OrderedInstallSequence(s_packages))
             {
                 // Section headers
                 if (pkg.Required && !drewRequired)
@@ -936,9 +970,11 @@ namespace GameUpSDK.Installer
 
         private void StartBatchInstall(IReadOnlyList<PackageDef> scope)
         {
-            _batchScope = scope != null && scope.Count > 0
-                ? scope.Distinct().ToList()
-                : s_packages.ToList();
+            _batchScope = OrderedInstallSequence(
+                    scope != null && scope.Count > 0
+                        ? scope.Distinct()
+                        : s_packages)
+                .ToList();
             _isBatchInstalling = true;
             _installQueue.Clear();
 
@@ -967,12 +1003,12 @@ namespace GameUpSDK.Installer
                 _installQueue.Enqueue(pkg);
             }
 
-            // 3) Download + import song song các UnityPackage chưa có file local nhưng có HostedUrls
-            var downloadPkgs = InScope()
-                .Where(p => !p.IsInstalled
-                            && p.Method == InstallMethod.UnityPackage
-                            && GetBundledPackagePaths(p.BundledFileNames) == null
-                            && p.HostedUrls?.Length > 0)
+            // 3) Download song song; import sau khi tải xong theo InstallPriority (tránh import AdMob trước Firebase).
+            var downloadPkgs = OrderedInstallSequence(
+                    InScope().Where(p => !p.IsInstalled
+                                         && p.Method == InstallMethod.UnityPackage
+                                         && GetBundledPackagePaths(p.BundledFileNames) == null
+                                         && p.HostedUrls?.Length > 0))
                 .ToList();
 
             void FinishBatch()
@@ -1343,10 +1379,9 @@ namespace GameUpSDK.Installer
                 .GroupBy(t => t.Pkg)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            foreach (var kv in byPkg)
+            foreach (PackageDef pkg in OrderedInstallSequence(byPkg.Keys))
             {
-                PackageDef pkg = kv.Key;
-                List<DownloadTask> tasks = kv.Value;
+                List<DownloadTask> tasks = byPkg[pkg];
                 var successPaths = tasks.Where(t => !t.HasError).Select(t => t.TempPath).ToList();
                 var errorMsgs = tasks.Where(t => t.HasError)
                     .Select(t => $"{t.FileName}: {t.ErrorMessage}").ToList();
