@@ -249,6 +249,9 @@ namespace GameUpSDK.Installer
 
         /// <summary>Package sẽ cài trong lần batch hiện tại (null = toàn bộ s_packages — chỉ dùng nội bộ).</summary>
         private List<PackageDef> _batchScope;
+
+        /// <summary>Bật khi batch bắt đầu từ &quot;Cài tất cả&quot; — gợi ý menu Ensure GameAnalytics asmdef khi xong.</summary>
+        private bool _gameAnalyticsSetupHintAfterBatch;
         private bool _wasCompiling;
 
         // Queue PackageManager (GitUrl / ScopedRegistry)
@@ -296,6 +299,9 @@ namespace GameUpSDK.Installer
 
             return int.MaxValue;
         }
+
+        private static bool IsGameAnalyticsSdkPackage(PackageDef pkg) =>
+            pkg != null && string.Equals(pkg.AssemblyName, "GameAnalyticsSDK", StringComparison.OrdinalIgnoreCase);
 
         private static IEnumerable<PackageDef> OrderedInstallSequence(IEnumerable<PackageDef> items)
         {
@@ -664,7 +670,7 @@ namespace GameUpSDK.Installer
                     GUILayout.Height(28)))
             {
                 if (missingAuto.Count > 0)
-                    StartBatchInstall(planned);
+                    StartBatchInstall(planned, showGameAnalyticsSetupHintWhenComplete: true);
             }
 
             EditorGUI.EndDisabledGroup();
@@ -1052,8 +1058,9 @@ namespace GameUpSDK.Installer
             }
         }
 
-        private void StartBatchInstall(IReadOnlyList<PackageDef> scope)
+        private void StartBatchInstall(IReadOnlyList<PackageDef> scope, bool showGameAnalyticsSetupHintWhenComplete = false)
         {
+            _gameAnalyticsSetupHintAfterBatch = showGameAnalyticsSetupHintWhenComplete;
             _batchScope = OrderedInstallSequence(
                     scope != null && scope.Count > 0
                         ? scope.Distinct()
@@ -1098,8 +1105,12 @@ namespace GameUpSDK.Installer
             void FinishBatch()
             {
                 _isBatchInstalling = false;
+                bool hintGa = _gameAnalyticsSetupHintAfterBatch;
+                _gameAnalyticsSetupHintAfterBatch = false;
                 _batchScope = null;
                 RefreshStatus();
+                if (hintGa)
+                    NotifyGameAnalyticsAsmdefHint(fromMediationInstallAllBatch: true);
             }
 
             if (_installQueue.Count > 0)
@@ -1122,6 +1133,31 @@ namespace GameUpSDK.Installer
             {
                 FinishBatch();
             }
+        }
+
+        /// <summary>
+        /// Nhắc menu Ensure GameAnalytics runtime asmdef (<see cref="GameUpDefineSymbolsAutoSync"/>).
+        /// </summary>
+        /// <param name="fromMediationInstallAllBatch">true khi vừa xong &quot;Cài tất cả&quot; Mediation; false khi vừa import xong GA (Cài pack).</param>
+        private static void NotifyGameAnalyticsAsmdefHint(bool fromMediationInstallAllBatch)
+        {
+            EditorApplication.delayCall += () =>
+            {
+                const string menuItem = "GameUp SDK → Ensure GameAnalytics runtime asmdef";
+                string intro = fromMediationInstallAllBatch
+                    ? "Cài package (bộ Mediation) đã xong. "
+                    : "Game Analytics SDK vừa import xong. ";
+                Debug.Log(
+                    "[GameUp] " + intro + "Để tạo/đảm bảo asmdef GA, chọn menu: " + menuItem + ".");
+
+                foreach (var w in Resources.FindObjectsOfTypeAll<GameUpDependenciesWindow>())
+                {
+                    if (w == null)
+                        continue;
+                    w.ShowNotification(
+                        new GUIContent("Game Analytics (asmdef): menu " + menuItem));
+                }
+            };
         }
 
         /// <summary>
@@ -1351,6 +1387,9 @@ namespace GameUpSDK.Installer
             {
                 pkg.InstallError = "Một số file import thất bại:\n" + string.Join("\n", errors);
             }
+
+            if (errors.Count == 0 && IsGameAnalyticsSdkPackage(pkg) && !_gameAnalyticsSetupHintAfterBatch)
+                NotifyGameAnalyticsAsmdefHint(fromMediationInstallAllBatch: false);
 
             Repaint();
         }
