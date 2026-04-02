@@ -4,6 +4,17 @@ Tất cả thay đổi đáng chú ý của **GameUp SDK** (`com.ohze.gameup.sdk
 
 Định dạng theo [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.3] — 2026-04-02
+
+### Summary
+
+- **GameAnalytics**: luồng cài đặt, asmdef runtime (`Ensure GameAnalytics runtime asmdef`), define `GAMEANALYTICS_DEPENDENCIES_INSTALLED`, Setup / scene SDK và analytics level–wave được coi là **hoàn thiện** cho consumer.
+- **Facebook SDK**: tích hợp trong installer & Setup, define `FACEBOOK_DEPENDENCIES_INSTALLED`, bootstrap/analytics phía GameUp — **hoàn thiện** cùng bản này.
+
+### Changed
+
+- `package.json`: phiên bản **1.1.3**; mô tả & keywords cập nhật (Facebook).
+
 ## [1.1.1] — 2026-04-01
 
 ### Changed
@@ -38,6 +49,7 @@ Tất cả thay đổi đáng chú ý của **GameUp SDK** (`com.ohze.gameup.sdk
 
 - Phát hành ban đầu GameUp SDK (Ads + Firebase/AppsFlyer, Setup Dependencies).
 
+[1.1.3]: https://github.com/DuyOhze119/sdk-gameup/compare/v1.1.2...v1.1.3
 [1.1.1]: https://github.com/DuyOhze119/sdk-gameup/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/DuyOhze119/sdk-gameup/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/DuyOhze119/sdk-gameup/compare/v1.0.0...v1.0.1
