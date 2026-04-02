@@ -932,7 +932,7 @@ namespace GameUpSDK.Installer
                 bool canAuto = CanAutoInstall(pkg);
                 if (canAuto)
                 {
-                    EditorGUI.BeginDisabledGroup(IsInteractionLocked());
+                    EditorGUI.BeginDisabledGroup(true);
                     if (GUILayout.Button("Cài pack", GUILayout.Width(88), GUILayout.Height(24)))
                         StartSinglePackageInstall(pkg);
                     EditorGUI.EndDisabledGroup();
