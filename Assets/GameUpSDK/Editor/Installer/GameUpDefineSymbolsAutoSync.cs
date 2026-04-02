@@ -69,7 +69,7 @@ namespace GameUpSDK.Installer
         [MenuItem("GameUp SDK/Ensure GameAnalytics runtime asmdef", priority = 23)]
         private static void MenuEnsureGameAnalyticsAsmdef()
         {
-            if (TryEnsureGameAnalyticsRuntimeAsmdef(out string message))
+            if (TryEnsureGameAnalyticsRuntimeAsmdef(out string message, out _))
                 Debug.Log("[GameUp] " + message);
             else
                 Debug.LogWarning("[GameUp] " + message);
@@ -130,7 +130,7 @@ namespace GameUpSDK.Installer
 
         private static void SyncDefines()
         {
-            TryEnsureGameAnalyticsRuntimeAsmdef(out _);
+            TryEnsureGameAnalyticsRuntimeAsmdef(out _, out _);
             EnsurePrimaryMediationDefines();
 
             bool levelPlayInstalled = IsAssemblyLoaded("Unity.LevelPlay");
@@ -156,9 +156,11 @@ namespace GameUpSDK.Installer
 
         /// <summary>
         /// Tạo <c>GameAnalyticsSDK.asmdef</c> tại <c>Assets/GameAnalytics/Plugins/</c> khi đã có script GA chuẩn nhưng thiếu asmdef (thường gặp với .unitypackage cũ).
+        /// Gọi ngay sau <c>AssetDatabase.ImportPackage</c> GA + <c>Refresh</c> để tránh pass compile đầu lỗi thiếu assembly <c>GameAnalyticsSDK</c>.
         /// </summary>
-        private static bool TryEnsureGameAnalyticsRuntimeAsmdef(out string message)
+        internal static bool TryEnsureGameAnalyticsRuntimeAsmdef(out string message, out bool createdNewAsmdef)
         {
+            createdNewAsmdef = false;
             message = null;
             string dataPath = Application.dataPath;
             if (string.IsNullOrEmpty(dataPath))
@@ -185,6 +187,7 @@ namespace GameUpSDK.Installer
             Directory.CreateDirectory(Path.GetDirectoryName(asmdefFull) ?? "");
             File.WriteAllText(asmdefFull, GameAnalyticsRuntimeAsmdefJson);
             AssetDatabase.ImportAsset(GameAnalyticsRuntimeAsmdefAssetPath, ImportAssetOptions.ForceUpdate);
+            createdNewAsmdef = true;
             message =
                 "Đã tạo " + GameAnalyticsRuntimeAsmdefAssetPath + ". GameUpSDK.Runtime tham chiếu assembly tên GameAnalyticsSDK — đợi Unity recompile.";
             return true;

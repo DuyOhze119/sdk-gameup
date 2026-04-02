@@ -1382,14 +1382,29 @@ namespace GameUpSDK.Installer
             {
                 pkg.IsInstalled = true;
                 pkg.InstallError = null;
+
+                // GA .unitypackage không kèm asmdef → pass compile đầu sẽ lỗi thiếu assembly GameAnalyticsSDK.
+                // Tạo asmdef ngay sau import (cần đã có GameAnalytics.cs trên disk — không thể tạo trước khi import).
+                if (IsGameAnalyticsSdkPackage(pkg))
+                {
+                    if (GameUpDefineSymbolsAutoSync.TryEnsureGameAnalyticsRuntimeAsmdef(
+                            out string asmdefMsg, out bool createdAsmdef))
+                    {
+                        if (createdAsmdef)
+                            Debug.Log("[GameUp] " + asmdefMsg);
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[GameUp] " + asmdefMsg);
+                        if (!_gameAnalyticsSetupHintAfterBatch)
+                            NotifyGameAnalyticsAsmdefHint(fromMediationInstallAllBatch: false);
+                    }
+                }
             }
             else
             {
                 pkg.InstallError = "Một số file import thất bại:\n" + string.Join("\n", errors);
             }
-
-            if (errors.Count == 0 && IsGameAnalyticsSdkPackage(pkg) && !_gameAnalyticsSetupHintAfterBatch)
-                NotifyGameAnalyticsAsmdefHint(fromMediationInstallAllBatch: false);
 
             Repaint();
         }
