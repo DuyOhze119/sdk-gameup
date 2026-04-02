@@ -5,7 +5,10 @@ using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 using UnityEditor.SceneManagement;
+
+#if GAMEANALYTICS_DEPENDENCIES_INSTALLED
 using GameAnalyticsSDK;
+#endif
 
 namespace GameUpSDK.Editor
 {
@@ -1181,21 +1184,27 @@ namespace GameUpSDK.Editor
 
         private static string ResolveGameAnalyticsPrefabPath()
         {
+#if GAMEANALYTICS_DEPENDENCIES_INSTALLED
             string p = GameAnalytics.WhereIs("GameAnalytics.prefab", "Prefab");
             if (!string.IsNullOrEmpty(p))
                 return p.Replace('\\', '/');
             return PathGameAnalyticsPrefabDefault;
+#endif
+            return null;
         }
 
         /// <summary>True nếu đã có object (không phải root SDK) chứa <see cref="GameAnalytics"/>.</summary>
         private static bool SdkRootHasGameAnalyticsDescendant(GameObject sdkRoot)
         {
+#if GAMEANALYTICS_DEPENDENCIES_INSTALLED
             if (sdkRoot == null) return false;
             foreach (var ga in sdkRoot.GetComponentsInChildren<GameAnalytics>(true))
             {
                 if (ga != null && ga.gameObject != sdkRoot)
                     return true;
             }
+            return false;
+#endif
             return false;
         }
 
