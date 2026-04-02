@@ -69,6 +69,7 @@ namespace GameUpSDK
 
         private void Awake()
         {
+            DontDestroyOnLoad(gameObject);
             CollectAdsFromChildren();
             BuildAdsList();
             Initialize();

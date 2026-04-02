@@ -5,6 +5,7 @@ using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 using UnityEditor.SceneManagement;
+using GameAnalyticsSDK;
 
 namespace GameUpSDK.Editor
 {
@@ -71,14 +72,16 @@ namespace GameUpSDK.Editor
             return GetPackagePrefabDirectory();
         }
 
-        private static string PathSDK        => GetPrefabDirectory() + "/SDK.prefab";
-        private static string PathAppsFlyer  => GetPrefabDirectory() + "/AppsFlyerObject.prefab";
+        private static string PathSDK => GetPrefabDirectory() + "/SDK.prefab";
+        private static string PathAppsFlyer => GetPrefabDirectory() + "/AppsFlyerObject.prefab";
         private static string PathIronSource => GetPrefabDirectory() + "/IronSourceAds.prefab";
-        private static string PathAdMob      => GetPrefabDirectory() + "/AdmobAds.prefab";
+        private static string PathAdMob => GetPrefabDirectory() + "/AdmobAds.prefab";
 
-        private const string PathGoogleMobileAdsSettings   = "Assets/GoogleMobileAds/Resources/GoogleMobileAdsSettings.asset";
+        private const string PathGoogleMobileAdsSettings = "Assets/GoogleMobileAds/Resources/GoogleMobileAdsSettings.asset";
         private const string PathLevelPlayMediationSettings = "Assets/LevelPlay/Resources/LevelPlayMediationSettings.asset";
-        private const string PathGameAnalyticsSettings      = "Assets/Resources/GameAnalytics/Settings.asset";
+        private const string PathGameAnalyticsSettings = "Assets/Resources/GameAnalytics/Settings.asset";
+        /// <summary>Mặc định GameAnalytics plugin; <see cref="GameAnalytics.WhereIs"/> dùng khi đường dẫn lệch.</summary>
+        private const string PathGameAnalyticsPrefabDefault = "Assets/GameAnalytics/Plugins/Prefabs/GameAnalytics.prefab";
         /// <summary>Đồng bộ với Facebook.Unity.Settings.FacebookSettings (SDK 18.x).</summary>
         private const string PathFacebookSettings = "Assets/FacebookSDK/SDK/Resources/FacebookSettings.asset";
 
@@ -239,7 +242,7 @@ namespace GameUpSDK.Editor
             {
                 SaveConfiguration();
             }
-            
+
             EditorGUILayout.Space(8);
             EditorGUILayout.HelpBox("Thêm SDK vào scene hiện tại (sẽ tạo instance từ prefab SDK).", MessageType.None);
             if (GUILayout.Button("Tạo SDK trong Scene hiện tại", GUILayout.Height(28)))
@@ -355,6 +358,7 @@ namespace GameUpSDK.Editor
             var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
             if (instance != null)
             {
+                EnsureGameAnalyticsChildUnderSdkObject(instance);
                 Selection.activeGameObject = instance;
                 EditorGUIUtility.PingObject(instance);
                 EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
@@ -876,7 +880,7 @@ namespace GameUpSDK.Editor
             EditorGUILayout.LabelField("LevelPlay Mediation Settings", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox("App Key điền vào " + PathLevelPlayMediationSettings, MessageType.None);
             _levelPlayAndroidAppKey = EditorGUILayout.TextField("Android App Key", _levelPlayAndroidAppKey);
-            _levelPlayIOSAppKey     = EditorGUILayout.TextField("iOS App Key",     _levelPlayIOSAppKey);
+            _levelPlayIOSAppKey = EditorGUILayout.TextField("iOS App Key", _levelPlayIOSAppKey);
         }
 
         private void DrawAdMobSection()
@@ -895,7 +899,7 @@ namespace GameUpSDK.Editor
             EditorGUILayout.LabelField("Google Mobile Ads App ID", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox("App ID điền vào " + PathGoogleMobileAdsSettings, MessageType.None);
             _googleMobileAdsAndroidAppId = EditorGUILayout.TextField("Android App ID", _googleMobileAdsAndroidAppId);
-            _googleMobileAdsIOSAppId     = EditorGUILayout.TextField("iOS App ID",     _googleMobileAdsIOSAppId);
+            _googleMobileAdsIOSAppId = EditorGUILayout.TextField("iOS App ID", _googleMobileAdsIOSAppId);
         }
 
         private void DrawFirebaseRemoteConfigSection()
@@ -916,9 +920,9 @@ namespace GameUpSDK.Editor
             if (!LoadAppsFlyer()) errors.Add("Prefab not found at: " + PathAppsFlyer);
             LoadAppsFlyerUtils();
             LoadFirebaseRemoteConfigUtils();
-            #if USE_LEVEL_PLAY_MEDIATION
+#if USE_LEVEL_PLAY_MEDIATION
             if (!LoadIronSource()) errors.Add("Prefab not found at: " + PathIronSource);
-            #endif
+#endif
             if (!LoadAdMob()) errors.Add("Prefab not found at: " + PathAdMob);
             LoadGoogleMobileAdsSettings();
             LoadLevelPlayMediationSettings();
@@ -1047,7 +1051,7 @@ namespace GameUpSDK.Editor
 
         private bool LoadIronSource()
         {
-            #if USE_LEVEL_PLAY_MEDIATION
+#if USE_LEVEL_PLAY_MEDIATION
             var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathIronSource);
             if (go == null) return false;
             var comp = go.GetComponent<GameUpSDK.IronSourceAds>();
@@ -1058,7 +1062,7 @@ namespace GameUpSDK.Editor
             Assign(so, "interstitialAdUnitId", ref _ironSourceInterstitialId);
             Assign(so, "rewardedVideoAdUnitId", ref _ironSourceRewardedId);
             return true;
-            #endif
+#endif
             return false;
         }
 
@@ -1082,7 +1086,7 @@ namespace GameUpSDK.Editor
             if (asset == null) return;
             var so = new SerializedObject(asset);
             Assign(so, "adMobAndroidAppId", ref _googleMobileAdsAndroidAppId);
-            Assign(so, "adMobIOSAppId",     ref _googleMobileAdsIOSAppId);
+            Assign(so, "adMobIOSAppId", ref _googleMobileAdsIOSAppId);
         }
 
         private bool SaveGoogleMobileAdsSettings()
@@ -1091,7 +1095,7 @@ namespace GameUpSDK.Editor
             if (asset == null) return false;
             var so = new SerializedObject(asset);
             Set(so, "adMobAndroidAppId", _googleMobileAdsAndroidAppId);
-            Set(so, "adMobIOSAppId",     _googleMobileAdsIOSAppId);
+            Set(so, "adMobIOSAppId", _googleMobileAdsIOSAppId);
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
             AssetDatabase.SaveAssets();
@@ -1104,7 +1108,7 @@ namespace GameUpSDK.Editor
             if (asset == null) return;
             var so = new SerializedObject(asset);
             Assign(so, "AndroidAppKey", ref _levelPlayAndroidAppKey);
-            Assign(so, "IOSAppKey",     ref _levelPlayIOSAppKey);
+            Assign(so, "IOSAppKey", ref _levelPlayIOSAppKey);
         }
 
         private bool SaveLevelPlayMediationSettings()
@@ -1113,7 +1117,7 @@ namespace GameUpSDK.Editor
             if (asset == null) return false;
             var so = new SerializedObject(asset);
             Set(so, "AndroidAppKey", _levelPlayAndroidAppKey);
-            Set(so, "IOSAppKey",     _levelPlayIOSAppKey);
+            Set(so, "IOSAppKey", _levelPlayIOSAppKey);
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
             AssetDatabase.SaveAssets();
@@ -1175,6 +1179,80 @@ namespace GameUpSDK.Editor
             AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
         }
 
+        private static string ResolveGameAnalyticsPrefabPath()
+        {
+            string p = GameAnalytics.WhereIs("GameAnalytics.prefab", "Prefab");
+            if (!string.IsNullOrEmpty(p))
+                return p.Replace('\\', '/');
+            return PathGameAnalyticsPrefabDefault;
+        }
+
+        /// <summary>True nếu đã có object (không phải root SDK) chứa <see cref="GameAnalytics"/>.</summary>
+        private static bool SdkRootHasGameAnalyticsDescendant(GameObject sdkRoot)
+        {
+            if (sdkRoot == null) return false;
+            foreach (var ga in sdkRoot.GetComponentsInChildren<GameAnalytics>(true))
+            {
+                if (ga != null && ga.gameObject != sdkRoot)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>Gắn prefab GameAnalytics làm con của root SDK (scene hoặc prefab đang mở trong memory).</summary>
+        private static void EnsureGameAnalyticsChildUnderSdkObject(GameObject sdkRoot)
+        {
+            if (sdkRoot == null || SdkRootHasGameAnalyticsDescendant(sdkRoot))
+                return;
+
+            string gaPath = ResolveGameAnalyticsPrefabPath();
+            var gaPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(gaPath);
+            if (gaPrefab == null)
+            {
+                Debug.LogWarning("[GameUpSDK] Không tìm thấy GameAnalytics.prefab (đã thử: " + gaPath + "). Bỏ qua gắn con GA.");
+                return;
+            }
+
+            var child = (GameObject)PrefabUtility.InstantiatePrefab(gaPrefab, sdkRoot.transform);
+            if (child != null)
+                child.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+        }
+
+        /// <summary>Mở asset SDK.prefab, thêm nested GameAnalytics nếu thiếu, lưu lại.</summary>
+        private static void EnsureGameAnalyticsNestedInSdkPrefabAsset(string sdkPrefabPath)
+        {
+            if (string.IsNullOrEmpty(sdkPrefabPath) ||
+                AssetDatabase.LoadAssetAtPath<GameObject>(sdkPrefabPath) == null)
+                return;
+
+            GameObject root = null;
+            try
+            {
+                root = PrefabUtility.LoadPrefabContents(sdkPrefabPath);
+                if (SdkRootHasGameAnalyticsDescendant(root))
+                    return;
+
+                string gaPath = ResolveGameAnalyticsPrefabPath();
+                var gaPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(gaPath);
+                if (gaPrefab == null)
+                {
+                    Debug.LogWarning("[GameUpSDK] Không tìm thấy GameAnalytics.prefab (đã thử: " + gaPath + ").");
+                    return;
+                }
+
+                var child = (GameObject)PrefabUtility.InstantiatePrefab(gaPrefab, root.transform);
+                if (child != null)
+                    child.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+
+                PrefabUtility.SaveAsPrefabAsset(root, sdkPrefabPath);
+            }
+            finally
+            {
+                if (root != null)
+                    PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
         /// <summary>Copy mọi prefab trong thư mục Prefab của package sang Assets/SDK/Prefabs và cập nhật guid tham chiếu.</summary>
         private static bool TryClonePackagePrefabsToWritable(out string errorMessage)
         {
@@ -1188,7 +1266,10 @@ namespace GameUpSDK.Editor
             }
 
             if (AssetDatabase.LoadAssetAtPath<GameObject>(WritablePrefabsRoot + "/SDK.prefab") != null)
+            {
+                EnsureGameAnalyticsNestedInSdkPrefabAsset(WritablePrefabsRoot + "/SDK.prefab");
                 return true;
+            }
 
             if (!AssetDatabase.IsValidFolder("Assets/SDK"))
                 AssetDatabase.CreateFolder("Assets", "SDK");
@@ -1260,6 +1341,7 @@ namespace GameUpSDK.Editor
                 return false;
             }
 
+            EnsureGameAnalyticsNestedInSdkPrefabAsset(WritablePrefabsRoot + "/SDK.prefab");
             return true;
         }
 

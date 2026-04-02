@@ -3,7 +3,8 @@
     "rootNamespace": "GameUpSDK.Editor",
     "references": [
         "GameUpSDK.Runtime",
-        "GameUpSDK.Installer"
+        "GameUpSDK.Installer",
+        "GameAnalyticsSDK"
     ],
     "includePlatforms": [
         "Editor"
