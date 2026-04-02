@@ -11,7 +11,7 @@ using Firebase.Extensions;
 
 namespace GameUpSDK
 {
-    public class FirebaseUtils : MonoSingleton<FirebaseUtils>
+    public class FirebaseUtils : MonoSingletonSdk<FirebaseUtils>
     {
         private bool _initialized;
         public Action<bool> onInitialized;

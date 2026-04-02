@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace GameUpSDK.Singletons
 {
-    public class MonoSingleton<T> : MonoBehaviour where T : MonoBehaviour
+    public class MonoSingletonSdk<T> : MonoBehaviour where T : MonoBehaviour
     {
         private static T _instance;
         public static T Instance

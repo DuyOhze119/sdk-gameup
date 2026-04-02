@@ -16,7 +16,7 @@ namespace GameUpSDK
     /// Firebase Remote Config: tên biến trùng với key trên Remote để tự động map (reflection).
     /// Number → int, Boolean → bool.
     /// </summary>
-    public class FirebaseRemoteConfigUtils : MonoSingleton<FirebaseRemoteConfigUtils>
+    public class FirebaseRemoteConfigUtils : MonoSingletonSdk<FirebaseRemoteConfigUtils>
     {
         // ---------- Config (tên biến = key trên Remote Config) ----------
         /// <summary>Khoảng thời gian tối thiểu (giây) giữa 2 lần hiển thị Interstitial.</summary>

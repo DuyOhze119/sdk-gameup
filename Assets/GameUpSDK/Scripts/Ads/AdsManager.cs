@@ -40,7 +40,7 @@ namespace GameUpSDK
     /// Mediator for all ad networks. Initializes networks by OrderExecute, uses waterfall for show (first available wins).
     /// Logs ads_request, ads_available, ads_show_success, ads_show_fail to Firebase with ad_type and placement.
     /// </summary>
-    public class AdsManager : MonoSingleton<AdsManager>
+    public class AdsManager : MonoSingletonSdk<AdsManager>
     {
         public enum PrimaryMediation
         {

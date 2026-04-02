@@ -7,7 +7,7 @@ using AppsFlyerSDK;
 
 namespace GameUpSDK
 {
-    public class AppsFlyerUtils : MonoSingleton<AppsFlyerUtils>
+    public class AppsFlyerUtils : MonoSingletonSdk<AppsFlyerUtils>
     {
 #if APPSFLYER_DEPENDENCIES_INSTALLED
         [SerializeField] private string sdkKey;
