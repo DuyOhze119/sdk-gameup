@@ -77,7 +77,9 @@ namespace GameUpSDK.Editor
 
         private static string PathSDK => GetPrefabDirectory() + "/SDK.prefab";
         private static string PathAppsFlyer => GetPrefabDirectory() + "/AppsFlyerObject.prefab";
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
         private static string PathIronSource => GetPrefabDirectory() + "/IronSourceAds.prefab";
+#endif
         private static string PathAdMob => GetPrefabDirectory() + "/AdmobAds.prefab";
 
         private const string PathGoogleMobileAdsSettings = "Assets/GoogleMobileAds/Resources/GoogleMobileAdsSettings.asset";
@@ -98,7 +100,9 @@ namespace GameUpSDK.Editor
             Facebook,
             AppsFlyer,
             GameAnalytics,
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
             IronSourceMediation,
+#endif
             AdMobAppOpen,
             FirebaseRemoteConfig,
         }
@@ -118,6 +122,7 @@ namespace GameUpSDK.Editor
         private string _appsFlyerUtilsAppId = "";
         private bool _appsFlyerUtilsIsDevMode = false;
 
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
         // IronSource (IronSourceAds: levelPlayAppKey, bannerAdUnitId, interstitialAdUnitId, rewardedVideoAdUnitId)
         private string _ironSourceAppKey = "";
         private string _ironSourceBannerId = "";
@@ -127,6 +132,7 @@ namespace GameUpSDK.Editor
         // LevelPlay Mediation Settings (LevelPlayMediationSettings.asset)
         private string _levelPlayAndroidAppKey = "";
         private string _levelPlayIOSAppKey = "";
+#endif
 
         // AdMob (AdmobAds: bannerAdUnitId, interstitialAdUnitId, rewardedAdUnitId, appOpenAdUnitId)
         private string _admobBannerId = "";
@@ -273,6 +279,25 @@ namespace GameUpSDK.Editor
             return GameUpSDK.AdsManager.PrimaryMediation.LevelPlay;
         }
 
+        /// <summary>Primary Mediation = LevelPlay (scripting defines).</summary>
+        private static bool IsPrimaryMediationLevelPlay()
+        {
+            return GetPrimaryMediationFromDefines() == GameUpSDK.AdsManager.PrimaryMediation.LevelPlay;
+        }
+
+        /// <summary>
+        /// Tab IronSource + asset LevelPlay chỉ khi đã cài pack LevelPlay (<see cref="GUDefinetion.LevelPlayDepsInstalled"/>)
+        /// và chọn mediation LevelPlay — tránh compile/reference khi chỉ dùng AdMob.
+        /// </summary>
+        private static bool IsIronSourceSetupSectionAvailable()
+        {
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
+            return IsPrimaryMediationLevelPlay();
+#else
+            return false;
+#endif
+        }
+
         private void BuildTabsForPrimaryMediation(GameUpSDK.AdsManager.PrimaryMediation pm, bool keepActiveTab)
         {
             // Preserve current visible tab by name when possible
@@ -289,7 +314,9 @@ namespace GameUpSDK.Editor
 
             if (pm == GameUpSDK.AdsManager.PrimaryMediation.LevelPlay)
             {
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
                 tabs.Add(SetupTab.IronSourceMediation);
+#endif
                 tabs.Add(SetupTab.AdMobAppOpen);
             }
             else
@@ -311,7 +338,9 @@ namespace GameUpSDK.Editor
                         case SetupTab.Facebook: DrawFacebookSection(); break;
                         case SetupTab.AppsFlyer: DrawAppsFlyerSection(); break;
                         case SetupTab.GameAnalytics: DrawGameAnalyticsSection(); break;
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
                         case SetupTab.IronSourceMediation: DrawIronSourceSection(); break;
+#endif
                         case SetupTab.AdMobAppOpen: DrawAdMobSection(); break;
                         case SetupTab.FirebaseRemoteConfig: DrawFirebaseRemoteConfigSection(); break;
                     }
@@ -331,9 +360,8 @@ namespace GameUpSDK.Editor
 
         private static int GetDefaultTabIndexFor(GameUpSDK.AdsManager.PrimaryMediation pm)
         {
-            // Mở tab ads theo PrimaryMediation để user cấu hình nhanh nhất.
-            // LevelPlay -> IronSource; AdMob -> AdMob. (sau Facebook + AppsFlyer + Game Analytics)
-            return pm == GameUpSDK.AdsManager.PrimaryMediation.LevelPlay ? 3 : 3;
+            // Mở tab ads sau Game Analytics (index 3): IronSource nếu có pack LevelPlay; không thì AdMob (App Open).
+            return 3;
         }
 
         private static string GetTabLabel(SetupTab tab)
@@ -343,7 +371,9 @@ namespace GameUpSDK.Editor
                 case SetupTab.Facebook: return "Facebook";
                 case SetupTab.AppsFlyer: return "AppsFlyer";
                 case SetupTab.GameAnalytics: return "Game Analytics";
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
                 case SetupTab.IronSourceMediation: return "IronSource Mediation";
+#endif
                 case SetupTab.AdMobAppOpen: return "AdMob (App Open)";
                 case SetupTab.FirebaseRemoteConfig: return "Firebase RC";
                 default: return tab.ToString();
@@ -865,6 +895,7 @@ namespace GameUpSDK.Editor
             AssetDatabase.SaveAssets();
         }
 
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
         private void DrawIronSourceSection()
         {
             EditorGUILayout.LabelField("IronSource (LevelPlay) Mediation", EditorStyles.boldLabel);
@@ -885,6 +916,7 @@ namespace GameUpSDK.Editor
             _levelPlayAndroidAppKey = EditorGUILayout.TextField("Android App Key", _levelPlayAndroidAppKey);
             _levelPlayIOSAppKey = EditorGUILayout.TextField("iOS App Key", _levelPlayIOSAppKey);
         }
+#endif
 
         private void DrawAdMobSection()
         {
@@ -923,12 +955,15 @@ namespace GameUpSDK.Editor
             if (!LoadAppsFlyer()) errors.Add("Prefab not found at: " + PathAppsFlyer);
             LoadAppsFlyerUtils();
             LoadFirebaseRemoteConfigUtils();
-#if USE_LEVEL_PLAY_MEDIATION
-            if (!LoadIronSource()) errors.Add("Prefab not found at: " + PathIronSource);
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
+            if (IsIronSourceSetupSectionAvailable() && !LoadIronSource())
+                errors.Add("Prefab not found at: " + PathIronSource);
 #endif
             if (!LoadAdMob()) errors.Add("Prefab not found at: " + PathAdMob);
             LoadGoogleMobileAdsSettings();
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
             LoadLevelPlayMediationSettings();
+#endif
             LoadFacebookSettings();
             _loadErrors = errors.Count > 0 ? string.Join("\n", errors) : null;
         }
@@ -989,7 +1024,7 @@ namespace GameUpSDK.Editor
                 Assign(so, "appOpenAdUnitId", ref _admobAppOpenId);
             }
 
-#if USE_LEVEL_PLAY_MEDIATION
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
             var iron = sdkRoot.GetComponentInChildren<GameUpSDK.IronSourceAds>(true);
             if (iron != null)
             {
@@ -1002,7 +1037,9 @@ namespace GameUpSDK.Editor
 #endif
 
             LoadGoogleMobileAdsSettings();
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
             LoadLevelPlayMediationSettings();
+#endif
             LoadFacebookSettings();
 
             _loadErrors = errors.Count > 0 ? string.Join("\n", errors) : null;
@@ -1052,12 +1089,12 @@ namespace GameUpSDK.Editor
             AssignBool(so, "enable_banner", ref _rcEnableBanner);
         }
 
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
         private bool LoadIronSource()
         {
-#if USE_LEVEL_PLAY_MEDIATION
             var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathIronSource);
             if (go == null) return false;
-            var comp = go.GetComponent<GameUpSDK.IronSourceAds>();
+            var comp = go.GetComponentInChildren<GameUpSDK.IronSourceAds>(true);
             if (comp == null) return false;
             var so = new SerializedObject(comp);
             Assign(so, "levelPlayAppKey", ref _ironSourceAppKey);
@@ -1065,9 +1102,8 @@ namespace GameUpSDK.Editor
             Assign(so, "interstitialAdUnitId", ref _ironSourceInterstitialId);
             Assign(so, "rewardedVideoAdUnitId", ref _ironSourceRewardedId);
             return true;
-#endif
-            return false;
         }
+#endif
 
         private bool LoadAdMob()
         {
@@ -1107,15 +1143,18 @@ namespace GameUpSDK.Editor
 
         private void LoadLevelPlayMediationSettings()
         {
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
             var asset = AssetDatabase.LoadAssetAtPath<ScriptableObject>(PathLevelPlayMediationSettings);
             if (asset == null) return;
             var so = new SerializedObject(asset);
             Assign(so, "AndroidAppKey", ref _levelPlayAndroidAppKey);
             Assign(so, "IOSAppKey", ref _levelPlayIOSAppKey);
+#endif
         }
 
         private bool SaveLevelPlayMediationSettings()
         {
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
             var asset = AssetDatabase.LoadAssetAtPath<ScriptableObject>(PathLevelPlayMediationSettings);
             if (asset == null) return false;
             var so = new SerializedObject(asset);
@@ -1125,6 +1164,9 @@ namespace GameUpSDK.Editor
             EditorUtility.SetDirty(asset);
             AssetDatabase.SaveAssets();
             return true;
+#else
+            return true;
+#endif
         }
 
         private static void Assign(SerializedObject so, string propName, ref string target)
@@ -1363,8 +1405,9 @@ namespace GameUpSDK.Editor
                 if (!SaveSceneAppsFlyerUtils(sdkRoot)) errors.Add("SDK in Scene (AppsFlyerUtils)");
                 if (!SaveSceneFirebaseRemoteConfigUtils(sdkRoot)) errors.Add("SDK in Scene (FirebaseRemoteConfigUtils)");
                 if (!SaveSceneAdsManager(sdkRoot)) errors.Add("SDK in Scene (AdsManager)");
-#if USE_LEVEL_PLAY_MEDIATION
-                if (!SaveSceneIronSource(sdkRoot)) errors.Add("SDK in Scene (IronSourceAds)");
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
+                if (IsIronSourceSetupSectionAvailable() && !SaveSceneIronSource(sdkRoot))
+                    errors.Add("SDK in Scene (IronSourceAds)");
 #endif
                 if (!SaveSceneAdMob(sdkRoot)) errors.Add("SDK in Scene (AdmobAds)");
 
@@ -1383,7 +1426,9 @@ namespace GameUpSDK.Editor
 
             // Các settings asset vẫn lưu như cũ
             if (!SaveGoogleMobileAdsSettings()) errors.Add(PathGoogleMobileAdsSettings);
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
             if (!SaveLevelPlayMediationSettings()) errors.Add(PathLevelPlayMediationSettings);
+#endif
 
             SaveGameAnalyticsSettingsAsset();
             SaveFacebookSettingsAsset();
@@ -1451,8 +1496,8 @@ namespace GameUpSDK.Editor
             var comp = sdkRoot.GetComponent<GameUpSDK.AdsManager>();
             if (comp == null) return false;
 
-            var levelPlay = new List<IronSourceAds>();
-            foreach (var c in sdkRoot.GetComponentsInChildren<IronSourceAds>(true))
+            var levelPlay = new List<GameUpSDK.IronSourceAds>();
+            foreach (var c in sdkRoot.GetComponentsInChildren<GameUpSDK.IronSourceAds>(true))
             {
                 if (c.gameObject == sdkRoot) continue;
                 levelPlay.Add(c);
@@ -1520,8 +1565,9 @@ namespace GameUpSDK.Editor
                 if (!SavePrefabAppsFlyerUtils(root)) errors.Add("SDK.prefab (AppsFlyerUtils)");
                 if (!SavePrefabFirebaseRemoteConfigUtils(root)) errors.Add("SDK.prefab (FirebaseRemoteConfigUtils)");
                 if (!PersistAdsManagerLists(root, recordPrefabInstance: false)) errors.Add("SDK.prefab (AdsManager)");
-#if USE_LEVEL_PLAY_MEDIATION
-                if (!SavePrefabIronSource(root)) errors.Add("SDK.prefab (IronSourceAds child)");
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
+                if (IsIronSourceSetupSectionAvailable() && !SavePrefabIronSource(root))
+                    errors.Add("SDK.prefab (IronSourceAds child)");
 #endif
                 if (!SavePrefabAdMob(root)) errors.Add("SDK.prefab (AdmobAds child)");
 
@@ -1534,7 +1580,7 @@ namespace GameUpSDK.Editor
             }
 
             TrySaveAppsFlyerObjectPrefab(errors);
-#if USE_LEVEL_PLAY_MEDIATION
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
             TrySaveIronSourcePrefabAsset(errors);
 #endif
             TrySaveAdMobPrefabAsset(errors);
@@ -1572,9 +1618,9 @@ namespace GameUpSDK.Editor
             return true;
         }
 
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
         private bool SavePrefabIronSource(GameObject sdkRoot)
         {
-#if USE_LEVEL_PLAY_MEDIATION
             var comp = sdkRoot.GetComponentInChildren<GameUpSDK.IronSourceAds>(true);
             if (comp == null) return false;
             var so = new SerializedObject(comp);
@@ -1585,10 +1631,8 @@ namespace GameUpSDK.Editor
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(comp);
             return true;
-#else
-            return true;
-#endif
         }
+#endif
 
         private bool SavePrefabAdMob(GameObject sdkRoot)
         {
@@ -1637,9 +1681,10 @@ namespace GameUpSDK.Editor
             }
         }
 
-#if USE_LEVEL_PLAY_MEDIATION
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
         private void TrySaveIronSourcePrefabAsset(List<string> errors)
         {
+            if (!IsIronSourceSetupSectionAvailable()) return;
             if (!IsPrefabAssetPathWritable(PathIronSource)) return;
             if (AssetDatabase.LoadAssetAtPath<GameObject>(PathIronSource) == null) return;
 
@@ -1647,7 +1692,7 @@ namespace GameUpSDK.Editor
             try
             {
                 root = PrefabUtility.LoadPrefabContents(PathIronSource);
-                var comp = root?.GetComponent<GameUpSDK.IronSourceAds>();
+                var comp = root != null ? root.GetComponentInChildren<GameUpSDK.IronSourceAds>(true) : null;
                 if (comp == null)
                 {
                     errors.Add("IronSourceAds.prefab (IronSourceAds)");
@@ -1721,6 +1766,7 @@ namespace GameUpSDK.Editor
             return true;
         }
 
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
         private bool SaveSceneIronSource(GameObject sdkRoot)
         {
             if (sdkRoot == null) return false;
@@ -1736,6 +1782,7 @@ namespace GameUpSDK.Editor
             PrefabUtility.RecordPrefabInstancePropertyModifications(comp);
             return true;
         }
+#endif
 
         private bool SaveSceneAdMob(GameObject sdkRoot)
         {

@@ -16,8 +16,5 @@ namespace GameUpSDK
         /// <summary>Chỉ một trong hai được bật; do GameUpDependenciesWindow set — phù hợp khi SDK là UPM package (không cần asset trong Assets/).</summary>
         public const string PrimaryMediationLevelPlay = "GAMEUP_PRIMARY_MEDIATION_LEVELPLAY";
         public const string PrimaryMediationAdMob = "GAMEUP_PRIMARY_MEDIATION_ADMOB";
-
-        // Deprecated (giữ để tránh breaking project cũ)
-        public const string UseLevelPlayMediation = "USE_LEVEL_PLAY_MEDIATION";
     }
 }
