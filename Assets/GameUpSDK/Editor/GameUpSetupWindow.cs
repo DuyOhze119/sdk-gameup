@@ -1358,7 +1358,6 @@ namespace GameUpSDK.Editor
         {
             var errors = new System.Collections.Generic.List<string>();
 
-            // Lưu trực tiếp lên SDK instance trong Scene (không lưu prefab asset).
             if (TryGetSdkSceneRoot(out var sdkRoot))
             {
                 if (!SaveSceneAppsFlyerUtils(sdkRoot)) errors.Add("SDK in Scene (AppsFlyerUtils)");
@@ -1372,10 +1371,15 @@ namespace GameUpSDK.Editor
                 EditorSceneManager.MarkSceneDirty(sdkRoot.scene);
                 EditorSceneManager.SaveOpenScenes();
             }
-            else
+            else if (!IsPrefabAssetPathWritable(PathSDK))
             {
-                errors.Add("Không tìm thấy SDK object trong Scene. Hãy bấm \"Tạo SDK trong Scene hiện tại\" trước.");
+                errors.Add(
+                    "Không tìm thấy SDK trong Scene và prefab SDK không ghi được (thường do nằm trong Packages/). " +
+                    "Hãy clone prefab sang Assets/SDK/Prefabs hoặc dùng \"Tạo SDK trong Scene hiện tại\".");
             }
+
+            // Ghi lên file .prefab dưới Assets/ (đồng bộ với scene hoặc khi chỉnh không có instance trong scene).
+            SaveConfigurationToWritablePrefabAssets(errors);
 
             // Các settings asset vẫn lưu như cũ
             if (!SaveGoogleMobileAdsSettings()) errors.Add(PathGoogleMobileAdsSettings);
@@ -1434,36 +1438,269 @@ namespace GameUpSDK.Editor
 
         private bool SaveSceneAdsManager(GameObject sdkRoot)
         {
+            return PersistAdsManagerLists(sdkRoot, recordPrefabInstance: true);
+        }
+
+        /// <summary>
+        /// Đồng bộ hai list serialized với hierarchy — trùng logic <see cref="GameUpSDK.AdsManager.CollectAdsFromChildren"/>.
+        /// Tên field thực tế là levelPlayAdsBehaviours / admobAdsBehaviours (không phải adsBehaviours).
+        /// </summary>
+        private static bool PersistAdsManagerLists(GameObject sdkRoot, bool recordPrefabInstance)
+        {
             if (sdkRoot == null) return false;
             var comp = sdkRoot.GetComponent<GameUpSDK.AdsManager>();
             if (comp == null) return false;
-            var so = new SerializedObject(comp);
-            var prop = so.FindProperty("adsBehaviours");
-            if (prop == null) return false;
 
-#if USE_LEVEL_PLAY_MEDIATION
-            var list = new List<IronSourceAds>();
+            var levelPlay = new List<IronSourceAds>();
             foreach (var c in sdkRoot.GetComponentsInChildren<IronSourceAds>(true))
             {
                 if (c.gameObject == sdkRoot) continue;
-                list.Add(c);
+                levelPlay.Add(c);
             }
-#else
-            var list = new List<AdmobAds>();
+
+            var admob = new List<AdmobAds>();
             foreach (var c in sdkRoot.GetComponentsInChildren<AdmobAds>(true))
             {
                 if (c.gameObject == sdkRoot) continue;
-                list.Add(c);
+                admob.Add(c);
             }
-#endif
-            prop.arraySize = list.Count;
-            for (int i = 0; i < list.Count; i++)
-                prop.GetArrayElementAtIndex(i).objectReferenceValue = list[i];
+
+            var so = new SerializedObject(comp);
+            var lp = so.FindProperty("levelPlayAdsBehaviours");
+            var ad = so.FindProperty("admobAdsBehaviours");
+            if (lp == null || ad == null) return false;
+
+            lp.arraySize = levelPlay.Count;
+            for (int i = 0; i < levelPlay.Count; i++)
+                lp.GetArrayElementAtIndex(i).objectReferenceValue = levelPlay[i];
+
+            ad.arraySize = admob.Count;
+            for (int i = 0; i < admob.Count; i++)
+                ad.GetArrayElementAtIndex(i).objectReferenceValue = admob[i];
 
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(comp);
-            PrefabUtility.RecordPrefabInstancePropertyModifications(comp);
+            if (recordPrefabInstance)
+                PrefabUtility.RecordPrefabInstancePropertyModifications(comp);
             return true;
+        }
+
+        /// <summary>True nếu có thể ghi file .prefab (không phải chỉ đọc trong Packages/).</summary>
+        private static bool IsPrefabAssetPathWritable(string assetPath)
+        {
+            if (string.IsNullOrEmpty(assetPath)) return false;
+            var p = assetPath.Replace('\\', '/');
+            if (p.StartsWith("Packages/", StringComparison.Ordinal)) return false;
+            return p.StartsWith("Assets/", StringComparison.Ordinal);
+        }
+
+        /// <summary>Ghi các field setup lên prefab SDK (và prefab ads phụ) khi asset nằm dưới Assets/.</summary>
+        private void SaveConfigurationToWritablePrefabAssets(List<string> errors)
+        {
+            if (!IsPrefabAssetPathWritable(PathSDK))
+                return;
+
+            var sdkPath = PathSDK;
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(sdkPath) == null)
+            {
+                errors.Add("SDK.prefab không tồn tại tại: " + sdkPath);
+                return;
+            }
+
+            GameObject root = null;
+            try
+            {
+                root = PrefabUtility.LoadPrefabContents(sdkPath);
+                if (root == null)
+                {
+                    errors.Add("Không LoadPrefabContents được: " + sdkPath);
+                    return;
+                }
+
+                if (!SavePrefabAppsFlyerUtils(root)) errors.Add("SDK.prefab (AppsFlyerUtils)");
+                if (!SavePrefabFirebaseRemoteConfigUtils(root)) errors.Add("SDK.prefab (FirebaseRemoteConfigUtils)");
+                if (!PersistAdsManagerLists(root, recordPrefabInstance: false)) errors.Add("SDK.prefab (AdsManager)");
+#if USE_LEVEL_PLAY_MEDIATION
+                if (!SavePrefabIronSource(root)) errors.Add("SDK.prefab (IronSourceAds child)");
+#endif
+                if (!SavePrefabAdMob(root)) errors.Add("SDK.prefab (AdmobAds child)");
+
+                PrefabUtility.SaveAsPrefabAsset(root, sdkPath);
+            }
+            finally
+            {
+                if (root != null)
+                    PrefabUtility.UnloadPrefabContents(root);
+            }
+
+            TrySaveAppsFlyerObjectPrefab(errors);
+#if USE_LEVEL_PLAY_MEDIATION
+            TrySaveIronSourcePrefabAsset(errors);
+#endif
+            TrySaveAdMobPrefabAsset(errors);
+
+            AssetDatabase.SaveAssets();
+        }
+
+        private bool SavePrefabAppsFlyerUtils(GameObject sdkRoot)
+        {
+            var comp = sdkRoot.GetComponent<GameUpSDK.AppsFlyerUtils>();
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            Set(so, "sdkKey", _appsFlyerUtilsSdkKey);
+            Set(so, "appId", _appsFlyerUtilsAppId);
+            var isDev = so.FindProperty("isDevMode");
+            if (isDev != null) isDev.boolValue = _appsFlyerUtilsIsDevMode;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(comp);
+            return true;
+        }
+
+        private bool SavePrefabFirebaseRemoteConfigUtils(GameObject sdkRoot)
+        {
+            var comp = sdkRoot.GetComponent<GameUpSDK.FirebaseRemoteConfigUtils>();
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            SetInt(so, "inter_capping_time", _rcInterCappingTime);
+            SetInt(so, "inter_start_level", _rcInterStartLevel);
+            SetBool(so, "enable_rate_app", _rcEnableRateApp);
+            SetInt(so, "level_start_show_rate_app", _rcLevelStartShowRateApp);
+            SetBool(so, "no_internet_popup_enable", _rcNoInternetPopupEnable);
+            SetBool(so, "enable_banner", _rcEnableBanner);
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(comp);
+            return true;
+        }
+
+        private bool SavePrefabIronSource(GameObject sdkRoot)
+        {
+#if USE_LEVEL_PLAY_MEDIATION
+            var comp = sdkRoot.GetComponentInChildren<GameUpSDK.IronSourceAds>(true);
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            Set(so, "levelPlayAppKey", _ironSourceAppKey);
+            Set(so, "bannerAdUnitId", _ironSourceBannerId);
+            Set(so, "interstitialAdUnitId", _ironSourceInterstitialId);
+            Set(so, "rewardedVideoAdUnitId", _ironSourceRewardedId);
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(comp);
+            return true;
+#else
+            return true;
+#endif
+        }
+
+        private bool SavePrefabAdMob(GameObject sdkRoot)
+        {
+            var comp = sdkRoot.GetComponentInChildren<GameUpSDK.AdmobAds>(true);
+            if (comp == null) return false;
+            var so = new SerializedObject(comp);
+            Set(so, "bannerAdUnitId", _admobBannerId);
+            Set(so, "interstitialAdUnitId", _admobInterstitialId);
+            Set(so, "rewardedAdUnitId", _admobRewardedId);
+            Set(so, "appOpenAdUnitId", _admobAppOpenId);
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(comp);
+            return true;
+        }
+
+        private void TrySaveAppsFlyerObjectPrefab(List<string> errors)
+        {
+            if (!IsPrefabAssetPathWritable(PathAppsFlyer)) return;
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(PathAppsFlyer) == null) return;
+
+            var type = Type.GetType("AppsFlyerObjectScript, AppsFlyer");
+            if (type == null) return;
+
+            GameObject root = null;
+            try
+            {
+                root = PrefabUtility.LoadPrefabContents(PathAppsFlyer);
+                var comp = root != null ? root.GetComponent(type) : null;
+                if (comp == null)
+                {
+                    errors.Add("AppsFlyerObject.prefab (AppsFlyerObjectScript)");
+                    return;
+                }
+
+                var so = new SerializedObject(comp);
+                Set(so, "devKey", _appsFlyerDevKey);
+                Set(so, "appID", _appsFlyerAppId);
+                so.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(comp);
+                PrefabUtility.SaveAsPrefabAsset(root, PathAppsFlyer);
+            }
+            finally
+            {
+                if (root != null)
+                    PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
+#if USE_LEVEL_PLAY_MEDIATION
+        private void TrySaveIronSourcePrefabAsset(List<string> errors)
+        {
+            if (!IsPrefabAssetPathWritable(PathIronSource)) return;
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(PathIronSource) == null) return;
+
+            GameObject root = null;
+            try
+            {
+                root = PrefabUtility.LoadPrefabContents(PathIronSource);
+                var comp = root?.GetComponent<GameUpSDK.IronSourceAds>();
+                if (comp == null)
+                {
+                    errors.Add("IronSourceAds.prefab (IronSourceAds)");
+                    return;
+                }
+
+                var so = new SerializedObject(comp);
+                Set(so, "levelPlayAppKey", _ironSourceAppKey);
+                Set(so, "bannerAdUnitId", _ironSourceBannerId);
+                Set(so, "interstitialAdUnitId", _ironSourceInterstitialId);
+                Set(so, "rewardedVideoAdUnitId", _ironSourceRewardedId);
+                so.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(comp);
+                PrefabUtility.SaveAsPrefabAsset(root, PathIronSource);
+            }
+            finally
+            {
+                if (root != null)
+                    PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+#endif
+
+        private void TrySaveAdMobPrefabAsset(List<string> errors)
+        {
+            if (!IsPrefabAssetPathWritable(PathAdMob)) return;
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(PathAdMob) == null) return;
+
+            GameObject root = null;
+            try
+            {
+                root = PrefabUtility.LoadPrefabContents(PathAdMob);
+                var comp = root?.GetComponent<GameUpSDK.AdmobAds>();
+                if (comp == null)
+                {
+                    errors.Add("AdmobAds.prefab (AdmobAds)");
+                    return;
+                }
+
+                var so = new SerializedObject(comp);
+                Set(so, "bannerAdUnitId", _admobBannerId);
+                Set(so, "interstitialAdUnitId", _admobInterstitialId);
+                Set(so, "rewardedAdUnitId", _admobRewardedId);
+                Set(so, "appOpenAdUnitId", _admobAppOpenId);
+                so.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(comp);
+                PrefabUtility.SaveAsPrefabAsset(root, PathAdMob);
+            }
+            finally
+            {
+                if (root != null)
+                    PrefabUtility.UnloadPrefabContents(root);
+            }
         }
 
         private bool SaveSceneFirebaseRemoteConfigUtils(GameObject sdkRoot)
