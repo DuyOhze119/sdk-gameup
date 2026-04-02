@@ -16,10 +16,28 @@ SDK tích hợp Quảng cáo (Ads) và Analytics cho game Unity, hỗ trợ:
 2. [Cài đặt Dependencies](#2-cài-đặt-dependencies)
 3. [Cấu hình qua Setup Window](#3-cấu-hình-qua-setup-window)
 4. [Thêm SDK vào Scene](#4-thêm-sdk-vào-scene)
-5. [AdsManager – Quảng cáo](#5-adsmanager--quảng-cáo)
-6. [GameUpAnalytics – Analytics](#6-gameupanalytics--analytics)
-7. [FirebaseRemoteConfigUtils – Remote Config](#7-firebaseremoteconfigutils--remote-config)
-8. [Remote Config Keys Reference](#8-remote-config-keys-reference)
+5. [Hoàn tất & kiểm tra trước khi dùng API](#5-hoàn-tất--kiểm-tra-trước-khi-dùng-api)
+6. [AdsManager – Quảng cáo](#6-adsmanager--quảng-cáo)
+7. [GameUpAnalytics – Analytics](#7-gameupanalytics--analytics)
+8. [FirebaseRemoteConfigUtils – Remote Config](#8-firebaseremoteconfigutils--remote-config)
+9. [Remote Config Keys Reference](#9-remote-config-keys-reference)
+
+---
+
+## Luồng cài đặt GameUp SDK (thứ tự khuyến nghị)
+
+Làm lần lượt; **chỉ sang bước sau khi bước trước compile sạch** (Console không lỗi liên quan GameUp / GameAnalytics).
+
+| Bước | Việc cần làm |
+|------|----------------|
+| **1** | [Cài package GameUp SDK](#1-cài-đặt) (UPM hoặc copy `Assets/GameUpSDK`). |
+| **2** | Mở **GameUp SDK → Setup Dependencies**, cài **packages bắt buộc** (LevelPlay, Firebase, …) và các mục **tùy chọn** bạn cần (ví dụ **GameAnalytics**). |
+| **3** | **Nếu bạn cài GameAnalytics** (thường là file `.unitypackage`): ngay sau khi import, nếu project báo lỗi compile thiếu assembly **`GameAnalyticsSDK`**, chạy menu **GameUp SDK → Ensure GameAnalytics runtime asmdef** để tạo `Assets/GameAnalytics/Plugins/GameAnalyticsSDK.asmdef`, đợi Unity **recompile** xong. Có thể thêm **GameUp SDK → Sync Define Symbols** nếu define chưa khớp. **Chỉ sau bước này** (và khi không còn lỗi) mới chuyển sang cấu hình Setup. |
+| **4** | Khi cửa sổ Dependencies hiện nút **→ Mở cấu hình SDK** (điều kiện analytics + mediation đã đủ), mở **GameUp SDK → Setup**, điền key/tab cần thiết, bấm **Save Configuration**. |
+| **5** | Trong Setup, bấm **Tạo SDK trong Scene hiện tại** (scene load đầu tiên). Xem [Hoàn tất & kiểm tra](#5-hoàn-tất--kiểm-tra-trước-khi-dùng-api) để biết khi nào coi là xong và cách kiểm tra **GameAnalytics** trên scene. |
+| **6** | Sau đó dùng các API: [AdsManager](#6-adsmanager--quảng-cáo), [GameUpAnalytics](#7-gameupanalytics--analytics), [FirebaseRemoteConfigUtils](#8-firebaseremoteconfigutils--remote-config), [bảng key Remote Config](#9-remote-config-keys-reference). |
+
+> **Tóm lại**: Dependencies (và **asmdef GameAnalytics** nếu dùng GA) → **Setup** → **SDK trong scene** → kiểm tra → tài liệu API.
 
 ---
 
@@ -43,7 +61,19 @@ Copy thư mục `Assets/GameUpSDK` vào project, sau đó mở thủ công: **Ga
 
 ## 2. Cài đặt Dependencies
 
-Mở **GameUp SDK → Setup Dependencies** trên thanh menu (hoặc để cửa sổ tự động mở khi cài lần đầu).
+Mở **GameUp SDK → Setup Dependencies** trên thanh menu (hoặc để cửa sổ tự động mở khi cài lần đầu). Logic installer và đồng bộ define nằm trong `Assets/GameUpSDK/Editor/Installer` (ví dụ `GameUpDependenciesWindow`, `GameUpDefineSymbolsAutoSync`).
+
+### GameAnalytics — tránh lỗi compile trước khi vào Setup
+
+`GameUpSDK.Runtime` tham chiếu assembly tên **`GameAnalyticsSDK`**. Bản GameAnalytics cài bằng **`.unitypackage`** cổ điển thường **không** kèm `GameAnalyticsSDK.asmdef`, khiến Unity không tạo assembly đúng tên → **lỗi compile**.
+
+**Sau khi import GameAnalytics từ cửa sổ Dependencies (hoặc tay), luôn làm như sau trước khi mở GameUp SDK → Setup:**
+
+1. Đợi Unity import xong, xem **Console**.
+2. Nếu có lỗi thiếu `GameAnalyticsSDK` / không resolve reference: menu **GameUp SDK → Ensure GameAnalytics runtime asmdef** (tạo `Assets/GameAnalytics/Plugins/GameAnalyticsSDK.asmdef`).
+3. Đợi **recompile**; khi cần, **GameUp SDK → Sync Define Symbols**.
+
+Auto-sync sau compile cũng gọi bước tạo asmdef nội bộ, nhưng chạy menu trên **một lần** sau import GA là cách chắc chắn để hết lỗi ngay.
 
 ### Packages bắt buộc
 
@@ -62,12 +92,10 @@ Mở **GameUp SDK → Setup Dependencies** trên thanh menu (hoặc để cửa 
 
 ### GameAnalytics — Installer (tùy chọn)
 
-Logic cài đặt và đồng bộ define nằm trong `Assets/GameUpSDK/Editor/Installer` (`GameUpDependenciesWindow`, `GameUpDefineSymbolsAutoSync`).
-
 - **Cài package**: trong **GameUp SDK → Setup Dependencies**, GameAnalytics nằm nhóm **TÙY CHỌN**. Nút **⬇ Cài dependency theo Primary Mediation** sẽ cố gắng cài cả GameAnalytics cùng Firebase, AppsFlyer và bộ mediation đã chọn (nếu chưa có). Mỗi package có file `.unitypackage` trong `Packages~/` của SDK hoặc **Hosted URL** tải về (GameAnalytics: `GA_SDK_UNITY.unitypackage` từ CDN GameAnalytics, bản tương ứng **7.10.6**).
 - **Phát hiện đã cài**: coi là đã có SDK khi load được assembly **`GameAnalyticsSDK`** *hoặc* type **`GameAnalyticsSDK.GameAnalytics`** trong bất kỳ assembly nào (hỗ trợ bản import `.unitypackage` cổ điển đặt script trong `Assembly-CSharp`).
 - **Define `GAMEANALYTICS_DEPENDENCIES_INSTALLED`**: được **bật/tắt tự động** theo trạng thái trên (Android / iOS / Standalone). Khi **bật**, `GameUpAnalytics` mới gửi dữ liệu lên GameAnalytics (progression + design event tiền tố `gameup:`); khi tắt, lớp wrapper GA là no-op.
-- **Assembly definition**: `GameUpSDK.Runtime` tham chiếu assembly tên `GameAnalyticsSDK`. Nếu bạn import GA bằng `.unitypackage` cũ **không** có `GameAnalyticsSDK.asmdef`, dùng menu **GameUp SDK → Ensure GameAnalytics runtime asmdef** để tạo `Assets/GameAnalytics/Plugins/GameAnalyticsSDK.asmdef` (auto-sync cũng thử bước này khi compile).
+- **Assembly definition**: xem mục [GameAnalytics — tránh lỗi compile](#gameanalytics--tránh-lỗi-compile-trước-khi-vào-setup) ở trên; menu **GameUp SDK → Ensure GameAnalytics runtime asmdef** tạo `Assets/GameAnalytics/Plugins/GameAnalyticsSDK.asmdef` khi thiếu (auto-sync cũng thử khi compile).
 - **Cấu hình key & scene**: tạo **GameObject GameAnalytics** (prefab/SDK) và điền Game Key / Secret Key — có thể dùng **Window → GameAnalytics** hoặc tab **Game Analytics** trong **GameUp SDK → Setup** (asset `Assets/Resources/GameAnalytics/Settings.asset`).
 
 Đồng bộ define thủ công bất cứ lúc nào: **GameUp SDK → Sync Define Symbols**.
@@ -77,7 +105,7 @@ Logic cài đặt và đồng bộ define nằm trong `Assets/GameUpSDK/Editor/I
 - Chọn **Primary Mediation** (LevelPlay hoặc AdMob), rồi dùng **⬇ Cài dependency theo Primary Mediation** để tải/import gói còn thiếu (Firebase, AppsFlyer, GameAnalytics, Google Mobile Ads hoặc LevelPlay, v.v. — từng mục đã có thì bỏ qua). Gói có file trong `Packages~/` của SDK sẽ import ngay; gói chỉ có URL sẽ được tải rồi import.
 - Nhấn **↻ Làm mới trạng thái** sau khi import tay từ trang nhà cung cấp.
 - **Scripting Define Symbols** (gồm `GAMEANALYTICS_DEPENDENCIES_INSTALLED`, `GAMEUP_SDK_DEPS_READY`, …) được cập nhật khi mở cửa sổ / sau compile — hoặc chạy **GameUp SDK → Sync Define Symbols**.
-- Khi điều kiện bật SDK thỏa (ít nhất một analytics + một mediation), nút **→ Mở cấu hình SDK** xuất hiện → nhấn để sang **GameUp SDK → Setup**.
+- Khi điều kiện bật SDK thỏa (ít nhất một analytics + một mediation), nút **→ Mở cấu hình SDK** xuất hiện → nhấn để sang **GameUp SDK → Setup**. **Không bỏ qua bước asmdef GameAnalytics** (nếu dùng GA) — nếu vẫn lỗi compile, Setup/editor có thể không hoạt động đúng.
 
 > **Quan trọng**: `GAMEUP_SDK_DEPS_READY` được installer đặt khi có **ít nhất một** analytics (Firebase, AppsFlyer hoặc GameAnalytics) **và** có mediation (AdMob hoặc LevelPlay). Đây là cờ backward-compat “SDK enabled”; logic no-op cụ thể của từng tính năng có thể dùng thêm define từng nhà cung cấp (ví dụ `GAMEANALYTICS_DEPENDENCIES_INSTALLED` cho GameAnalytics).
 
@@ -146,15 +174,37 @@ Sau khi chỉnh sửa, bấm **Save Configuration** để lưu vào prefab.
 
 ## 4. Thêm SDK vào Scene
 
-Sau khi Save Configuration, bấm **"Tạo SDK trong Scene hiện tại"** trong Setup Window.
+Sau khi **Save Configuration** trong **GameUp SDK → Setup**, bấm **"Tạo SDK trong Scene hiện tại"**.
 
-SDK sẽ được khởi tạo tự động từ prefab `SDK.prefab` (Singleton, `DontDestroyOnLoad`).
+SDK được khởi tạo từ prefab `SDK.prefab` (Singleton, `DontDestroyOnLoad`).
 
 > **Lưu ý**: Chỉ cần thêm vào scene **đầu tiên** (Splash/Loading). Không thêm lại ở các scene khác.
 
 ---
 
-## 5. AdsManager – Quảng cáo
+## 5. Hoàn tất & kiểm tra trước khi dùng API
+
+### Khi nào coi là cài đặt xong
+
+Bạn có thể chuyển sang gọi API (mục 6–9) khi **đồng thời** thỏa:
+
+1. **Console** không còn lỗi compile liên quan GameUp / `GameAnalyticsSDK` / mediation.
+2. Trong **Setup Dependencies**, điều kiện analytics + mediation đã đủ (nút **→ Mở cấu hình SDK** đã từng xuất hiện hoặc tương đương — define `GAMEUP_SDK_DEPS_READY` đã được sync).
+3. Đã **Save Configuration** trong **GameUp SDK → Setup**.
+4. Scene load đầu đã có **một** GameObject SDK (từ **Tạo SDK trong Scene hiện tại** hoặc prefab tương đương).
+
+### Kiểm tra GameAnalytics trên scene (chỉ khi bạn dùng GameAnalytics)
+
+- **Nếu không cài GameAnalytics**: không cần object GameAnalytics trong Hierarchy; `GameUpAnalytics` vẫn log Firebase/AppsFlyer như tài liệu.
+- **Nếu đã cài GameAnalytics** (`GAMEANALYTICS_DEPENDENCIES_INSTALLED` bật sau sync): mở **Hierarchy**, chọn root **SDK**, mở rộng cây con:
+  - **Có GameAnalytics**: bạn sẽ thấy **một GameObject con** (thường từ prefab `GameAnalytics`) chứa component **`GameAnalytics`** — flow **Tạo SDK trong Scene hiện tại** cố gắng tự thêm prefab này làm con của SDK khi GA đã được phát hiện.
+  - **Không thấy** nhưng bạn cần GA: kiểm tra prefab GA tồn tại (mặc định thường `Assets/GameAnalytics/Plugins/Prefabs/GameAnalytics.prefab`), tab **Game Analytics** trong Setup (key/settings), rồi tạo lại SDK trong scene hoặc gắn prefab GameAnalytics thủ công dưới root SDK theo hướng dẫn [GameAnalytics Unity](https://docs.gameanalytics.com/event-tracking-and-integrations/sdks-and-collection-api/game-engine-sdks/unity/).
+
+Sau khi các mục trên ổn, xem tiếp **phân API** bên dưới.
+
+---
+
+## 6. AdsManager – Quảng cáo
 
 `AdsManager` là điểm trung tâm để hiển thị tất cả loại quảng cáo. Dùng **waterfall**: network có độ ưu tiên cao nhất (`OrderExecute` nhỏ nhất) và đang available sẽ được dùng.
 
@@ -249,13 +299,13 @@ Chuỗi mô tả vị trí/ngữ cảnh hiển thị quảng cáo, dùng để t
 ### GDPR / Consent
 
 ```csharp
-// Gọi sau khi người dùng hoàn tất consent flow
+// Đã tự đọng set true trong 
 AdsManager.Instance.SetAfterCheckGDPR();
 ```
 
 ---
 
-## 6. GameUpAnalytics – Analytics
+## 7. GameUpAnalytics – Analytics
 
 `GameUpAnalytics` là static class, log event đến Firebase và/hoặc AppsFlyer. Khi **`GAMEANALYTICS_DEPENDENCIES_INSTALLED`** được bật (sau khi cài GameAnalytics — xem [GameAnalytics — Installer](#gameanalytics--installer-tùy-chọn)), cùng API còn mirror **progression** và **design events** lên GameAnalytics (hierarchy cố định world `main` → số level → segment wave `w{n}`, theo [GA Unity — Progression](https://docs.gameanalytics.com/event-tracking-and-integrations/sdks-and-collection-api/game-engine-sdks/unity/event-tracking)).
 
@@ -355,7 +405,7 @@ Ad Revenue được log tự động đến cả Firebase và AppsFlyer thông q
 
 ---
 
-## 7. FirebaseRemoteConfigUtils – Remote Config
+## 8. FirebaseRemoteConfigUtils – Remote Config
 
 `FirebaseRemoteConfigUtils` tự động fetch và sync giá trị từ Firebase Remote Config vào các public field cùng tên (via reflection). Không cần gọi thủ công trong luồng bình thường.
 
@@ -410,7 +460,7 @@ FirebaseRemoteConfigUtils.Instance.FetchAndActivate(ok =>
 
 ---
 
-## 8. Remote Config Keys Reference
+## 9. Remote Config Keys Reference
 
 Các key phải đặt **đúng tên** trên Firebase Remote Config console để SDK tự động sync (tên biến = tên key):
 

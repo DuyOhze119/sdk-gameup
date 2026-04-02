@@ -168,6 +168,8 @@ namespace GameUpSDK
                 }
             }
             _initialized = true;
+            SetAfterCheckGDPR();
+
             Debug.Log("[GameUp] AdsManager Initialize called for " + _ads.Count + " networks.");
 
             // Luôn RequestAll để preload (banner chỉ hiện khi gọi ShowBanner, không tự hiện nhờ SetDisplayOnLoad(false) ở LevelPlay).
