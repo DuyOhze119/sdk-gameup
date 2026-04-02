@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using GameUpSDK.Singletons;
 #if APPSFLYER_DEPENDENCIES_INSTALLED
 using AppsFlyerSDK;
 #endif

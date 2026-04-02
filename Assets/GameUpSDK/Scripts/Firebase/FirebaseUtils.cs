@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using System.Collections.Generic;
+using GameUpSDK.Singletons;
 #if FIREBASE_DEPENDENCIES_INSTALLED
 using Firebase;
 using Firebase.Analytics;

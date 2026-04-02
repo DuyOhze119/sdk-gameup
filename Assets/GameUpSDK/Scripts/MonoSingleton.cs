@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace GameUpSDK
+namespace GameUpSDK.Singletons
 {
     public class MonoSingleton<T> : MonoBehaviour where T : MonoBehaviour
     {
