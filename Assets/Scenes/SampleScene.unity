@@ -324,6 +324,26 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3023022297655963174, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: admobAdsBehaviours.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3023022297655963174, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: admobAdsBehaviours.Array.data[0]
+      value: 
+      objectReference: {fileID: 980002695}
+    - target: {fileID: 3023022297655963174, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: levelPlayAdsBehaviours.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3023022297655963174, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: levelPlayAdsBehaviours.Array.data[0]
+      value: 
+      objectReference: {fileID: 980002696}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: bannerAdUnitId
+      value: 111
+      objectReference: {fileID: 0}
     - target: {fileID: 4275973953013205297, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
       propertyPath: m_Name
       value: SDK
@@ -341,6 +361,28 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 2771652189409630104, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
   m_PrefabInstance: {fileID: 980002693}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &980002695 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+  m_PrefabInstance: {fileID: 980002693}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b6c4f4b9bff0484da41432b3399cd54, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &980002696 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4916787099274234970, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+  m_PrefabInstance: {fileID: 980002693}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 771b6eb068d55e34eb37d2bf84ae9896, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
