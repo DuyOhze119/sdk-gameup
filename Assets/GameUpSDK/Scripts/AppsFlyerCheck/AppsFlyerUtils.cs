@@ -7,20 +7,12 @@ using AppsFlyerSDK;
 
 namespace GameUpSDK
 {
+    /// <summary>
+    /// Gọi event / ad revenue AppsFlyer. SDK được khởi tạo bởi AppsFlyerObject (AppsFlyerObjectScript) — devKey và appID cấu hình trên object đó.
+    /// </summary>
     public class AppsFlyerUtils : MonoSingletonSdk<AppsFlyerUtils>
     {
 #if APPSFLYER_DEPENDENCIES_INSTALLED
-        [SerializeField] private string sdkKey;
-        [SerializeField] private string appId;
-        [SerializeField] private bool isDevMode = false;
-
-        private void Awake()
-        {
-            AppsFlyer.setIsDebug(isDevMode);
-            AppsFlyer.initSDK(sdkKey, GameUtils.IsAndroid() ? "" : appId);
-            AppsFlyer.startSDK();
-        }
-
         /// <summary>
         /// Gửi ad revenue lên AppsFlyer. Dùng enum MediationNetwork của SDK (GoogleAdMob, IronSource, ApplovinMax, ...).
         /// </summary>
@@ -36,10 +28,6 @@ namespace GameUpSDK
             AppsFlyer.sendEvent(eventName, eventValues);
         }
 #else
-        [SerializeField] private string sdkKey;
-        [SerializeField] private string appId;
-        [SerializeField] private bool isDevMode = false;
-
         public static void LogAdRevenue(string monetizationNetwork, int mediationNetwork,
             double eventRevenue, string revenueCurrency, Dictionary<string, string> additionalParameters = null) { }
 

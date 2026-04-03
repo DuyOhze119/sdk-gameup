@@ -113,14 +113,10 @@ namespace GameUpSDK.Editor
         private string _facebookClientToken = "";
         private string _facebookAndroidKeystorePath = "";
 
-        // AppsFlyer (AppsFlyerObjectScript on AppsFlyerObject.prefab: devKey, appID)
+        // AppsFlyer — AppsFlyerObjectScript (devKey, appID, isDebug); init SDK trên AppsFlyerObject, không trùng với AppsFlyerUtils
         private string _appsFlyerDevKey = "";
         private string _appsFlyerAppId = "";
-
-        // AppsFlyerUtils on SDK.prefab (sdkKey, appId, isDevMode)
-        private string _appsFlyerUtilsSdkKey = "";
-        private string _appsFlyerUtilsAppId = "";
-        private bool _appsFlyerUtilsIsDevMode = false;
+        private bool _appsFlyerIsDebug = false;
 
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
         // IronSource (IronSourceAds: levelPlayAppKey, bannerAdUnitId, interstitialAdUnitId, rewardedVideoAdUnitId)
@@ -671,18 +667,14 @@ namespace GameUpSDK.Editor
 
         private void DrawAppsFlyerSection()
         {
-            EditorGUILayout.LabelField("AppsFlyer Settings", EditorStyles.boldLabel);
-
-            EditorGUILayout.HelpBox("AppsFlyerObjectScript on " + PathAppsFlyer, MessageType.None);
+            EditorGUILayout.LabelField("AppsFlyer", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Một lần nhập: Dev Key (AppsFlyer dashboard) và App ID App Store (chỉ iOS; Android để trống). " +
+                "Ghi lên AppsFlyerObject trong SDK / " + PathAppsFlyer + ".",
+                MessageType.None);
             _appsFlyerDevKey = EditorGUILayout.TextField("Dev Key", _appsFlyerDevKey);
             _appsFlyerAppId = EditorGUILayout.TextField("App ID (iOS)", _appsFlyerAppId);
-
-            EditorGUILayout.Space(8);
-            EditorGUILayout.LabelField("AppsFlyerUtils (GameUpSDK)", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("AppsFlyerUtils on " + PathSDK + " – init SDK, log events, ad revenue.", MessageType.None);
-            _appsFlyerUtilsSdkKey = EditorGUILayout.TextField("SDK Key", _appsFlyerUtilsSdkKey);
-            _appsFlyerUtilsAppId = EditorGUILayout.TextField("App ID (iOS)", _appsFlyerUtilsAppId);
-            _appsFlyerUtilsIsDevMode = EditorGUILayout.Toggle("Dev Mode", _appsFlyerUtilsIsDevMode);
+            _appsFlyerIsDebug = EditorGUILayout.Toggle("Debug (AppsFlyer SDK)", _appsFlyerIsDebug);
         }
 
         private static Type _gameAnalyticsSettingsType;
@@ -953,7 +945,6 @@ namespace GameUpSDK.Editor
         {
             var errors = new System.Collections.Generic.List<string>();
             if (!LoadAppsFlyer()) errors.Add("Prefab not found at: " + PathAppsFlyer);
-            LoadAppsFlyerUtils();
             LoadFirebaseRemoteConfigUtils();
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
             if (IsIronSourceSetupSectionAvailable() && !LoadIronSource())
@@ -992,15 +983,22 @@ namespace GameUpSDK.Editor
             // Chỉ load các component nằm trên SDK root/prefab instance.
             var errors = new System.Collections.Generic.List<string>();
 
-            var afUtils = sdkRoot.GetComponent<GameUpSDK.AppsFlyerUtils>();
-            if (afUtils != null)
+            var afType = Type.GetType("AppsFlyerObjectScript, AppsFlyer");
+            if (afType != null)
             {
-                var so = new SerializedObject(afUtils);
-                Assign(so, "sdkKey", ref _appsFlyerUtilsSdkKey);
-                Assign(so, "appId", ref _appsFlyerUtilsAppId);
-                var isDev = so.FindProperty("isDevMode");
-                if (isDev != null) _appsFlyerUtilsIsDevMode = isDev.boolValue;
+                var afComp = sdkRoot.GetComponentInChildren(afType, true);
+                if (afComp != null)
+                {
+                    var so = new SerializedObject(afComp);
+                    Assign(so, "devKey", ref _appsFlyerDevKey);
+                    Assign(so, "appID", ref _appsFlyerAppId);
+                    AssignBool(so, "isDebug", ref _appsFlyerIsDebug);
+                }
+                else if (!LoadAppsFlyer())
+                    errors.Add("Prefab not found at: " + PathAppsFlyer);
             }
+            else if (!LoadAppsFlyer())
+                errors.Add("Prefab not found at: " + PathAppsFlyer);
 
             var rc = sdkRoot.GetComponent<GameUpSDK.FirebaseRemoteConfigUtils>();
             if (rc != null)
@@ -1058,20 +1056,9 @@ namespace GameUpSDK.Editor
             var appID = so.FindProperty("appID");
             if (devKey != null) _appsFlyerDevKey = devKey.stringValue ?? "";
             if (appID != null) _appsFlyerAppId = appID.stringValue ?? "";
+            var isDbg = so.FindProperty("isDebug");
+            if (isDbg != null) _appsFlyerIsDebug = isDbg.boolValue;
             return true;
-        }
-
-        private void LoadAppsFlyerUtils()
-        {
-            var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathSDK);
-            if (go == null) return;
-            var comp = go.GetComponent<GameUpSDK.AppsFlyerUtils>();
-            if (comp == null) return;
-            var so = new SerializedObject(comp);
-            Assign(so, "sdkKey", ref _appsFlyerUtilsSdkKey);
-            Assign(so, "appId", ref _appsFlyerUtilsAppId);
-            var isDev = so.FindProperty("isDevMode");
-            if (isDev != null) _appsFlyerUtilsIsDevMode = isDev.boolValue;
         }
 
         private void LoadFirebaseRemoteConfigUtils()
@@ -1402,7 +1389,7 @@ namespace GameUpSDK.Editor
 
             if (TryGetSdkSceneRoot(out var sdkRoot))
             {
-                if (!SaveSceneAppsFlyerUtils(sdkRoot)) errors.Add("SDK in Scene (AppsFlyerUtils)");
+                if (!SaveSceneAppsFlyerObject(sdkRoot)) errors.Add("SDK in Scene (AppsFlyerObjectScript)");
                 if (!SaveSceneFirebaseRemoteConfigUtils(sdkRoot)) errors.Add("SDK in Scene (FirebaseRemoteConfigUtils)");
                 if (!SaveSceneAdsManager(sdkRoot)) errors.Add("SDK in Scene (AdsManager)");
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
@@ -1465,16 +1452,17 @@ namespace GameUpSDK.Editor
             return false;
         }
 
-        private bool SaveSceneAppsFlyerUtils(GameObject sdkRoot)
+        private bool SaveSceneAppsFlyerObject(GameObject sdkRoot)
         {
             if (sdkRoot == null) return false;
-            var comp = sdkRoot.GetComponent<GameUpSDK.AppsFlyerUtils>();
+            var type = Type.GetType("AppsFlyerObjectScript, AppsFlyer");
+            if (type == null) return true;
+            var comp = sdkRoot.GetComponentInChildren(type, true);
             if (comp == null) return false;
             var so = new SerializedObject(comp);
-            Set(so, "sdkKey", _appsFlyerUtilsSdkKey);
-            Set(so, "appId", _appsFlyerUtilsAppId);
-            var isDev = so.FindProperty("isDevMode");
-            if (isDev != null) isDev.boolValue = _appsFlyerUtilsIsDevMode;
+            Set(so, "devKey", _appsFlyerDevKey);
+            Set(so, "appID", _appsFlyerAppId);
+            SetBool(so, "isDebug", _appsFlyerIsDebug);
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(comp);
             PrefabUtility.RecordPrefabInstancePropertyModifications(comp);
@@ -1562,7 +1550,7 @@ namespace GameUpSDK.Editor
                     return;
                 }
 
-                if (!SavePrefabAppsFlyerUtils(root)) errors.Add("SDK.prefab (AppsFlyerUtils)");
+                if (!SavePrefabAppsFlyerObject(root)) errors.Add("SDK.prefab (AppsFlyerObjectScript)");
                 if (!SavePrefabFirebaseRemoteConfigUtils(root)) errors.Add("SDK.prefab (FirebaseRemoteConfigUtils)");
                 if (!PersistAdsManagerLists(root, recordPrefabInstance: false)) errors.Add("SDK.prefab (AdsManager)");
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
@@ -1588,15 +1576,16 @@ namespace GameUpSDK.Editor
             AssetDatabase.SaveAssets();
         }
 
-        private bool SavePrefabAppsFlyerUtils(GameObject sdkRoot)
+        private bool SavePrefabAppsFlyerObject(GameObject sdkRoot)
         {
-            var comp = sdkRoot.GetComponent<GameUpSDK.AppsFlyerUtils>();
+            var type = Type.GetType("AppsFlyerObjectScript, AppsFlyer");
+            if (type == null) return true;
+            var comp = sdkRoot.GetComponentInChildren(type, true);
             if (comp == null) return false;
             var so = new SerializedObject(comp);
-            Set(so, "sdkKey", _appsFlyerUtilsSdkKey);
-            Set(so, "appId", _appsFlyerUtilsAppId);
-            var isDev = so.FindProperty("isDevMode");
-            if (isDev != null) isDev.boolValue = _appsFlyerUtilsIsDevMode;
+            Set(so, "devKey", _appsFlyerDevKey);
+            Set(so, "appID", _appsFlyerAppId);
+            SetBool(so, "isDebug", _appsFlyerIsDebug);
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(comp);
             return true;
@@ -1670,6 +1659,7 @@ namespace GameUpSDK.Editor
                 var so = new SerializedObject(comp);
                 Set(so, "devKey", _appsFlyerDevKey);
                 Set(so, "appID", _appsFlyerAppId);
+                SetBool(so, "isDebug", _appsFlyerIsDebug);
                 so.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(comp);
                 PrefabUtility.SaveAsPrefabAsset(root, PathAppsFlyer);
