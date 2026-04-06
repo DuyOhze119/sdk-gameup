@@ -117,6 +117,9 @@ namespace GameUpSDK
                     });
                 };
                 var request = new AdRequest();
+                // AdMob BannerView hiển thị mặc định khi load xong (khác LevelPlay SetDisplayOnLoad(false)).
+                // Ẩn trước LoadAd để chỉ hiện khi AdsManager.ShowBanner → Show().
+                _bannerView.Hide();
                 _bannerView.LoadAd(request);
             });
 #endif
