@@ -10,7 +10,7 @@ namespace GameUpSDK
     /// <summary>
     /// AdMob (Google Mobile Ads) implementation of IAds. Handles Banner, Interstitial, Rewarded, and App Open.
     /// </summary>
-    public class AdmobAds : MonoBehaviour, IAds
+    public class AdmobAds : MonoBehaviour, IAds, INativeOverlayAds
     {
         [Header("Ad Unit IDs (optional - set via code)")]
         [SerializeField]
@@ -19,6 +19,7 @@ namespace GameUpSDK
         [SerializeField] private string interstitialAdUnitId;
         [SerializeField] private string rewardedAdUnitId;
         [SerializeField] private string appOpenAdUnitId;
+        [SerializeField] private string nativeOverlayAdUnitId;
 
         public int OrderExecute { get; set; }
 
@@ -34,6 +35,7 @@ namespace GameUpSDK
         private InterstitialAd _interstitialAd;
         private RewardedAd _rewardedAd;
         private AppOpenAd _appOpenAd;
+        private NativeOverlayAd _nativeOverlayAd;
         private DateTime _appOpenExpireTime = DateTime.MinValue;
         private const int AppOpenTimeoutHours = 4;
 #endif
@@ -44,6 +46,11 @@ namespace GameUpSDK
             interstitialAdUnitId = interstitial;
             rewardedAdUnitId = rewarded;
             appOpenAdUnitId = appOpen;
+        }
+
+        public void SetNativeOverlayAdUnitId(string nativeOverlay)
+        {
+            nativeOverlayAdUnitId = nativeOverlay;
         }
 
         public void Initialize()
@@ -66,6 +73,7 @@ namespace GameUpSDK
                     RequestInterstitial();
                     RequestRewardedVideo();
                     RequestAppOpenAds();
+                    RequestNativeOverlay("init");
                 });
             });
 #else
@@ -220,6 +228,262 @@ namespace GameUpSDK
             });
 #endif
         }
+
+        // ---- Native Overlay Ads (AdMob) ----
+
+        public void RequestNativeOverlay(string where)
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            if (!_initialized || string.IsNullOrEmpty(nativeOverlayAdUnitId))
+                return;
+
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (_nativeOverlayAd != null)
+                {
+                    try { _nativeOverlayAd.Destroy(); }
+                    catch { /* ignore */ }
+                    _nativeOverlayAd = null;
+                }
+
+                var adRequest = new AdRequest();
+
+                var options = new NativeAdOptions
+                {
+                    AdChoicesPlacement = AdChoicesPlacement.TopRightCorner,
+                    MediaAspectRatio = MediaAspectRatio.Any
+                };
+
+                NativeOverlayAd.Load(nativeOverlayAdUnitId, adRequest, options, (NativeOverlayAd ad, LoadAdError error) =>
+                {
+                    MainThreadDispatcher.Enqueue(() =>
+                    {
+                        if (error != null || ad == null)
+                        {
+                            Debug.LogError("[GameUp] AdmobAds NativeOverlay load failed: " + (error?.GetMessage() ?? "null"));
+                            return;
+                        }
+
+                        _nativeOverlayAd = ad;
+                        RegisterNativeOverlayEvents(ad);
+                    });
+                });
+            });
+#endif
+        }
+
+        public bool IsNativeOverlayAvailable()
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            return _nativeOverlayAd != null;
+#else
+            return false;
+#endif
+        }
+
+        public void RenderNativeOverlay(string where, NativeOverlayPlacement placement, NativeOverlayTemplateStyle style = null)
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            if (_nativeOverlayAd == null)
+                return;
+
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                // Try exact pixel placement first if provided (depends on plugin version).
+                if (placement.PixelX.HasValue && placement.PixelY.HasValue)
+                {
+                    // Unity screen coords: origin bottom-left. Android view coords: origin top-left.
+                    // Using RenderTemplate(style, x, y) has shown device-specific issues; render by anchor first,
+                    // then move the template with SetTemplatePosition(x, y).
+                    var xPx = placement.PixelX.Value;
+                    var yPx = Screen.height - placement.PixelY.Value;
+
+                    var x = PixelsToDp(xPx);
+                    var y = PixelsToDp(yPx);
+
+                    _nativeOverlayAd.RenderTemplate(BuildNativeTemplateStyle(style), AdPosition.Center);
+                    _nativeOverlayAd.SetTemplatePosition(x, y);
+                    return;
+                }
+
+                // Fallback to anchor presets.
+                var adPosition = MapAnchorToAdPosition(placement.Anchor);
+                _nativeOverlayAd.RenderTemplate(BuildNativeTemplateStyle(style), adPosition);
+            });
+#endif
+        }
+
+        public void ShowNativeOverlay(string where)
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (_nativeOverlayAd != null)
+                    _nativeOverlayAd.Show();
+            });
+#endif
+        }
+
+        public void HideNativeOverlay(string where)
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (_nativeOverlayAd != null)
+                    _nativeOverlayAd.Hide();
+            });
+#endif
+        }
+
+        public void DestroyNativeOverlay(string where)
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (_nativeOverlayAd == null)
+                    return;
+                try { _nativeOverlayAd.Destroy(); }
+                finally { _nativeOverlayAd = null; }
+            });
+#endif
+        }
+
+        public NativeOverlayPlacement BuildPlacementFromRectTransform(RectTransform rectTransform, Canvas canvas = null)
+        {
+            if (rectTransform == null)
+                return new NativeOverlayPlacement { Anchor = NativeOverlayAnchor.Bottom };
+
+            var corners = new Vector3[4];
+            rectTransform.GetWorldCorners(corners);
+            var worldCenter = (corners[0] + corners[2]) * 0.5f;
+
+            Camera cam = null;
+            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                cam = canvas.worldCamera;
+
+            var screen = RectTransformUtility.WorldToScreenPoint(cam, worldCenter);
+            return new NativeOverlayPlacement
+            {
+                Anchor = NativeOverlayAnchor.Center,
+                PixelX = Mathf.RoundToInt(screen.x),
+                PixelY = Mathf.RoundToInt(screen.y),
+            };
+        }
+
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+        private void RegisterNativeOverlayEvents(NativeOverlayAd ad)
+        {
+            ad.OnAdPaid += adValue =>
+            {
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (adValue == null)
+                        return;
+                    double value = adValue.Value * 0.000001f;
+                    var data = new AdImpressionData
+                    {
+                        AdNetwork = "Admob",
+                        AdUnit = nativeOverlayAdUnitId,
+                        InstanceName = nativeOverlayAdUnitId,
+                        AdFormat = "NativeOverlay",
+                        Revenue = value
+                    };
+                    AdsEvent.RaiseImpressionDataReady(data);
+                });
+            };
+        }
+
+        private static int PixelsToDp(int px)
+        {
+#if UNITY_ANDROID
+            var density = GetAndroidDensity();
+            if (density <= 0f)
+                return px;
+            return Mathf.RoundToInt(px / density);
+#else
+            return px;
+#endif
+        }
+
+#if UNITY_ANDROID
+        private static float _androidDensity = -1f;
+
+        private static float GetAndroidDensity()
+        {
+            if (_androidDensity > 0f)
+                return _androidDensity;
+
+            try
+            {
+                using var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+                using var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
+                using var resources = activity.Call<AndroidJavaObject>("getResources");
+                using var metrics = resources.Call<AndroidJavaObject>("getDisplayMetrics");
+                _androidDensity = metrics.Get<float>("density");
+            }
+            catch
+            {
+                _androidDensity = 1f;
+            }
+
+            if (_androidDensity <= 0f)
+                _androidDensity = 1f;
+
+            return _androidDensity;
+        }
+#endif
+
+        private static NativeTemplateStyle BuildNativeTemplateStyle(NativeOverlayTemplateStyle style)
+        {
+            var result = new NativeTemplateStyle
+            {
+                TemplateId = NativeTemplateId.Medium
+            };
+
+            if (style == null)
+                return result;
+
+            result.TemplateId = style.TemplateId == NativeOverlayTemplateId.Small ? NativeTemplateId.Small : NativeTemplateId.Medium;
+
+            if (style.MainBackgroundColor.HasValue)
+                result.MainBackgroundColor = style.MainBackgroundColor.Value;
+
+            if (style.CallToAction != null)
+            {
+                var cta = new NativeTemplateTextStyle();
+                if (style.CallToAction.BackgroundColor.HasValue) cta.BackgroundColor = style.CallToAction.BackgroundColor.Value;
+                if (style.CallToAction.FontColor.HasValue) cta.TextColor = style.CallToAction.FontColor.Value;
+                if (style.CallToAction.FontSize.HasValue) cta.FontSize = style.CallToAction.FontSize.Value;
+                if (style.CallToAction.FontStyle.HasValue)
+                {
+                    cta.Style = style.CallToAction.FontStyle.Value switch
+                    {
+                        NativeOverlayFontStyle.Bold => NativeTemplateFontStyle.Bold,
+                        NativeOverlayFontStyle.Italic => NativeTemplateFontStyle.Italic,
+                        NativeOverlayFontStyle.Monospace => NativeTemplateFontStyle.Monospace,
+                        _ => NativeTemplateFontStyle.Normal
+                    };
+                }
+                result.CallToActionText = cta;
+            }
+
+            return result;
+        }
+
+        private static AdPosition MapAnchorToAdPosition(NativeOverlayAnchor anchor)
+        {
+            return anchor switch
+            {
+                NativeOverlayAnchor.Top => AdPosition.Top,
+                NativeOverlayAnchor.TopLeft => AdPosition.TopLeft,
+                NativeOverlayAnchor.TopRight => AdPosition.TopRight,
+                NativeOverlayAnchor.BottomLeft => AdPosition.BottomLeft,
+                NativeOverlayAnchor.BottomRight => AdPosition.BottomRight,
+                NativeOverlayAnchor.Center => AdPosition.Center,
+                _ => AdPosition.Bottom
+            };
+        }
+#endif
 
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
         private void RegisterInterstitialEvents(InterstitialAd ad)
@@ -453,6 +717,7 @@ namespace GameUpSDK
             _interstitialAd?.Destroy();
             _rewardedAd?.Destroy();
             _appOpenAd?.Destroy();
+            try { _nativeOverlayAd?.Destroy(); } catch { /* ignore */ }
 #endif
         }
     }

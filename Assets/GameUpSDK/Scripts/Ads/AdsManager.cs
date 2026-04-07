@@ -290,6 +290,118 @@ namespace GameUpSDK
             network?.HideBanner(where);
         }
 
+        // ---- Native Overlay (AdMob) ----
+
+        /// <summary>
+        /// Load/refresh native overlay on the first network that supports it.
+        /// </summary>
+        public void RequestNativeOverlay(string where)
+        {
+            var network = _ads.OfType<INativeOverlayAds>().FirstOrDefault();
+            if (network == null)
+                return;
+            try
+            {
+                network.RequestNativeOverlay(where);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[GameUp] AdsManager RequestNativeOverlay: " + e);
+            }
+        }
+
+        /// <summary>
+        /// Render native overlay and optionally try exact placement from a RectTransform.
+        /// </summary>
+        public void RenderNativeOverlay(string where, NativeOverlayPlacement placement, NativeOverlayTemplateStyle style = null)
+        {
+            var network = _ads.OfType<INativeOverlayAds>().FirstOrDefault(a => a.IsNativeOverlayAvailable());
+            if (network == null)
+            {
+                Debug.Log("[GameUp] AdsManager RenderNativeOverlay: no network available.");
+                return;
+            }
+
+            try
+            {
+                network.RenderNativeOverlay(where, placement, style);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[GameUp] AdsManager RenderNativeOverlay: " + e);
+            }
+        }
+
+        public void RenderNativeOverlay(string where, RectTransform rectTransform, Canvas canvas = null, NativeOverlayTemplateStyle style = null)
+        {
+            var network = _ads.OfType<INativeOverlayAds>().FirstOrDefault(a => a.IsNativeOverlayAvailable());
+            if (network == null)
+            {
+                Debug.Log("[GameUp] AdsManager RenderNativeOverlay: no network available.");
+                return;
+            }
+
+            try
+            {
+                var placement = network.BuildPlacementFromRectTransform(rectTransform, canvas);
+                network.RenderNativeOverlay(where, placement, style);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[GameUp] AdsManager RenderNativeOverlay(RectTransform): " + e);
+            }
+        }
+
+        public void ShowNativeOverlay(string where)
+        {
+            LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeNativeOverlay, where);
+            var network = _ads.OfType<INativeOverlayAds>().FirstOrDefault(a => a.IsNativeOverlayAvailable());
+            if (network == null)
+            {
+                Debug.Log("[GameUp] AdsManager ShowNativeOverlay: no network available.");
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeNativeOverlay, where);
+                return;
+            }
+
+            LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeNativeOverlay, where);
+            try
+            {
+                network.ShowNativeOverlay(where);
+                LogAdsEventManager(AdsEvent.AdsShowSuccess, AdsEvent.AdTypeNativeOverlay, where);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[GameUp] AdsManager ShowNativeOverlay: " + e);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeNativeOverlay, where);
+            }
+        }
+
+        public void HideNativeOverlay(string where)
+        {
+            var network = _ads.OfType<INativeOverlayAds>().FirstOrDefault(a => a.IsNativeOverlayAvailable());
+            try
+            {
+                network?.HideNativeOverlay(where);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[GameUp] AdsManager HideNativeOverlay: " + e);
+            }
+        }
+
+        public void DestroyNativeOverlay(string where)
+        {
+            var network = _ads.OfType<INativeOverlayAds>().FirstOrDefault();
+            try
+            {
+                network?.DestroyNativeOverlay(where);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[GameUp] AdsManager DestroyNativeOverlay: " + e);
+            }
+        }
+
         /// <summary>Show Interstitial (no level check: only time capping from AdsRules).</summary>
         public void ShowInterstitial(string where, Action onSuccess = null, Action onFail = null)
         {

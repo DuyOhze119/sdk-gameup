@@ -4,7 +4,18 @@
     "references": [
         "GameUpSDK.Runtime",
         "GameUpSDK.Installer",
-        "GameAnalyticsSDK"
+        "GameAnalyticsSDK",
+        "AppsFlyer",
+        "GoogleMobileAds.Mediation.IronSource.Android",
+        "GoogleMobileAds.Mediation.IronSource.Api",
+        "GoogleMobileAds.Mediation.IronSource.Common",
+        "GoogleMobileAds.Mediation.IronSource.iOS",
+        "GoogleMobileAds.Mediation.IronSource.Mediation",
+        "GoogleMobileAds.Mediation.UnityAds.Android",
+        "GoogleMobileAds.Mediation.UnityAds.Api",
+        "GoogleMobileAds.Mediation.UnityAds.Common",
+        "GoogleMobileAds.Mediation.UnityAds.iOS",
+        "Unity.LevelPlay"
     ],
     "includePlatforms": [
         "Editor"
