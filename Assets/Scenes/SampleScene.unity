@@ -342,7 +342,87 @@ PrefabInstance:
       objectReference: {fileID: 980002696}
     - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
       propertyPath: bannerAdUnitId
-      value: 111
+      value: ca-app-pub-3940256099942544/6300978111
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: appOpenAdUnitId
+      value: ca-app-pub-3940256099942544/9257395921
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: rewardedAdUnitId
+      value: ca-app-pub-3940256099942544/5224354917
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: useMultiAdUnitIds
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.size
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: interstitialAdUnitId
+      value: ca-app-pub-3940256099942544/1033173712
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[0].id
+      value: ca-app-pub-3940256099942544/6300978111
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[1].id
+      value: ca-app-pub-3940256099942544/1033173712
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[2].id
+      value: ca-app-pub-3940256099942544/5224354917
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[3].id
+      value: ca-app-pub-3940256099942544/9257395921
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[0].intId
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[1].intId
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[2].intId
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[3].intId
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[0].nameId
+      value: main
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[1].adType
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[1].nameId
+      value: main
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[2].adType
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[2].nameId
+      value: main
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[3].adType
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIds.Array.data[3].nameId
+      value: main
       objectReference: {fileID: 0}
     - target: {fileID: 4275973953013205297, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
       propertyPath: m_Name

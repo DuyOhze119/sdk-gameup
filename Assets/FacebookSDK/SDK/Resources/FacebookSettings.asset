@@ -18,7 +18,7 @@ MonoBehaviour:
   appIds:
   - 0
   appLabels:
-  - App Name
+  - sdk-gameup
   cookie: 1
   logging: 1
   status: 1

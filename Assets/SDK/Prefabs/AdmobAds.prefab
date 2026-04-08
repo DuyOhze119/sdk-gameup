@@ -44,7 +44,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b6c4f4b9bff0484da41432b3399cd54, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  bannerAdUnitId: 111
-  interstitialAdUnitId: 
-  rewardedAdUnitId: 
-  appOpenAdUnitId: 
+  useMultiAdUnitIds: 0
+  adUnitIds: []
+  bannerAdUnitId: ca-app-pub-3940256099942544/6300978111
+  interstitialAdUnitId: ca-app-pub-3940256099942544/1033173712
+  rewardedAdUnitId: ca-app-pub-3940256099942544/5224354917
+  appOpenAdUnitId: ca-app-pub-3940256099942544/9257395921

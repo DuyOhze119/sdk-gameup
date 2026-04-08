@@ -10,9 +10,16 @@ namespace GameUpSDK
     /// <summary>
     /// AdMob (Google Mobile Ads) implementation of IAds. Handles Banner, Interstitial, Rewarded, and App Open.
     /// </summary>
-    public class AdmobAds : MonoBehaviour, IAds
+    public class AdmobAds : MonoBehaviour, IAds, IPlacementAwareAds, IAdUnitIdResolver
     {
-        [Header("Ad Unit IDs (optional - set via code)")]
+        [Header("Ad Unit IDs")]
+        [Tooltip("Bật để dùng nhiều Ad Unit theo placement key (where). Tắt = dùng 1 ID/format như hiện tại.")]
+        [SerializeField] private bool useMultiAdUnitIds;
+
+        [Tooltip("Danh sách mapping: (AdType, NameId=where, Id=ad unit id). Chỉ dùng khi useMultiAdUnitIds=true.")]
+        [SerializeField] private System.Collections.Generic.List<AdUnitIdEntry> adUnitIds = new System.Collections.Generic.List<AdUnitIdEntry>();
+
+        [Header("Single IDs (legacy / fallback)")]
         [SerializeField]
         private string bannerAdUnitId;
 
@@ -31,9 +38,17 @@ namespace GameUpSDK
 
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
         private BannerView _bannerView;
+        private string _bannerUnitIdActive;
+        private bool _bannerShouldBeVisible;
+
         private InterstitialAd _interstitialAd;
         private RewardedAd _rewardedAd;
         private AppOpenAd _appOpenAd;
+
+        private readonly System.Collections.Generic.Dictionary<string, InterstitialAd> _interstitialByWhere = new System.Collections.Generic.Dictionary<string, InterstitialAd>();
+        private readonly System.Collections.Generic.Dictionary<string, RewardedAd> _rewardedByWhere = new System.Collections.Generic.Dictionary<string, RewardedAd>();
+        private readonly System.Collections.Generic.Dictionary<string, AppOpenAd> _appOpenByWhere = new System.Collections.Generic.Dictionary<string, AppOpenAd>();
+        private readonly System.Collections.Generic.Dictionary<string, DateTime> _appOpenExpireByWhere = new System.Collections.Generic.Dictionary<string, DateTime>();
         private DateTime _appOpenExpireTime = DateTime.MinValue;
         private const int AppOpenTimeoutHours = 4;
 #endif
@@ -87,50 +102,139 @@ namespace GameUpSDK
         public void RequestBanner()
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            if (!_initialized || string.IsNullOrEmpty(bannerAdUnitId)) return;
+            if (!_initialized) return;
+            if (!useMultiAdUnitIds)
+            {
+                if (string.IsNullOrEmpty(bannerAdUnitId)) return;
+                RequestBannerInternal(bannerAdUnitId);
+                return;
+            }
+
+            // Banner in multi mode: preload "main" if present, otherwise preload first valid Banner entry.
+            string unitId = null;
+            for (int i = 0; i < adUnitIds.Count; i++)
+            {
+                var e = adUnitIds[i];
+                if (e == null || e.AdType != AdUnitType.Banner || !e.IsValid()) continue;
+                if (string.Equals(e.NameId, "main", StringComparison.Ordinal))
+                {
+                    unitId = e.Id;
+                    break;
+                }
+                if (unitId == null) unitId = e.Id;
+            }
+            if (!string.IsNullOrEmpty(unitId))
+                RequestBannerInternal(unitId);
+#endif
+        }
+
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+        private void RequestBannerInternal(string unitId)
+        {
             MainThreadDispatcher.Enqueue(() =>
             {
-                if (_bannerView != null)
+                if (_bannerView != null && _bannerUnitIdActive != unitId)
                 {
                     _bannerView.Destroy();
                     _bannerView = null;
                 }
 
-                // Dùng size chuẩn để có fill. Custom (full width x 150) dễ bị "request doesn't meet size requirements".
-                _bannerView = new BannerView(bannerAdUnitId, AdSize.Banner, AdPosition.Bottom);
-                _bannerView.OnAdPaid += adValue =>
+                _bannerUnitIdActive = unitId;
+                if (_bannerView == null)
                 {
-                    MainThreadDispatcher.Enqueue(() =>
+                    // Dùng size chuẩn để có fill. Custom (full width x 150) dễ bị "request doesn't meet size requirements".
+                    _bannerView = new BannerView(unitId, AdSize.Banner, AdPosition.Bottom);
+                    _bannerView.OnAdPaid += adValue =>
                     {
-                        if (adValue == null)
-                            return;
-                        double value = adValue.Value * 0.000001f;
-                        var data = new AdImpressionData
+                        MainThreadDispatcher.Enqueue(() =>
                         {
-                            AdNetwork = "Admob",
-                            AdUnit = bannerAdUnitId,
-                            InstanceName = bannerAdUnitId,
-                            AdFormat = "Banner",
-                            Revenue = value
-                        };
-                        AdsEvent.RaiseImpressionDataReady(data);
-                    });
-                };
+                            if (adValue == null)
+                                return;
+                            double value = adValue.Value * 0.000001f;
+                            var data = new AdImpressionData
+                            {
+                                AdNetwork = "Admob",
+                                AdUnit = unitId,
+                                InstanceName = unitId,
+                                AdFormat = "Banner",
+                                Revenue = value
+                            };
+                            AdsEvent.RaiseImpressionDataReady(data);
+                        });
+                    };
+                }
+
                 var request = new AdRequest();
-                // AdMob BannerView hiển thị mặc định khi load xong (khác LevelPlay SetDisplayOnLoad(false)).
-                // Ẩn trước LoadAd để chỉ hiện khi AdsManager.ShowBanner → Show().
                 _bannerView.Hide();
                 _bannerView.LoadAd(request);
+                if (_bannerShouldBeVisible)
+                    _bannerView.Show();
             });
-#endif
         }
+#endif
 
         public void RequestInterstitial()
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            if (!_initialized || string.IsNullOrEmpty(interstitialAdUnitId)) return;
+            if (!_initialized) return;
+            if (!useMultiAdUnitIds)
+            {
+                if (string.IsNullOrEmpty(interstitialAdUnitId)) return;
+                RequestInterstitialInternal(interstitialAdUnitId, where: null);
+                return;
+            }
+
+            foreach (var e in adUnitIds)
+            {
+                if (e == null || e.AdType != AdUnitType.Interstitial || !e.IsValid()) continue;
+                RequestInterstitialInternal(e.Id, e.NameId);
+            }
+#endif
+        }
+
+        public void RequestRewardedVideo()
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            if (!_initialized) return;
+            if (!useMultiAdUnitIds)
+            {
+                if (string.IsNullOrEmpty(rewardedAdUnitId)) return;
+                RequestRewardedInternal(rewardedAdUnitId, where: null);
+                return;
+            }
+
+            foreach (var e in adUnitIds)
+            {
+                if (e == null || e.AdType != AdUnitType.RewardedVideo || !e.IsValid()) continue;
+                RequestRewardedInternal(e.Id, e.NameId);
+            }
+#endif
+        }
+
+        public void RequestAppOpenAds()
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            if (!_initialized) return;
+            if (!useMultiAdUnitIds)
+            {
+                if (string.IsNullOrEmpty(appOpenAdUnitId)) return;
+                RequestAppOpenInternal(appOpenAdUnitId, where: null);
+                return;
+            }
+
+            foreach (var e in adUnitIds)
+            {
+                if (e == null || e.AdType != AdUnitType.AppOpen || !e.IsValid()) continue;
+                RequestAppOpenInternal(e.Id, e.NameId);
+            }
+#endif
+        }
+
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+        private void RequestInterstitialInternal(string unitId, string where)
+        {
             var request = new AdRequest();
-            InterstitialAd.Load(interstitialAdUnitId, request, (ad, error) =>
+            InterstitialAd.Load(unitId, request, (ad, error) =>
             {
                 MainThreadDispatcher.Enqueue(() =>
                 {
@@ -141,21 +245,28 @@ namespace GameUpSDK
                         return;
                     }
 
-                    if (_interstitialAd != null) _interstitialAd.Destroy();
-                    _interstitialAd = ad;
-                    RegisterInterstitialEvents(ad);
+                    if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
+                    {
+                        if (_interstitialByWhere.TryGetValue(where, out var old) && old != null) old.Destroy();
+                        _interstitialByWhere[where] = ad;
+                        RegisterInterstitialEvents(ad, where);
+                    }
+                    else
+                    {
+                        if (_interstitialAd != null) _interstitialAd.Destroy();
+                        _interstitialAd = ad;
+                        RegisterInterstitialEvents(ad, where: null);
+                    }
+
                     OnInterstitialLoaded?.Invoke();
                 });
             });
-#endif
         }
 
-        public void RequestRewardedVideo()
+        private void RequestRewardedInternal(string unitId, string where)
         {
-#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            if (!_initialized || string.IsNullOrEmpty(rewardedAdUnitId)) return;
             var request = new AdRequest();
-            RewardedAd.Load(rewardedAdUnitId, request, (ad, error) =>
+            RewardedAd.Load(unitId, request, (ad, error) =>
             {
                 MainThreadDispatcher.Enqueue(() =>
                 {
@@ -166,8 +277,17 @@ namespace GameUpSDK
                         return;
                     }
 
-                    if (_rewardedAd != null) _rewardedAd.Destroy();
-                    _rewardedAd = ad;
+                    if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
+                    {
+                        if (_rewardedByWhere.TryGetValue(where, out var old) && old != null) old.Destroy();
+                        _rewardedByWhere[where] = ad;
+                    }
+                    else
+                    {
+                        if (_rewardedAd != null) _rewardedAd.Destroy();
+                        _rewardedAd = ad;
+                    }
+
                     OnRewardedLoaded?.Invoke();
                     ad.OnAdPaid += adValue =>
                     {
@@ -189,21 +309,27 @@ namespace GameUpSDK
                     };
                 });
             });
-#endif
         }
 
-        public void RequestAppOpenAds()
+        private void RequestAppOpenInternal(string unitId, string where)
         {
-#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            if (!_initialized || string.IsNullOrEmpty(appOpenAdUnitId)) return;
-            if (_appOpenAd != null)
+            if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
             {
-                _appOpenAd.Destroy();
-                _appOpenAd = null;
+                if (_appOpenByWhere.TryGetValue(where, out var old) && old != null) old.Destroy();
+                _appOpenByWhere.Remove(where);
+                _appOpenExpireByWhere.Remove(where);
+            }
+            else
+            {
+                if (_appOpenAd != null)
+                {
+                    _appOpenAd.Destroy();
+                    _appOpenAd = null;
+                }
             }
 
             var request = new AdRequest();
-            AppOpenAd.Load(appOpenAdUnitId, request, (ad, error) =>
+            AppOpenAd.Load(unitId, request, (ad, error) =>
             {
                 MainThreadDispatcher.Enqueue(() =>
                 {
@@ -213,33 +339,68 @@ namespace GameUpSDK
                         return;
                     }
 
-                    _appOpenAd = ad;
-                    _appOpenExpireTime = DateTime.Now + TimeSpan.FromHours(AppOpenTimeoutHours);
-                    RegisterAppOpenEvents(ad);
+                    var expire = DateTime.Now + TimeSpan.FromHours(AppOpenTimeoutHours);
+                    if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
+                    {
+                        _appOpenByWhere[where] = ad;
+                        _appOpenExpireByWhere[where] = expire;
+                        RegisterAppOpenEvents(ad, where);
+                    }
+                    else
+                    {
+                        _appOpenAd = ad;
+                        _appOpenExpireTime = expire;
+                        RegisterAppOpenEvents(ad, where: null);
+                    }
                 });
             });
-#endif
         }
 
-#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
         private void RegisterInterstitialEvents(InterstitialAd ad)
+        {
+            RegisterInterstitialEvents(ad, where: null);
+        }
+
+        private void RegisterInterstitialEvents(InterstitialAd ad, string where)
         {
             ad.OnAdFullScreenContentClosed += () =>
             {
                 MainThreadDispatcher.Enqueue(() =>
                 {
-                    _interstitialAd?.Destroy();
-                    _interstitialAd = null;
-                    RequestInterstitial();
+                    if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
+                    {
+                        if (_interstitialByWhere.TryGetValue(where, out var cur) && cur != null) cur.Destroy();
+                        _interstitialByWhere.Remove(where);
+                        var unitId = ResolveUnitId(AdUnitType.Interstitial, where);
+                        if (!string.IsNullOrEmpty(unitId))
+                            RequestInterstitialInternal(unitId, where);
+                    }
+                    else
+                    {
+                        _interstitialAd?.Destroy();
+                        _interstitialAd = null;
+                        RequestInterstitial();
+                    }
                 });
             };
             ad.OnAdFullScreenContentFailed += _ =>
             {
                 MainThreadDispatcher.Enqueue(() =>
                 {
-                    _interstitialAd?.Destroy();
-                    _interstitialAd = null;
-                    RequestInterstitial();
+                    if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
+                    {
+                        if (_interstitialByWhere.TryGetValue(where, out var cur) && cur != null) cur.Destroy();
+                        _interstitialByWhere.Remove(where);
+                        var unitId = ResolveUnitId(AdUnitType.Interstitial, where);
+                        if (!string.IsNullOrEmpty(unitId))
+                            RequestInterstitialInternal(unitId, where);
+                    }
+                    else
+                    {
+                        _interstitialAd?.Destroy();
+                        _interstitialAd = null;
+                        RequestInterstitial();
+                    }
                 });
             };
 
@@ -265,22 +426,51 @@ namespace GameUpSDK
 
         private void RegisterAppOpenEvents(AppOpenAd ad)
         {
+            RegisterAppOpenEvents(ad, where: null);
+        }
+
+        private void RegisterAppOpenEvents(AppOpenAd ad, string where)
+        {
             ad.OnAdFullScreenContentClosed += () =>
             {
                 MainThreadDispatcher.Enqueue(() =>
                 {
-                    _appOpenAd?.Destroy();
-                    _appOpenAd = null;
-                    RequestAppOpenAds();
+                    if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
+                    {
+                        if (_appOpenByWhere.TryGetValue(where, out var cur) && cur != null) cur.Destroy();
+                        _appOpenByWhere.Remove(where);
+                        _appOpenExpireByWhere.Remove(where);
+                        var unitId = ResolveUnitId(AdUnitType.AppOpen, where);
+                        if (!string.IsNullOrEmpty(unitId))
+                            RequestAppOpenInternal(unitId, where);
+                    }
+                    else
+                    {
+                        _appOpenAd?.Destroy();
+                        _appOpenAd = null;
+                        RequestAppOpenAds();
+                    }
                 });
             };
             ad.OnAdFullScreenContentFailed += _ =>
             {
                 MainThreadDispatcher.Enqueue(() =>
                 {
-                    _appOpenAd?.Destroy();
-                    _appOpenAd = null;
-                    RequestAppOpenAds();
+                    if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
+                    {
+                        if (_appOpenByWhere.TryGetValue(where, out var cur) && cur != null) cur.Destroy();
+                        _appOpenByWhere.Remove(where);
+                        _appOpenExpireByWhere.Remove(where);
+                        var unitId = ResolveUnitId(AdUnitType.AppOpen, where);
+                        if (!string.IsNullOrEmpty(unitId))
+                            RequestAppOpenInternal(unitId, where);
+                    }
+                    else
+                    {
+                        _appOpenAd?.Destroy();
+                        _appOpenAd = null;
+                        RequestAppOpenAds();
+                    }
                 });
             };
 
@@ -346,8 +536,12 @@ namespace GameUpSDK
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             MainThreadDispatcher.Enqueue(() =>
             {
-                if (_bannerView != null)
-                    _bannerView.Show();
+                _bannerShouldBeVisible = true;
+                var unitId = ResolveUnitId(AdUnitType.Banner, where);
+                if (!string.IsNullOrEmpty(unitId) && (_bannerView == null || _bannerUnitIdActive != unitId))
+                    RequestBannerInternal(unitId);
+                else
+                    _bannerView?.Show();
             });
 #endif
         }
@@ -355,13 +549,32 @@ namespace GameUpSDK
         public void HideBanner(string where)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            MainThreadDispatcher.Enqueue(() => { _bannerView?.Hide(); });
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                _bannerShouldBeVisible = false;
+                _bannerView?.Hide();
+            });
 #endif
         }
 
         public void ShowInterstitial(string where, Action onSuccess, Action onFail)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            if (useMultiAdUnitIds)
+            {
+                if (string.IsNullOrEmpty(where) || !_interstitialByWhere.TryGetValue(where, out var multiAd) || multiAd == null || !multiAd.CanShowAd())
+                {
+                    onFail?.Invoke();
+                    return;
+                }
+
+                _interstitialByWhere.Remove(where);
+                multiAd.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() => onSuccess?.Invoke());
+                multiAd.OnAdFullScreenContentFailed += _ => MainThreadDispatcher.Enqueue(() => onFail?.Invoke());
+                multiAd.Show();
+                return;
+            }
+
             if (_interstitialAd == null || !_interstitialAd.CanShowAd())
             {
                 onFail?.Invoke();
@@ -381,6 +594,45 @@ namespace GameUpSDK
         public void ShowRewardedVideo(string where, Action onSuccess, Action onFail)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            if (useMultiAdUnitIds)
+            {
+                if (string.IsNullOrEmpty(where) || !_rewardedByWhere.TryGetValue(where, out var multiAd) || multiAd == null || !multiAd.CanShowAd())
+                {
+                    onFail?.Invoke();
+                    return;
+                }
+
+                _rewardedByWhere.Remove(where);
+                AdsRules.BeginInterstitialCappingPause();
+                var rewardGrantedMulti = false;
+                multiAd.OnAdFullScreenContentClosed += () =>
+                {
+                    MainThreadDispatcher.Enqueue(() =>
+                    {
+                        AdsRules.EndInterstitialCappingPause();
+                        if (!rewardGrantedMulti) onFail?.Invoke();
+                        var unitId = ResolveUnitId(AdUnitType.RewardedVideo, where);
+                        if (!string.IsNullOrEmpty(unitId)) RequestRewardedInternal(unitId, where);
+                    });
+                };
+                multiAd.OnAdFullScreenContentFailed += _ =>
+                {
+                    MainThreadDispatcher.Enqueue(() =>
+                    {
+                        AdsRules.EndInterstitialCappingPause();
+                        onFail?.Invoke();
+                        var unitId = ResolveUnitId(AdUnitType.RewardedVideo, where);
+                        if (!string.IsNullOrEmpty(unitId)) RequestRewardedInternal(unitId, where);
+                    });
+                };
+                multiAd.Show(_ =>
+                {
+                    rewardGrantedMulti = true;
+                    MainThreadDispatcher.Enqueue(() => onSuccess?.Invoke());
+                });
+                return;
+            }
+
             if (_rewardedAd == null || !_rewardedAd.CanShowAd())
             {
                 onFail?.Invoke();
@@ -422,6 +674,37 @@ namespace GameUpSDK
         public void ShowAppOpenAds(string where, Action onSuccess, Action onFail)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            if (useMultiAdUnitIds)
+            {
+                if (string.IsNullOrEmpty(where) ||
+                    !_appOpenByWhere.TryGetValue(where, out var multiAd) ||
+                    multiAd == null ||
+                    !_appOpenExpireByWhere.TryGetValue(where, out var exp) ||
+                    DateTime.Now >= exp ||
+                    !multiAd.CanShowAd())
+                {
+                    onFail?.Invoke();
+                    return;
+                }
+
+                _appOpenByWhere.Remove(where);
+                _appOpenExpireByWhere.Remove(where);
+                multiAd.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
+                {
+                    onSuccess?.Invoke();
+                    var unitId = ResolveUnitId(AdUnitType.AppOpen, where);
+                    if (!string.IsNullOrEmpty(unitId)) RequestAppOpenInternal(unitId, where);
+                });
+                multiAd.OnAdFullScreenContentFailed += _ => MainThreadDispatcher.Enqueue(() =>
+                {
+                    onFail?.Invoke();
+                    var unitId = ResolveUnitId(AdUnitType.AppOpen, where);
+                    if (!string.IsNullOrEmpty(unitId)) RequestAppOpenInternal(unitId, where);
+                });
+                multiAd.Show();
+                return;
+            }
+
             if (_appOpenAd == null || !_appOpenAd.CanShowAd() || DateTime.Now >= _appOpenExpireTime)
             {
                 onFail?.Invoke();
@@ -453,6 +736,113 @@ namespace GameUpSDK
             _interstitialAd?.Destroy();
             _rewardedAd?.Destroy();
             _appOpenAd?.Destroy();
+
+            foreach (var kv in _interstitialByWhere) kv.Value?.Destroy();
+            foreach (var kv in _rewardedByWhere) kv.Value?.Destroy();
+            foreach (var kv in _appOpenByWhere) kv.Value?.Destroy();
+            _interstitialByWhere.Clear();
+            _rewardedByWhere.Clear();
+            _appOpenByWhere.Clear();
+            _appOpenExpireByWhere.Clear();
+#endif
+        }
+
+        private string ResolveUnitId(AdUnitType type, string where)
+        {
+            if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
+            {
+                for (int i = 0; i < adUnitIds.Count; i++)
+                {
+                    var e = adUnitIds[i];
+                    if (e == null) continue;
+                    if (e.AdType != type) continue;
+                    if (!e.IsValid()) continue;
+                    if (string.Equals(e.NameId, where, StringComparison.Ordinal))
+                        return e.Id;
+                }
+            }
+
+            switch (type)
+            {
+                case AdUnitType.Banner: return bannerAdUnitId;
+                case AdUnitType.Interstitial: return interstitialAdUnitId;
+                case AdUnitType.RewardedVideo: return rewardedAdUnitId;
+                case AdUnitType.AppOpen: return appOpenAdUnitId;
+                default: return null;
+            }
+        }
+
+        bool IAdUnitIdResolver.TryResolve(int intId, out AdUnitType adType, out string nameId)
+        {
+            adType = AdUnitType.Interstitial;
+            nameId = null;
+
+            if (!useMultiAdUnitIds || adUnitIds == null || adUnitIds.Count == 0)
+                return false;
+
+            for (int i = 0; i < adUnitIds.Count; i++)
+            {
+                var e = adUnitIds[i];
+                if (e == null) continue;
+                if (e.intId != intId) continue;
+                if (!e.IsValid()) continue;
+                adType = e.AdType;
+                nameId = e.NameId;
+                return !string.IsNullOrEmpty(nameId);
+            }
+            return false;
+        }
+
+        // Placement-aware availability for AdsManager
+        bool IPlacementAwareAds.IsBannerAvailable(string where)
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            if (!useMultiAdUnitIds) return IsBannerAvailable();
+            var unitId = ResolveUnitId(AdUnitType.Banner, where);
+            return !string.IsNullOrEmpty(unitId); // banner can be created on demand
+#else
+            return false;
+#endif
+        }
+
+        bool IPlacementAwareAds.IsInterstitialAvailable(string where)
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            if (!useMultiAdUnitIds) return IsInterstitialAvailable();
+            return !string.IsNullOrEmpty(where) &&
+                   _interstitialByWhere.TryGetValue(where, out var ad) &&
+                   ad != null &&
+                   ad.CanShowAd();
+#else
+            return false;
+#endif
+        }
+
+        bool IPlacementAwareAds.IsRewardedVideoAvailable(string where)
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            if (!useMultiAdUnitIds) return IsRewardedVideoAvailable();
+            return !string.IsNullOrEmpty(where) &&
+                   _rewardedByWhere.TryGetValue(where, out var ad) &&
+                   ad != null &&
+                   ad.CanShowAd();
+#else
+            return false;
+#endif
+        }
+
+        bool IPlacementAwareAds.IsAppOpenAdsAvailable(string where)
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            if (!useMultiAdUnitIds) return IsAppOpenAdsAvailable();
+            return !string.IsNullOrEmpty(where) &&
+                   _appOpenByWhere.TryGetValue(where, out var ad) &&
+                   ad != null &&
+                   _appOpenExpireByWhere.TryGetValue(where, out var exp) &&
+                   DateTime.Now < exp &&
+                   ad.CanShowAd();
+#else
+            return false;
 #endif
         }
     }
