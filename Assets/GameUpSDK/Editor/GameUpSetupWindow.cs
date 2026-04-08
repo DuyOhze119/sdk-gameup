@@ -209,8 +209,9 @@ namespace GameUpSDK.Editor
             {
                 EditorGUILayout.HelpBox(
                     "SDK đang nằm trong Packages (read-only) nên không thể lưu cấu hình vào prefab.\n\n" +
-                    "Bạn vẫn có thể cấu hình bình thường. Khi bấm \"Save Configuration\", cấu hình sẽ được lưu " +
-                    "trực tiếp lên SDK object hiện có trong Scene (prefab instance overrides).\n\n" +
+                    "Bạn vẫn có thể cấu hình bình thường. Khi bấm \"Save Configuration\", hệ thống sẽ ưu tiên " +
+                    "tự clone prefab sang Assets/SDK/Prefabs để lưu cấu hình bền vững, kể cả khi đang ở scene không có SDK.\n\n" +
+                    "Nếu clone không thực hiện được thì cấu hình sẽ được lưu trực tiếp lên SDK object hiện có trong Scene (prefab instance overrides).\n\n" +
                     "Nếu bạn muốn có một bản prefab có thể chỉnh sửa trong project, hãy clone prefab từ:\n" +
                     GetPackagePrefabDirectory().Replace('\\', '/') + "\n" +
                     "sang:\n" + WritablePrefabsRoot,
@@ -1732,8 +1733,23 @@ namespace GameUpSDK.Editor
         private void SaveConfiguration()
         {
             var errors = new System.Collections.Generic.List<string>();
+            var hasSceneSdk = TryGetSdkSceneRoot(out var sdkRoot);
 
-            if (TryGetSdkSceneRoot(out var sdkRoot))
+            // Không có SDK trong scene và prefab hiện tại nằm trong Packages (read-only):
+            // tự clone prefab sang Assets để vẫn lưu được cấu hình (đặc biệt cho AdMob) khi đang ở scene bất kỳ.
+            if (!hasSceneSdk && !IsPrefabAssetPathWritable(PathSDK))
+            {
+                if (!TryClonePackagePrefabsToWritable(out var cloneErr))
+                {
+                    if (!string.IsNullOrEmpty(cloneErr))
+                        errors.Add(cloneErr);
+                    errors.Add(
+                        "Không tìm thấy SDK trong Scene và không clone được prefab ghi được từ Packages. " +
+                        "Hãy thử bấm \"Clone Prefab từ Package → Assets/SDK/Prefabs\" thủ công.");
+                }
+            }
+
+            if (hasSceneSdk)
             {
                 if (!SaveSceneAppsFlyerObject(sdkRoot)) errors.Add("SDK in Scene (AppsFlyerObjectScript)");
                 if (!SaveSceneFirebaseRemoteConfigUtils(sdkRoot)) errors.Add("SDK in Scene (FirebaseRemoteConfigUtils)");
