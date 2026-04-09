@@ -908,12 +908,7 @@ namespace GameUpSDK.Editor
             EditorGUILayout.Space(4);
             EditorGUILayout.Space(8);
             EditorGUILayout.LabelField("Multi IDs (by placement key = where)", EditorStyles.miniBoldLabel);
-            var prevMulti = _ironSourceUseMultiAdUnitIds;
             _ironSourceUseMultiAdUnitIds = EditorGUILayout.Toggle("Use Multi IDs", _ironSourceUseMultiAdUnitIds);
-            if (_ironSourceUseMultiAdUnitIds && !prevMulti)
-            {
-                SeedMultiListFromSingle(ref _ironSourceAdUnitIds, _ironSourceBannerId, _ironSourceInterstitialId, _ironSourceRewardedId, appOpenId: null, overwrite: true);
-            }
 
             if (_ironSourceUseMultiAdUnitIds)
             {
@@ -944,12 +939,7 @@ namespace GameUpSDK.Editor
                 "Target: AdmobAds trên " + PathAdMob, MessageType.None);
             EditorGUILayout.Space(8);
             EditorGUILayout.LabelField("Multi IDs (by placement key = where)", EditorStyles.miniBoldLabel);
-            var prevMulti = _admobUseMultiAdUnitIds;
             _admobUseMultiAdUnitIds = EditorGUILayout.Toggle("Use Multi IDs", _admobUseMultiAdUnitIds);
-            if (_admobUseMultiAdUnitIds && !prevMulti)
-            {
-                SeedMultiListFromSingle(ref _admobAdUnitIds, _admobBannerId, _admobInterstitialId, _admobRewardedId, _admobAppOpenId, overwrite: true);
-            }
 
             if (_admobUseMultiAdUnitIds)
             {

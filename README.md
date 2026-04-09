@@ -2,7 +2,7 @@
 
 SDK tích hợp Quảng cáo (Ads) và Analytics cho game Unity, hỗ trợ:
 
-- **Ads**: IronSource/LevelPlay Mediation (Banner, Interstitial, Rewarded Video) + AdMob (App Open)
+- **Ads**: IronSource/LevelPlay hoặc AdMob (Banner, Interstitial, Rewarded Video, App Open) với hỗ trợ **Multi IDs theo placement (`where`)**
 - **Analytics**: Firebase Analytics + AppsFlyer MMP; tùy chọn **GameAnalytics** (progression level/wave, design events) qua installer
 - **Remote Config**: Firebase Remote Config với auto-sync
 
@@ -86,7 +86,7 @@ Auto-sync sau compile cũng gọi bước tạo asmdef nội bộ, nhưng chạy
 
 | Package | Version | Ghi chú |
 |---|---|---|
-| Google Mobile Ads (AdMob) | 10.7.0 | Chỉ cần nếu dùng App Open Ads |
+| Google Mobile Ads (AdMob) | 10.7.0 | Cần khi dùng App Open Ads hoặc chọn Primary Mediation = AdMob |
 | AppsFlyer Attribution SDK | 6.17.81 | Attribution & MMP |
 | GameAnalytics SDK | 7.10.6 (unitypackage) | Tùy chọn — progression / funnels; cài qua installer hoặc [tài liệu GA Unity](https://docs.gameanalytics.com/event-tracking-and-integrations/sdks-and-collection-api/game-engine-sdks/unity/) |
 
@@ -123,7 +123,7 @@ Auto-sync sau compile cũng gọi bước tạo asmdef nội bộ, nhưng chạy
 
 ## 3. Cấu hình qua Setup Window
 
-Mở **GameUp SDK → Setup** để cấu hình toàn bộ SDK trong một cửa sổ duy nhất. Window gồm các tab: AppsFlyer, IronSource Mediation, AdMob (App Open), Game Analytics, Firebase Remote Config.
+Mở **GameUp SDK → Setup** để cấu hình toàn bộ SDK trong một cửa sổ duy nhất. Window gồm các tab: AppsFlyer, IronSource Mediation, AdMob, Game Analytics, Firebase Remote Config.
 
 ### Tab: AppsFlyer
 
@@ -139,16 +139,21 @@ Mở **GameUp SDK → Setup** để cấu hình toàn bộ SDK trong một cửa
 | Trường | Mô tả |
 |---|---|
 | App Key (bắt buộc) | App Key từ LevelPlay/IronSource dashboard |
+| Use Multi IDs | Bật để dùng nhiều placement theo `where` (`AdType + NameId + Id`) |
+| Ad Unit ID list (Multi) | Mỗi dòng: `IntId` (tăng tự động), `AdType`, `NameId` (= `where`), `Id` (= placement id LevelPlay) |
 | Banner / Interstitial / Rewarded ID | Ad Unit ID (để trống = dùng `DefaultBanner`, `DefaultInterstitial`, `DefaultRewardedVideo`) |
 | Android/iOS App Key | App Key điền vào `LevelPlayMediationSettings` |
 
-### Tab: AdMob (App Open)
+### Tab: AdMob
 
-AdMob chỉ dùng cho **App Open Ads**. Banner/Interstitial/Rewarded đi qua IronSource Mediation.
+AdMob có thể chạy đủ 4 format (Banner/Interstitial/Rewarded/App Open) khi chọn **Primary Mediation = AdMob**.  
+Nếu chọn **Primary Mediation = LevelPlay**, thường chỉ dùng AdMob cho App Open (LevelPlay không hỗ trợ App Open).
 
 | Trường | Mô tả |
 |---|---|
-| App Open ID | Ad Unit ID cho App Open |
+| Use Multi IDs | Bật để map nhiều ad unit theo `where` |
+| Ad Unit ID list (Multi) | Mỗi dòng: `IntId`, `AdType`, `NameId` (= `where`), `Id` (= Ad Unit ID) |
+| Banner / Interstitial / Rewarded / App Open ID (single) | ID dự phòng kiểu cũ (legacy/fallback) khi tắt Multi IDs |
 | Android/iOS App ID | Google Mobile Ads App ID (điền vào `GoogleMobileAdsSettings`) |
 
 ### Tab: Game Analytics
@@ -208,6 +213,21 @@ Sau khi các mục trên ổn, xem tiếp **phân API** bên dưới.
 
 `AdsManager` là điểm trung tâm để hiển thị tất cả loại quảng cáo. Dùng **waterfall**: network có độ ưu tiên cao nhất (`OrderExecute` nhỏ nhất) và đang available sẽ được dùng.
 
+### Multi Ads (Use Multi IDs)
+
+SDK hỗ trợ map nhiều ad unit theo placement qua `AdUnitIdEntry`:
+
+- `adType`: loại quảng cáo (`Banner`, `Interstitial`, `RewardedVideo`, `AppOpen`)
+- `nameId`: placement key (chính là tham số `where` khi gọi API)
+- `id`: ad unit id / placement id của network
+- `intId`: id số nguyên để gọi nhanh qua `ShowById(intId, ...)`
+
+Trong Setup Window:
+
+- Bật `Use Multi IDs` tại tab IronSource hoặc AdMob
+- Thêm các dòng mapping trong danh sách Multi IDs
+- Khi bật Multi IDs, `AdsManager` sẽ chọn quảng cáo theo `where` (hoặc resolve từ `intId`)
+
 ### Banner
 
 ```csharp
@@ -256,6 +276,7 @@ AdsManager.Instance.ShowInterstitial(
 > SDK tự động kiểm tra `inter_start_level` và `inter_capping_time` qua `AdsRules`.  
 > `onSuccess` được gọi khi quảng cáo **đóng lại** bình thường.  
 > `onFail` được gọi khi bị block bởi rule, không có quảng cáo, hoặc hiển thị lỗi.  
+> Với Multi IDs, `where` cần khớp `NameId` đã cấu hình để có ad đúng placement.  
 > **Luôn xử lý cả `onSuccess` và `onFail`** để tiếp tục flow game.
 
 ### Rewarded Video
@@ -278,7 +299,8 @@ AdsManager.Instance.ShowRewardedVideo(
 ```
 
 > `onSuccess` chỉ được gọi khi người chơi **xem đủ** để nhận reward (sự kiện `OnAdRewarded`).  
-> `onFail` được gọi khi không có quảng cáo, lỗi hiển thị, hoặc người chơi **đóng sớm** trước khi nhận reward.
+> `onFail` được gọi khi không có quảng cáo, lỗi hiển thị, hoặc người chơi **đóng sớm** trước khi nhận reward.  
+> Với Multi IDs, `where` cần khớp `NameId` đã cấu hình.
 
 ### App Open Ads
 
@@ -290,16 +312,35 @@ AdsManager.Instance.ShowAppOpenAds(
 );
 ```
 
-> App Open Ads chỉ khả dụng khi đã cài và cấu hình **AdMob**. IronSource/LevelPlay không hỗ trợ loại quảng cáo này.
+> App Open Ads chỉ khả dụng khi đã cài và cấu hình **AdMob**. IronSource/LevelPlay không hỗ trợ loại quảng cáo này.  
+> Ở mode Multi IDs, cần map `AdType = AppOpen` cho `where` tương ứng.
 
 ### Tham số `where`
 
 Chuỗi mô tả vị trí/ngữ cảnh hiển thị quảng cáo, dùng để tracking analytics (Firebase + AppsFlyer). Ví dụ: `"main_menu"`, `"level_complete"`, `"revive"`, `"settings"`.
 
+- **Single ID mode**: có thể dùng `where` tự do cho analytics.
+- **Multi IDs mode**: `where` phải trùng với `NameId` đã cấu hình trong danh sách Multi IDs để lấy đúng ad unit.
+
+### Gọi quảng cáo bằng `intId` (Multi IDs)
+
+`AdsManager` hỗ trợ API gọi theo id số nguyên, SDK tự resolve loại quảng cáo + `where` theo danh sách Multi IDs:
+
+```csharp
+AdsManager.Instance.ShowById(
+    intId: 2,            // map trong list Multi IDs
+    currentLevel: 10,    // dùng cho Interstitial/Rewarded rules + analytics
+    onSuccess: () => { /* success */ },
+    onFail: () => { /* fail */ }
+);
+```
+
+> `ShowById` chỉ hoạt động khi network đang dùng có bật Multi IDs và có dòng `intId` hợp lệ.
+
 ### GDPR / Consent
 
 ```csharp
-// Đã tự đọng set true trong 
+// Đã tự động set true trong initialize
 AdsManager.Instance.SetAfterCheckGDPR();
 ```
 
