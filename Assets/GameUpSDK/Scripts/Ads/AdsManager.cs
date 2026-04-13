@@ -201,7 +201,7 @@ namespace GameUpSDK
             ShowBanner(showBannerPlacementAfterInit);
         }
 
-        private bool IsBannerReadyForPlacement(string where)
+        public bool IsBannerReadyForPlacement(string where)
         {
             return _ads.Any(a =>
             {
