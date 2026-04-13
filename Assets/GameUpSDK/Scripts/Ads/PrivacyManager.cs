@@ -52,13 +52,21 @@ namespace GameUpSDK
         private IEnumerator RunPrivacyFlowCoroutine()
         {
 #if UNITY_IOS && !UNITY_EDITOR
-            if (RequiresAttPrompt())
-                yield return RequestAttCoroutine();
+    if (RequiresAttPrompt())
+        yield return RequestAttCoroutine();
 #endif
 
             yield return RequestUmpCoroutine();
 
             _completed = true;
+
+            // QUAN TRỌNG: Gọi hàm này để update trạng thái cho các Ad Network
+            // Giả sử AdsManager của bạn là Singleton
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.SetAfterCheckGDPR(_consentGranted);
+            }
+
             _onCompleted?.Invoke(_consentGranted);
             _onCompleted = null;
         }
