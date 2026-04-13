@@ -464,7 +464,7 @@ namespace GameUpSDK
         /// <summary>Show Rewarded Video với level hiện tại (log ad_rewarded_show_complete kèm param level).</summary>
         public void ShowRewardedVideo(string where, int currentLevel, Action onSuccess = null, Action onFail = null, Action onRqFail = null)
         {
-            LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeRewardedVideo, where);
+            //LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeRewardedVideo, where);
             var network = _ads.FirstOrDefault(a =>
             {
                 if (a is IPlacementAwareAds placementAware)
@@ -473,8 +473,8 @@ namespace GameUpSDK
             });
             if (network == null)
             {
-                Debug.Log("[GameUp] AdsManager ShowRewardedVideo: no network available.");
-                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeRewardedVideo, where, "network_null");
+                Debug.Log("[GameUp] AdsManager ShowRewardedVideo: no ads available.");
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeRewardedVideo, where, "no_ads_available");
                 onRqFail?.Invoke();
                 onFail?.Invoke();
                 return;
