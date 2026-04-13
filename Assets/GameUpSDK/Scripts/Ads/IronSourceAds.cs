@@ -36,6 +36,8 @@ namespace GameUpSDK
         public event Action<string> OnInterstitialLoadFailed;
         public event Action OnRewardedLoaded;
         public event Action<string> OnRewardedLoadFailed;
+        public event Action<string> OnBannerShown;
+        public event Action<string> OnBannerShowFailed;
 
         private BannerSize _bannerSize = BannerSize.Large;
 
@@ -59,10 +61,12 @@ namespace GameUpSDK
         private LevelPlayBannerAd _bannerAd;
         private LevelPlayInterstitialAd _interstitialAd;
         private LevelPlayRewardedAd _rewardedAd;
+        private bool _bannerLoaded;
 
         private readonly System.Collections.Generic.Dictionary<string, LevelPlayBannerAd> _bannerByWhere = new System.Collections.Generic.Dictionary<string, LevelPlayBannerAd>();
         private readonly System.Collections.Generic.Dictionary<string, LevelPlayInterstitialAd> _interstitialByWhere = new System.Collections.Generic.Dictionary<string, LevelPlayInterstitialAd>();
         private readonly System.Collections.Generic.Dictionary<string, LevelPlayRewardedAd> _rewardedByWhere = new System.Collections.Generic.Dictionary<string, LevelPlayRewardedAd>();
+        private readonly System.Collections.Generic.Dictionary<string, bool> _bannerLoadedByWhere = new System.Collections.Generic.Dictionary<string, bool>();
 
         public void Initialize()
         {
@@ -127,6 +131,13 @@ namespace GameUpSDK
 
         private void SubscribeToAdEvents()
         {
+            if (_bannerAd != null)
+                RegisterBannerEvents(_bannerAd, where: null);
+            foreach (var kv in _bannerByWhere)
+            {
+                if (kv.Value != null)
+                    RegisterBannerEvents(kv.Value, kv.Key);
+            }
             if (_interstitialAd != null)
             {
                 _interstitialAd.OnAdLoaded += _ => MainThreadDispatcher.Enqueue(() => OnInterstitialLoaded?.Invoke());
@@ -139,6 +150,24 @@ namespace GameUpSDK
                 _rewardedAd.OnAdLoadFailed += (error) => MainThreadDispatcher.Enqueue(() =>
                     OnRewardedLoadFailed?.Invoke(error?.ErrorMessage ?? error?.ErrorCode.ToString() ?? "unknown"));
             }
+        }
+
+        private void RegisterBannerEvents(LevelPlayBannerAd ad, string where)
+        {
+            ad.OnAdLoaded += _ => MainThreadDispatcher.Enqueue(() =>
+            {
+                if (!useMultiAdUnitIds || string.IsNullOrEmpty(where))
+                    _bannerLoaded = true;
+                else
+                    _bannerLoadedByWhere[where] = true;
+            });
+            ad.OnAdLoadFailed += _ => MainThreadDispatcher.Enqueue(() =>
+            {
+                if (!useMultiAdUnitIds || string.IsNullOrEmpty(where))
+                    _bannerLoaded = false;
+                else
+                    _bannerLoadedByWhere[where] = false;
+            });
         }
 
         private void OnLevelPlayInitFailed(LevelPlayInitError error)
@@ -176,6 +205,7 @@ namespace GameUpSDK
             _bannerByWhere.Clear();
             _interstitialByWhere.Clear();
             _rewardedByWhere.Clear();
+            _bannerLoadedByWhere.Clear();
 
             for (int i = 0; i < adUnitIds.Count; i++)
             {
@@ -236,11 +266,16 @@ namespace GameUpSDK
         {
             if (!useMultiAdUnitIds)
             {
+                _bannerLoaded = false;
                 _bannerAd?.LoadAd();
                 return;
             }
             foreach (var kv in _bannerByWhere)
+            {
+                _bannerLoadedByWhere[kv.Key] = false;
                 kv.Value?.LoadAd();
+            }
+            _bannerLoaded = false;
             _bannerAd?.LoadAd();
         }
 
@@ -269,7 +304,7 @@ namespace GameUpSDK
         }
         public void RequestAppOpenAds() { }
 
-        public bool IsBannerAvailable() => _bannerAd != null;
+        public bool IsBannerAvailable() => _bannerAd != null && _bannerLoaded;
         public bool IsInterstitialAvailable() => _interstitialAd != null && _interstitialAd.IsAdReady();
         public bool IsRewardedVideoAvailable() => _rewardedAd != null && _rewardedAd.IsAdReady();
         public bool IsAppOpenAdsAvailable() => false;
@@ -278,10 +313,22 @@ namespace GameUpSDK
         {
             if (useMultiAdUnitIds && !string.IsNullOrEmpty(where) && _bannerByWhere.TryGetValue(where, out var b) && b != null)
             {
+                if (!_bannerLoadedByWhere.TryGetValue(where, out var isLoaded) || !isLoaded)
+                {
+                    OnBannerShowFailed?.Invoke(where);
+                    return;
+                }
                 b.ShowAd();
+                OnBannerShown?.Invoke(where);
+                return;
+            }
+            if (!IsBannerAvailable())
+            {
+                OnBannerShowFailed?.Invoke(string.IsNullOrEmpty(where) ? "main" : where);
                 return;
             }
             _bannerAd?.ShowAd();
+            OnBannerShown?.Invoke(string.IsNullOrEmpty(where) ? "main" : where);
         }
         public void HideBanner(string where) { _bannerAd?.HideAd(); }
 
@@ -452,7 +499,10 @@ namespace GameUpSDK
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
             if (!useMultiAdUnitIds) return IsBannerAvailable();
-            return !string.IsNullOrEmpty(where) && _bannerByWhere.ContainsKey(where);
+            return !string.IsNullOrEmpty(where) &&
+                   _bannerByWhere.ContainsKey(where) &&
+                   _bannerLoadedByWhere.TryGetValue(where, out var loaded) &&
+                   loaded;
 #else
             return false;
 #endif

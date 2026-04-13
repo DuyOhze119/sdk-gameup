@@ -90,5 +90,17 @@ namespace GameUpSDK
 
         /// <summary>Raised when a rewarded ad fails to load. Parameter is the error message.</summary>
         event Action<string> OnRewardedLoadFailed;
+
+        /// <summary>
+        /// Raised when banner show is confirmed by the network implementation.
+        /// Parameter is placement (where) when available.
+        /// </summary>
+        event Action<string> OnBannerShown;
+
+        /// <summary>
+        /// Raised when banner show attempt fails.
+        /// Parameter is placement (where) when available.
+        /// </summary>
+        event Action<string> OnBannerShowFailed;
     }
 }

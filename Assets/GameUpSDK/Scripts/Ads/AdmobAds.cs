@@ -35,6 +35,8 @@ namespace GameUpSDK
         public event Action<string> OnInterstitialLoadFailed;
         public event Action OnRewardedLoaded;
         public event Action<string> OnRewardedLoadFailed;
+        public event Action<string> OnBannerShown;
+        public event Action<string> OnBannerShowFailed;
 
         private bool _initialized;
 
@@ -46,6 +48,7 @@ namespace GameUpSDK
         private bool _bannerLoading;
         private bool _bannerRequestInProgress;
         private string _pendingBannerUnitId;
+        private string _bannerPlacementForShow;
 
         private InterstitialAd _interstitialAd;
         private RewardedAd _rewardedAd;
@@ -205,6 +208,7 @@ namespace GameUpSDK
                             {
                                 LogAdTrace("show", AdUnitType.Banner, _bannerUnitIdActive, where: null, extra: "from=auto_on_loaded");
                                 _bannerView?.Show();
+                                OnBannerShown?.Invoke(string.IsNullOrEmpty(_bannerPlacementForShow) ? "main" : _bannerPlacementForShow);
                             }
 
                             if (!string.IsNullOrEmpty(_pendingBannerUnitId) && _pendingBannerUnitId != _bannerUnitIdActive)
@@ -228,6 +232,8 @@ namespace GameUpSDK
                             var message = loadError?.GetMessage() ?? "unknown";
                             var code = loadError != null ? loadError.GetCode().ToString() : "unknown";
                             Debug.LogWarning("[GameUp] AdmobAds load_fail | type=Banner | where=null | unitId=" + Safe(_bannerUnitIdActive) + " | code=" + code + " | message=" + message);
+                            if (_bannerShouldBeVisible)
+                                OnBannerShowFailed?.Invoke(string.IsNullOrEmpty(_bannerPlacementForShow) ? "main" : _bannerPlacementForShow);
 
                             if (!string.IsNullOrEmpty(_pendingBannerUnitId))
                             {
@@ -643,6 +649,7 @@ namespace GameUpSDK
             MainThreadDispatcher.Enqueue(() =>
             {
                 _bannerShouldBeVisible = true;
+                _bannerPlacementForShow = string.IsNullOrEmpty(where) ? "main" : where;
                 var unitId = ResolveUnitId(AdUnitType.Banner, where);
                 if (!string.IsNullOrEmpty(unitId) && (_bannerView == null || _bannerUnitIdActive != unitId))
                 {
@@ -653,6 +660,7 @@ namespace GameUpSDK
                 if (_bannerView == null)
                 {
                     Debug.LogWarning("[GameUp] AdmobAds ShowBanner skipped: no BannerView. where=" + where + ", resolvedUnitId=" + (unitId ?? "null"));
+                    OnBannerShowFailed?.Invoke(_bannerPlacementForShow);
                     return;
                 }
 
@@ -660,6 +668,7 @@ namespace GameUpSDK
                 {
                     LogAdTrace("show", AdUnitType.Banner, _bannerUnitIdActive, where);
                     _bannerView.Show();
+                    OnBannerShown?.Invoke(_bannerPlacementForShow);
                     return;
                 }
 

@@ -165,6 +165,10 @@ namespace GameUpSDK
                     ad.OnInterstitialLoadFailed += (error) => LogAdsEvent(AdsEvent.InterLoadFail, null, error ?? "unknown");
                     ad.OnRewardedLoaded += () => LogAdsEvent(AdsEvent.RewardCompleteLoad, null, null);
                     ad.OnRewardedLoadFailed += (error) => LogAdsEvent(AdsEvent.RewardLoadFail, null, error ?? "unknown");
+                    ad.OnBannerShown += (placement) =>
+                        LogAdsEventManager(AdsEvent.AdsShowSuccess, AdsEvent.AdTypeBanner, string.IsNullOrEmpty(placement) ? "unknown" : placement);
+                    ad.OnBannerShowFailed += (placement) =>
+                        LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, string.IsNullOrEmpty(placement) ? "unknown" : placement, "network_show_failed");
                     ad.Initialize();
                 }
                 catch (Exception e)
@@ -291,6 +295,7 @@ namespace GameUpSDK
             if (!string.IsNullOrEmpty(failReason))
                 _logParamCache[AdsEvent.ParamSource] = failReason;
             FirebaseUtils.LogEventsAPI(eventName, _logParamCache);
+            Debug.Log("[GameUp] AdsManager LogAdsEventManager: " + eventName + " | adType=" + adType + " | placement=" + placement + " | failReason=" + failReason);
         }
 
         private static string BuildShowFailExceptionReason(Exception exception)
@@ -331,7 +336,6 @@ namespace GameUpSDK
             try
             {
                 network.ShowBanner(where);
-                LogAdsEventManager(AdsEvent.AdsShowSuccess, AdsEvent.AdTypeBanner, where);
             }
             catch (Exception e)
             {
