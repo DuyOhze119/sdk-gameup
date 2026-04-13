@@ -5,12 +5,14 @@ using GoogleMobileAds.Api;
 using GoogleMobileAds.Common;
 #endif
 
+
+
 namespace GameUpSDK
 {
     /// <summary>
     /// AdMob (Google Mobile Ads) implementation of IAds. Handles Banner, Interstitial, Rewarded, and App Open.
     /// </summary>
-    public class AdmobAds : MonoBehaviour, IAds, IPlacementAwareAds, IAdUnitIdResolver
+    public class AdmobAds : MonoBehaviour, IAds, IPlacementAwareAds, IAdUnitIdResolver, IConsentAwareAds
     {
         [Header("Ad Unit IDs")]
         [Tooltip("Bật để dùng nhiều Ad Unit theo placement key (where). Tắt = dùng 1 ID/format như hiện tại.")]
@@ -111,11 +113,16 @@ namespace GameUpSDK
 
         public void SetAfterCheckGDPR()
         {
+            SetAfterCheckGDPR(true);
+        }
+
+        public void SetAfterCheckGDPR(bool isConsent)
+        {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            // Consent is typically handled by UMP; SDK respects it after init.
-            Debug.Log("[GameUp] AdmobAds SetAfterCheckGDPR called.");
-            GoogleMobileAds.Mediation.UnityAds.Api.UnityAds.SetConsentMetaData("gdpr.consent", true);
-            GoogleMobileAds.Mediation.IronSource.Api.IronSource.SetMetaData("do_not_sell", "true");
+            // Forward UMP decision to mediation adapters.
+            Debug.Log("[GameUp] AdmobAds SetAfterCheckGDPR called. consent=" + isConsent);
+            GoogleMobileAds.Mediation.UnityAds.Api.UnityAds.SetConsentMetaData("gdpr.consent", isConsent);
+            GoogleMobileAds.Mediation.IronSource.Api.IronSource.SetMetaData("do_not_sell", isConsent ? "false" : "true");
 #endif
         }
 

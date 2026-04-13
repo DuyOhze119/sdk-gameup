@@ -13,7 +13,7 @@ namespace GameUpSDK
     /// LevelPlay không hỗ trợ App Open; các method App Open no-op / return false.
     /// </summary>
 
-    public class IronSourceAds : MonoBehaviour, IAds, IBannerSizeConfig, IPlacementAwareAds, IAdUnitIdResolver
+    public class IronSourceAds : MonoBehaviour, IAds, IBannerSizeConfig, IPlacementAwareAds, IAdUnitIdResolver, IConsentAwareAds
     {
         [Header("LevelPlay App Key (bắt buộc - lấy từ LevelPlay dashboard)")]
         [SerializeField] private string levelPlayAppKey;
@@ -223,8 +223,13 @@ namespace GameUpSDK
 
         public void SetAfterCheckGDPR()
         {
-            LevelPlay.SetConsent(true);
-            Debug.Log("[CtySDK] IronSourceAds SetAfterCheckGDPR (consent set).");
+            SetAfterCheckGDPR(true);
+        }
+
+        public void SetAfterCheckGDPR(bool isConsent)
+        {
+            LevelPlay.SetConsent(isConsent);
+            Debug.Log("[CtySDK] IronSourceAds SetAfterCheckGDPR (consent=" + isConsent + ").");
         }
 
         public void RequestBanner()
@@ -427,6 +432,7 @@ namespace GameUpSDK
 #else
         public void Initialize() { }
         public void SetAfterCheckGDPR() { }
+        public void SetAfterCheckGDPR(bool isConsent) { }
         public void RequestBanner() { }
         public void RequestInterstitial() { }
         public void RequestRewardedVideo() { }

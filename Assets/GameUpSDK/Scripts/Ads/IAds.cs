@@ -56,6 +56,14 @@ namespace GameUpSDK
     }
 
     /// <summary>
+    /// Optional consent-aware extension. AdsManager forwards UMP result when available.
+    /// </summary>
+    public interface IConsentAwareAds
+    {
+        void SetAfterCheckGDPR(bool isConsent);
+    }
+
+    /// <summary>
     /// Full ads contract: init, request, show, and availability. OrderExecute controls waterfall priority.
     /// Load events notify AdsManager for centralized logging.
     /// </summary>

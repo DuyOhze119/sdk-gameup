@@ -1,7 +1,9 @@
 {
     "name": "GameUpSDK.Installer",
     "rootNamespace": "GameUpSDK.Installer",
-    "references": ["GUID:82d2b7cb6c1a0f34990e9d926a7ac3d0"],
+    "references": [
+        "GameUpSDK.Runtime"
+    ],
     "includePlatforms": [
         "Editor"
     ],

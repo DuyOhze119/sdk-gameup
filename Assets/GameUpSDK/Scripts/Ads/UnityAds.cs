@@ -10,7 +10,7 @@ namespace GameUpSDK
     /// UnityAds wrapper for ironSource (LevelPlay) Mediation. Manages ads through the LevelPlay SDK,
     /// logs ads_unity_* events to Firebase, and ensures callbacks run on the main thread.
     /// </summary>
-    public class UnityAds : MonoBehaviour, IAds
+    public class UnityAds : MonoBehaviour, IAds, IConsentAwareAds
     {
         [Header("LevelPlay App Key (optional - set via code)")]
         [SerializeField] private string levelPlayAppKey;
@@ -122,8 +122,13 @@ namespace GameUpSDK
 
         public void SetAfterCheckGDPR()
         {
-            LevelPlay.SetConsent(true);
-            Debug.Log("[CtySDK] UnityAds SetAfterCheckGDPR (consent set).");
+            SetAfterCheckGDPR(true);
+        }
+
+        public void SetAfterCheckGDPR(bool isConsent)
+        {
+            LevelPlay.SetConsent(isConsent);
+            Debug.Log("[CtySDK] UnityAds SetAfterCheckGDPR (consent=" + isConsent + ").");
         }
 
         public void RequestBanner()
@@ -237,6 +242,7 @@ namespace GameUpSDK
 #else
         public void Initialize() { }
         public void SetAfterCheckGDPR() { }
+        public void SetAfterCheckGDPR(bool isConsent) { }
         public void RequestBanner() { }
         public void RequestInterstitial() { }
         public void RequestRewardedVideo() { }

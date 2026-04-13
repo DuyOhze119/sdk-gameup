@@ -77,6 +77,7 @@ namespace GameUpSDK
             CollectAdsFromChildren();
             BuildAdsList();
             Initialize();
+            PrivacyManager.Instance.BeginPrivacyFlow(SetAfterCheckGDPR);
         }
 
         /// <summary>
@@ -172,7 +173,6 @@ namespace GameUpSDK
                 }
             }
             _initialized = true;
-            SetAfterCheckGDPR();
 
             Debug.Log("[GameUp] AdsManager Initialize called for " + _ads.Count + " networks.");
 
@@ -216,11 +216,22 @@ namespace GameUpSDK
         /// </summary>
         public void SetAfterCheckGDPR()
         {
+            SetAfterCheckGDPR(true);
+        }
+
+        /// <summary>
+        /// Call after GDPR/consent flow. Forwards consent result to all networks.
+        /// </summary>
+        public void SetAfterCheckGDPR(bool isConsent)
+        {
             foreach (var ad in _ads)
             {
                 try
                 {
-                    ad.SetAfterCheckGDPR();
+                    if (ad is IConsentAwareAds consentAware)
+                        consentAware.SetAfterCheckGDPR(isConsent);
+                    else
+                        ad.SetAfterCheckGDPR();
                 }
                 catch (Exception e)
                 {
