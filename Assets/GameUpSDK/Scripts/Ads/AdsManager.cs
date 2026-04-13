@@ -68,7 +68,7 @@ namespace GameUpSDK
         private bool _initialized;
 
         // Tái dùng để tránh GC allocation mỗi lần log (FirebaseUtils._LogEvents tiêu thụ đồng bộ, không giữ reference)
-        private readonly Dictionary<object, object> _logParamCache = new Dictionary<object, object>(2);
+        private readonly Dictionary<object, object> _logParamCache = new Dictionary<object, object>(3);
         private readonly Dictionary<string, string> _afParamCache = new Dictionary<string, string>(1);
 
         private void Awake()
@@ -261,6 +261,7 @@ namespace GameUpSDK
         /// </summary>
         private void LogAdsEventWithLevel(string eventName, string where, int level, string appsFlyerEventName = null)
         {
+            _logParamCache.Clear();
             _logParamCache[AdsEvent.ParamWhere] = where ?? "";
             _logParamCache[AdsEvent.ParamLevel] = level.ToString();
             FirebaseUtils.LogEventsAPI(eventName, _logParamCache);
@@ -271,11 +272,24 @@ namespace GameUpSDK
             }
         }
 
-        private void LogAdsEventManager(string eventName, string adType, string placement)
+        private void LogAdsEventManager(string eventName, string adType, string placement, string failReason = null)
         {
+            _logParamCache.Clear();
             _logParamCache[AdsEvent.ParamAdType] = adType;
             _logParamCache[AdsEvent.ParamPlacement] = placement ?? "";
+            if (!string.IsNullOrEmpty(failReason))
+                _logParamCache[AdsEvent.ParamSource] = failReason;
             FirebaseUtils.LogEventsAPI(eventName, _logParamCache);
+        }
+
+        private static string BuildShowFailExceptionReason(Exception exception)
+        {
+            if (exception == null)
+                return "unknown_exception";
+            string message = exception.Message;
+            if (string.IsNullOrEmpty(message))
+                return exception.GetType().Name;
+            return exception.GetType().Name + ": " + message;
         }
 
         // ---- Show with waterfall ----
@@ -298,7 +312,7 @@ namespace GameUpSDK
             if (network == null)
             {
                 Debug.Log("[GameUp] AdsManager ShowBanner: no network available.");
-                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where, "network_null");
                 onRqFail?.Invoke();
                 return;
             }
@@ -311,7 +325,7 @@ namespace GameUpSDK
             catch (Exception e)
             {
                 Debug.LogError("[GameUp] AdsManager ShowBanner: " + e);
-                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where, BuildShowFailExceptionReason(e));
             }
         }
 
@@ -411,7 +425,7 @@ namespace GameUpSDK
             if (network == null)
             {
                 Debug.Log("[GameUp] AdsManager ShowInterstitial: no network available.");
-                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeInterstitial, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeInterstitial, where, "network_null");
                 onRqFail?.Invoke();
                 onFail?.Invoke();
                 return;
@@ -431,7 +445,7 @@ namespace GameUpSDK
             catch (Exception e)
             {
                 Debug.LogError("[GameUp] AdsManager ShowInterstitial: " + e);
-                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeInterstitial, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeInterstitial, where, BuildShowFailExceptionReason(e));
                 onFail?.Invoke();
             }
         }
@@ -460,7 +474,7 @@ namespace GameUpSDK
             if (network == null)
             {
                 Debug.Log("[GameUp] AdsManager ShowRewardedVideo: no network available.");
-                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeRewardedVideo, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeRewardedVideo, where, "network_null");
                 onRqFail?.Invoke();
                 onFail?.Invoke();
                 return;
@@ -485,7 +499,7 @@ namespace GameUpSDK
             catch (Exception e)
             {
                 Debug.LogError("[GameUp] AdsManager ShowRewardedVideo: " + e);
-                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeRewardedVideo, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeRewardedVideo, where, BuildShowFailExceptionReason(e));
                 onFail?.Invoke();
             }
         }
@@ -502,7 +516,7 @@ namespace GameUpSDK
             if (network == null)
             {
                 Debug.Log("[GameUp] AdsManager ShowAppOpenAds: no network available.");
-                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeAppOpen, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeAppOpen, where, "network_null");
                 onRqFail?.Invoke();
                 onFail?.Invoke();
                 return;
@@ -525,7 +539,7 @@ namespace GameUpSDK
             catch (Exception e)
             {
                 Debug.LogError("[GameUp] AdsManager ShowAppOpenAds: " + e);
-                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeAppOpen, where);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeAppOpen, where, BuildShowFailExceptionReason(e));
                 onFail?.Invoke();
             }
         }
