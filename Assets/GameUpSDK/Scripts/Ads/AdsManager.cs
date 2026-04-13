@@ -280,7 +280,7 @@ namespace GameUpSDK
 
         // ---- Show with waterfall ----
 
-        public void ShowBanner(string where)
+        public void ShowBanner(string where, Action onRqFail = null)
         {
             if (!AdsRules.IsBannerEnabled())
             {
@@ -299,6 +299,7 @@ namespace GameUpSDK
             {
                 Debug.Log("[GameUp] AdsManager ShowBanner: no network available.");
                 LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where);
+                onRqFail?.Invoke();
                 return;
             }
             LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeBanner, where);
@@ -314,9 +315,9 @@ namespace GameUpSDK
             }
         }
 
-        public void ShowBanner(int whereId)
+        public void ShowBanner(int whereId, Action onRqFail = null)
         {
-            ShowBanner(whereId.ToString());
+            ShowBanner(whereId.ToString(), onRqFail);
         }
 
         public void HideBanner(string where)
@@ -336,21 +337,21 @@ namespace GameUpSDK
         }
 
         /// <summary>Show Interstitial (no level check: only time capping from AdsRules).</summary>
-        public void ShowInterstitial(string where, Action onSuccess = null, Action onFail = null)
+        public void ShowInterstitial(string where, Action onSuccess = null, Action onFail = null, Action onRqFail = null)
         {
-            ShowInterstitial(where, int.MaxValue, onSuccess, onFail);
+            ShowInterstitial(where, int.MaxValue, onSuccess, onFail, onRqFail);
         }
 
-        public void ShowInterstitial(int whereId, Action onSuccess = null, Action onFail = null)
+        public void ShowInterstitial(int whereId, Action onSuccess = null, Action onFail = null, Action onRqFail = null)
         {
-            ShowInterstitial(whereId.ToString(), int.MaxValue, onSuccess, onFail);
+            ShowInterstitial(whereId.ToString(), int.MaxValue, onSuccess, onFail, onRqFail);
         }
 
         /// <summary>
         /// Show ad by integer ID. The SDK resolves which ad type to show from configured AdUnitIdEntry lists.
         /// In this mode, 'where' is the resolved AdUnitIdEntry.nameId.
         /// </summary>
-        public void ShowById(int intId, int currentLevel = 0, Action onSuccess = null, Action onFail = null)
+        public void ShowById(int intId, int currentLevel = 0, Action onSuccess = null, Action onFail = null, Action onRqFail = null)
         {
             IAdUnitIdResolver resolver = null;
             for (int i = 0; i < _ads.Count; i++)
@@ -365,6 +366,7 @@ namespace GameUpSDK
             if (resolver == null || !resolver.TryResolve(intId, out var type, out var where) || string.IsNullOrEmpty(where))
             {
                 Debug.Log("[GameUp] AdsManager ShowById: cannot resolve id " + intId);
+                onRqFail?.Invoke();
                 onFail?.Invoke();
                 return;
             }
@@ -372,17 +374,17 @@ namespace GameUpSDK
             switch (type)
             {
                 case AdUnitType.Banner:
-                    ShowBanner(where);
+                    ShowBanner(where, onRqFail);
                     onSuccess?.Invoke();
                     break;
                 case AdUnitType.Interstitial:
-                    ShowInterstitial(where, currentLevel <= 0 ? int.MaxValue : currentLevel, onSuccess, onFail);
+                    ShowInterstitial(where, currentLevel <= 0 ? int.MaxValue : currentLevel, onSuccess, onFail, onRqFail);
                     break;
                 case AdUnitType.RewardedVideo:
-                    ShowRewardedVideo(where, currentLevel, onSuccess, onFail);
+                    ShowRewardedVideo(where, currentLevel, onSuccess, onFail, onRqFail);
                     break;
                 case AdUnitType.AppOpen:
-                    ShowAppOpenAds(where, onSuccess, onFail);
+                    ShowAppOpenAds(where, onSuccess, onFail, onRqFail);
                     break;
                 default:
                     onFail?.Invoke();
@@ -391,7 +393,7 @@ namespace GameUpSDK
         }
 
         /// <summary>Show Interstitial với level hiện tại: kiểm tra inter_start_level và inter_capping_time qua AdsRules.</summary>
-        public void ShowInterstitial(string where, int currentLevel, Action onSuccess = null, Action onFail = null)
+        public void ShowInterstitial(string where, int currentLevel, Action onSuccess = null, Action onFail = null, Action onRqFail = null)
         {
             if (!AdsRules.CanShowInterstitial(currentLevel))
             {
@@ -410,6 +412,7 @@ namespace GameUpSDK
             {
                 Debug.Log("[GameUp] AdsManager ShowInterstitial: no network available.");
                 LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeInterstitial, where);
+                onRqFail?.Invoke();
                 onFail?.Invoke();
                 return;
             }
@@ -434,18 +437,18 @@ namespace GameUpSDK
         }
 
         /// <summary>Show Rewarded Video (level = 0 nếu không truyền).</summary>
-        public void ShowRewardedVideo(string where, Action onSuccess = null, Action onFail = null)
+        public void ShowRewardedVideo(string where, Action onSuccess = null, Action onFail = null, Action onRqFail = null)
         {
-            ShowRewardedVideo(where, 0, onSuccess, onFail);
+            ShowRewardedVideo(where, 0, onSuccess, onFail, onRqFail);
         }
 
-        public void ShowRewardedVideo(int whereId, Action onSuccess = null, Action onFail = null)
+        public void ShowRewardedVideo(int whereId, Action onSuccess = null, Action onFail = null, Action onRqFail = null)
         {
-            ShowRewardedVideo(whereId.ToString(), 0, onSuccess, onFail);
+            ShowRewardedVideo(whereId.ToString(), 0, onSuccess, onFail, onRqFail);
         }
 
         /// <summary>Show Rewarded Video với level hiện tại (log ad_rewarded_show_complete kèm param level).</summary>
-        public void ShowRewardedVideo(string where, int currentLevel, Action onSuccess = null, Action onFail = null)
+        public void ShowRewardedVideo(string where, int currentLevel, Action onSuccess = null, Action onFail = null, Action onRqFail = null)
         {
             LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeRewardedVideo, where);
             var network = _ads.FirstOrDefault(a =>
@@ -458,6 +461,7 @@ namespace GameUpSDK
             {
                 Debug.Log("[GameUp] AdsManager ShowRewardedVideo: no network available.");
                 LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeRewardedVideo, where);
+                onRqFail?.Invoke();
                 onFail?.Invoke();
                 return;
             }
@@ -486,7 +490,7 @@ namespace GameUpSDK
             }
         }
 
-        public void ShowAppOpenAds(string where, Action onSuccess = null, Action onFail = null)
+        public void ShowAppOpenAds(string where, Action onSuccess = null, Action onFail = null, Action onRqFail = null)
         {
             LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeAppOpen, where);
             var network = _ads.FirstOrDefault(a =>
@@ -499,6 +503,7 @@ namespace GameUpSDK
             {
                 Debug.Log("[GameUp] AdsManager ShowAppOpenAds: no network available.");
                 LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeAppOpen, where);
+                onRqFail?.Invoke();
                 onFail?.Invoke();
                 return;
             }
@@ -525,9 +530,9 @@ namespace GameUpSDK
             }
         }
 
-        public void ShowAppOpenAds(int whereId, Action onSuccess = null, Action onFail = null)
+        public void ShowAppOpenAds(int whereId, Action onSuccess = null, Action onFail = null, Action onRqFail = null)
         {
-            ShowAppOpenAds(whereId.ToString(), onSuccess, onFail);
+            ShowAppOpenAds(whereId.ToString(), onSuccess, onFail, onRqFail);
         }
 
         /// <summary>
