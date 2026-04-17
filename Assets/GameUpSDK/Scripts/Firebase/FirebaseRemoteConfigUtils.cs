@@ -160,13 +160,22 @@ namespace GameUpSDK
             if (_remoteConfig == null) return;
 
             Type type = GetType();
-            var extraData = remoteConfigExtraData.GetType();
+
+            Type extraData = null;
+            if (remoteConfigExtraData != null)
+            {
+                extraData = remoteConfigExtraData.GetType();
+            }
+
             foreach (string k in _remoteConfig.Keys)
             {
                 try
                 {
                     BindingFields(k, type);
-                    BindingFields(k, extraData);
+                    if (extraData != null)
+                    { 
+                        BindingFields(k, extraData);
+                    }
                 }
                 catch (Exception ex)
                 {
