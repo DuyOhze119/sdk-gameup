@@ -430,6 +430,19 @@ namespace GameUpSDK
                 onFail?.Invoke();
                 return;
             }
+
+            ShowInterstitialInternal(where, currentLevel, onSuccess, onFail, onRqFail);
+        }
+
+        public void ShowInterWithoutCondition(string where, int currentLevel, Action onSuccess = null, Action onFail = null,
+            Action onRqFail = null)
+        {
+            ShowInterstitialInternal(where, currentLevel, onSuccess, onFail, onRqFail);
+        }
+
+        private void ShowInterstitialInternal(string where, int currentLevel, Action onSuccess = null, Action onFail = null,
+            Action onRqFail = null)
+        {
             LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeInterstitial, where);
             var network = _ads.FirstOrDefault(a =>
             {
