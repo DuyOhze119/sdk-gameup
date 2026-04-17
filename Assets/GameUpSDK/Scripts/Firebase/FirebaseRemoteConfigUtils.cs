@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
 using GameUpSDK.Singletons;
+using UnityEngine.Serialization;
 #if FIREBASE_DEPENDENCIES_INSTALLED
 using Firebase;
 using Firebase.Extensions;
@@ -32,6 +33,8 @@ namespace GameUpSDK
         /// <summary>Tắt/Bật hiển thị Banner trong Game. Ưu tiên cao hơn AdsManager.showBannerAfterInit: nếu false thì không show banner (kể cả khi showBannerAfterInit = true).</summary>
         public bool enable_banner = true;
 
+        [SerializeField]
+        private  ScriptableObject remoteConfigExtraData;
         private bool _remoteConfigReady;
         public bool IsRemoteConfigReady => _remoteConfigReady;
         public Action<bool> OnFetchCompleted;
@@ -157,21 +160,35 @@ namespace GameUpSDK
             if (_remoteConfig == null) return;
 
             Type type = GetType();
+            var extraData = remoteConfigExtraData.GetType();
             foreach (string k in _remoteConfig.Keys)
             {
                 try
                 {
-                    FieldInfo field = type.GetField(k, BindingFlags.Public | BindingFlags.Instance);
-                    if (field == null) continue;
-
-                    if (field.FieldType == typeof(int))
-                        field.SetValue(this, (int)_remoteConfig.GetValue(k).LongValue);
-                    else if (field.FieldType == typeof(bool))
-                        field.SetValue(this, _remoteConfig.GetValue(k).BooleanValue);
+                    BindingFields(k, type);
+                    BindingFields(k, extraData);
                 }
                 catch (Exception ex)
                 {
                     Debug.LogWarning("[GameUp] RemoteConfig UpdateKeys " + k + ": " + ex.Message);
+                }
+            }
+        }
+
+        private void BindingFields(string key, Type type)
+        {
+            var field = type.GetField(key, BindingFlags.Public | BindingFlags.Instance);
+            if (field != null)
+            {
+                if (field.FieldType == typeof(int))
+                    field.SetValue(this, (int)_remoteConfig.GetValue(key).LongValue);
+                else if (field.FieldType == typeof(bool))
+                    field.SetValue(this, _remoteConfig.GetValue(key).BooleanValue);
+                else if (field.FieldType == typeof(string))
+                    field.SetValue(this, _remoteConfig.GetValue(key).StringValue);
+                else if (field.FieldType == typeof(float))
+                {
+                    field.SetValue(this, (float)_remoteConfig.GetValue(key).LongValue);
                 }
             }
         }

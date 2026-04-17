@@ -69,6 +69,7 @@ MonoBehaviour:
   level_start_show_rate_app: 5
   no_internet_popup_enable: 1
   enable_banner: 1
+  remoteConfigExtraData: {fileID: 11400000, guid: 2579468d9c1319b41878a8dde42bb3b1, type: 2}
 --- !u!114 &8238185120996978045
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -81,9 +82,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e0e7ad790b9a64b4489c896ea6615dfa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  sdkKey: 
-  appId: 
-  isDevMode: 0
 --- !u!114 &3023022297655963174
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -103,6 +101,7 @@ MonoBehaviour:
   showBannerAfterInit: 1
   showBannerPlacementAfterInit: main
   showBannerDelaySeconds: 2
+  showBannerInitWaitMaxSeconds: 5
   bannerSize: 1
 --- !u!1001 &6106133546150576619
 PrefabInstance:
