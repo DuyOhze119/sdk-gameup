@@ -53,16 +53,12 @@ namespace GameUpSDK
             {
                 try
                 {
-                    var field = GetType().GetField(kv.Key, BindingFlags.Public | BindingFlags.Instance);
-                    if (field == null) continue;
-                    if (field.FieldType == typeof(int) && kv.Value is int i)
-                        field.SetValue(this, i);
-                    else if (field.FieldType == typeof(bool) && kv.Value is bool b)
-                        field.SetValue(this, b);
+                    BindingFieldsFromDefaults(kv, this);
+                    BindingFieldsFromDefaults(kv, remoteConfigExtraData);
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning("[GameUp] RemoteConfig ApplyDefault " + kv.Key + ": " + ex.Message);
+                    Debug.LogWarning("[GameUp] RemoteConfig UpdateKeys " + kv.Key + ": " + ex.Message);
                 }
             }
         }
@@ -179,12 +175,9 @@ namespace GameUpSDK
             foreach (string k in _remoteConfig.Keys)
             {
                 try
-                {
-                    BindingFields(k, type);
-                    if (extraData != null)
-                    { 
-                        BindingFields(k, extraData);
-                    }
+                { 
+                    BindingFields(k, this);
+                    BindingFields(k, remoteConfigExtraData);
                 }
                 catch (Exception ex)
                 {
@@ -193,23 +186,43 @@ namespace GameUpSDK
             }
         }
 
-        private void BindingFields(string key, Type type)
+        private void BindingFields(string key, object o)
         {
-            var field = type.GetField(key, BindingFlags.Public | BindingFlags.Instance);
+            if(o == null) return;
+            var field = o.GetType().GetField(key, BindingFlags.Public | BindingFlags.Instance);
             if (field != null)
             {
                 if (field.FieldType == typeof(int))
-                    field.SetValue(this, (int)_remoteConfig.GetValue(key).LongValue);
+                    field.SetValue(o, (int)_remoteConfig.GetValue(key).LongValue);
                 else if (field.FieldType == typeof(bool))
-                    field.SetValue(this, _remoteConfig.GetValue(key).BooleanValue);
+                    field.SetValue(o, _remoteConfig.GetValue(key).BooleanValue);
                 else if (field.FieldType == typeof(string))
-                    field.SetValue(this, _remoteConfig.GetValue(key).StringValue);
+                    field.SetValue(o, _remoteConfig.GetValue(key).StringValue);
                 else if (field.FieldType == typeof(float))
                 {
-                    field.SetValue(this, (float)_remoteConfig.GetValue(key).LongValue);
+                    field.SetValue(o, (float)_remoteConfig.GetValue(key).LongValue);
                 }
             }
-            Debug.Log($"[GameUp] RemoteConfig UpdateKeys {key}: {field?.GetValue(key)}");
+            Debug.Log($"[GameUp] RemoteConfig UpdateKeys {key}: {_remoteConfig.GetValue(key)}");
+        }
+
+        private void BindingFieldsFromDefaults(KeyValuePair<string, object> kv, object o)
+        {
+            if(o == null) return;
+            var field = o.GetType().GetField(kv.Key, BindingFlags.Public | BindingFlags.Instance);
+            if (field != null)
+            {
+                Debug.Log(kv.Value);
+                if (field.FieldType == typeof(int) && kv.Value is int i)
+                    field.SetValue(o, i);
+                else if (field.FieldType == typeof(bool) && kv.Value is bool b)
+                    field.SetValue(o, b);
+                else if (field.FieldType == typeof(string) && kv.Value is string s)
+                    field.SetValue(o, s);
+                else if (field.FieldType == typeof(float) && kv.Value is float f) 
+                    field.SetValue(o, f); 
+                Debug.Log($"[GameUp] RemoteConfig UpdateKeys {kv.Key}: {kv.Value}");
+            }
         }
 
         /// <summary>Fetch và activate config (gọi lại khi cần refresh).</summary>
