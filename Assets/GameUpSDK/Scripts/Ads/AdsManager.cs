@@ -215,6 +215,16 @@ namespace GameUpSDK
             });
         }
 
+        public bool IsCollapsibleBannerReadyForPlacement(string where)
+        {
+            return _ads.Any(a =>
+            {
+                if (a is IPlacementAwareAds placementAware)
+                    return placementAware.IsCollapsibleBannerAvailable(where);
+                return a.IsCollapsibleBannerAvailable();
+            });
+        }
+
         /// <summary>
         /// Call after GDPR/consent flow. Forwards to all networks.
         /// </summary>
@@ -310,6 +320,21 @@ namespace GameUpSDK
 
         // ---- Show with waterfall ----
 
+        public void RequestCollapsibleBanner(string where = null, CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom)
+        {
+            foreach (var ad in _ads)
+            {
+                try
+                {
+                    ad.RequestCollapsibleBanner(where, placement);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError("[GameUp] AdsManager RequestCollapsibleBanner failed for " + ad.GetType().Name + ": " + e);
+                }
+            }
+        }
+
         public void ShowBanner(string where, Action onRqFail = null)
         {
             if (!AdsRules.IsBannerEnabled())
@@ -344,9 +369,49 @@ namespace GameUpSDK
             }
         }
 
+        public void ShowCollapsibleBanner(string where, CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom, Action onRqFail = null)
+        {
+            if (!AdsRules.IsBannerEnabled())
+            {
+                Debug.Log("[GameUp] AdsManager ShowCollapsibleBanner: disabled by Remote Config (enable_banner).");
+                return;
+            }
+
+            LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeBanner, where);
+            var network = _ads.FirstOrDefault(a =>
+            {
+                if (a is IPlacementAwareAds placementAware)
+                    return placementAware.IsCollapsibleBannerAvailable(where);
+                return a.IsCollapsibleBannerAvailable();
+            });
+            if (network == null)
+            {
+                Debug.Log("[GameUp] AdsManager ShowCollapsibleBanner: no network available.");
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where, "network_null");
+                onRqFail?.Invoke();
+                return;
+            }
+
+            LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeBanner, where);
+            try
+            {
+                network.ShowCollapsibleBanner(where, placement);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[GameUp] AdsManager ShowCollapsibleBanner: " + e);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where, BuildShowFailExceptionReason(e));
+            }
+        }
+
         public void ShowBanner(int whereId, Action onRqFail = null)
         {
             ShowBanner(whereId.ToString(), onRqFail);
+        }
+
+        public void ShowCollapsibleBanner(int whereId, CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom, Action onRqFail = null)
+        {
+            ShowCollapsibleBanner(whereId.ToString(), placement, onRqFail);
         }
 
         public void HideBanner(string where)

@@ -139,11 +139,17 @@ namespace GameUpSDK
             _bannerAd.LoadAd();
         }
 
+        public void RequestCollapsibleBanner(string where, CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom)
+        {
+            RequestBanner();
+        }
+
         public void RequestInterstitial() { _interstitialAd?.LoadAd(); }
         public void RequestRewardedVideo() { _rewardedAd?.LoadAd(); }
         public void RequestAppOpenAds() { }
 
         public bool IsBannerAvailable() => _bannerAd != null && _bannerLoaded;
+        public bool IsCollapsibleBannerAvailable() => false;
         public bool IsInterstitialAvailable() => _interstitialAd != null && _interstitialAd.IsAdReady();
         public bool IsRewardedVideoAvailable() => _rewardedAd != null && _rewardedAd.IsAdReady();
         public bool IsAppOpenAdsAvailable() => false;
@@ -164,6 +170,11 @@ namespace GameUpSDK
             }
             _bannerAd.ShowAd();
             OnBannerShown?.Invoke(string.IsNullOrEmpty(where) ? "main" : where);
+        }
+
+        public void ShowCollapsibleBanner(string where, CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom)
+        {
+            ShowBanner(where);
         }
 
         public void HideBanner(string where) { _bannerAd?.HideAd(); }
@@ -257,14 +268,17 @@ namespace GameUpSDK
         public void SetAfterCheckGDPR() { }
         public void SetAfterCheckGDPR(bool isConsent) { }
         public void RequestBanner() { }
+        public void RequestCollapsibleBanner(string where, CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom) { }
         public void RequestInterstitial() { }
         public void RequestRewardedVideo() { }
         public void RequestAppOpenAds() { }
         public bool IsBannerAvailable() => false;
+        public bool IsCollapsibleBannerAvailable() => false;
         public bool IsInterstitialAvailable() => false;
         public bool IsRewardedVideoAvailable() => false;
         public bool IsAppOpenAdsAvailable() => false;
         public void ShowBanner(string where) { }
+        public void ShowCollapsibleBanner(string where, CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom) { }
         public void HideBanner(string where) { }
         public void ShowInterstitial(string where, Action onSuccess, Action onFail) => onFail?.Invoke();
         public void ShowRewardedVideo(string where, Action onSuccess, Action onFail) => onFail?.Invoke();
