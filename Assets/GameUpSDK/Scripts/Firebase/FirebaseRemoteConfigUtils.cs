@@ -34,7 +34,7 @@ namespace GameUpSDK
         public bool enable_banner = true;
 
         [SerializeField]
-        private  ScriptableObject remoteConfigExtraData;
+        protected ScriptableObject remoteConfigExtraData;
         private bool _remoteConfigReady;
         public bool IsRemoteConfigReady => _remoteConfigReady;
         public Action<bool> OnFetchCompleted;
@@ -46,15 +46,17 @@ namespace GameUpSDK
         }
 
         /// <summary>Áp dụng giá trị mặc định lên các field (dùng trong Editor và khi Firebase lỗi).</summary>
-        private void ApplyDefaultValues()
+        protected void ApplyDefaultValues()
         {
             var defaults = GetDefaultValues();
             foreach (var kv in defaults)
             {
                 try
                 {
-                    BindingFieldsFromDefaults(kv, this);
-                    BindingFieldsFromDefaults(kv, remoteConfigExtraData);
+                    foreach (var target in GetRemoteConfigTargets())
+                    {
+                        BindingFieldsFromDefaults(kv, target);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -63,18 +65,60 @@ namespace GameUpSDK
             }
         }
 
-        private Dictionary<string, object> GetDefaultValues()
+        /// <summary>
+        /// Default values dùng cho SetDefaultsAsync và fallback khi Firebase lỗi.
+        /// Mặc định sẽ tự lấy tất cả public instance field (int/bool/string/float/double/long) trên các target.
+        /// Dự án khác có thể override để thêm/ghi đè key tùy ý.
+        /// </summary>
+        protected virtual Dictionary<string, object> GetDefaultValues()
         {
-            return new Dictionary<string, object>
+            // Use current serialized values so Inspector tweaks are preserved in Play Mode.
+            return BuildDefaultsFromTargets();
+        }
+
+        protected virtual IEnumerable<object> GetRemoteConfigTargets()
+        {
+            yield return this;
+            if (remoteConfigExtraData != null) yield return remoteConfigExtraData;
+        }
+
+        protected virtual bool ShouldIncludeFieldAsDefault(FieldInfo field)
+        {
+            if (field == null) return false;
+            if (!field.IsPublic) return false;
+            if (field.IsStatic) return false;
+
+            var t = field.FieldType;
+            return t == typeof(int) ||
+                   t == typeof(bool) ||
+                   t == typeof(string) ||
+                   t == typeof(float) ||
+                   t == typeof(double) ||
+                   t == typeof(long);
+        }
+
+        protected virtual Dictionary<string, object> BuildDefaultsFromTargets()
+        {
+            var defaults = new Dictionary<string, object>();
+
+            foreach (var target in GetRemoteConfigTargets())
             {
-                // Use current serialized values so Editor/Inspector tweaks are preserved in Play Mode.
-                { "inter_capping_time", inter_capping_time },
-                { "inter_start_level", inter_start_level },
-                { "enable_rate_app", enable_rate_app },
-                { "level_start_show_rate_app", level_start_show_rate_app },
-                { "no_internet_popup_enable", no_internet_popup_enable },
-                { "enable_banner", enable_banner }
-            };
+                if (target == null) continue;
+
+                var fields = target.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance);
+                foreach (var field in fields)
+                {
+                    if (!ShouldIncludeFieldAsDefault(field)) continue;
+
+                    // If multiple targets have the same key, the first one wins by default.
+                    if (!defaults.ContainsKey(field.Name))
+                    {
+                        defaults[field.Name] = field.GetValue(target);
+                    }
+                }
+            }
+
+            return defaults;
         }
 
 #if FIREBASE_DEPENDENCIES_INSTALLED
@@ -160,24 +204,18 @@ namespace GameUpSDK
             OnFetchCompleted?.Invoke(activated);
         }
 
-        private void UpdateKeysFromRemote()
+        protected void UpdateKeysFromRemote()
         {
             if (_remoteConfig == null) return;
-
-            Type type = GetType();
-
-            Type extraData = null;
-            if (remoteConfigExtraData != null)
-            {
-                extraData = remoteConfigExtraData.GetType();
-            }
 
             foreach (string k in _remoteConfig.Keys)
             {
                 try
                 { 
-                    BindingFields(k, this);
-                    BindingFields(k, remoteConfigExtraData);
+                    foreach (var target in GetRemoteConfigTargets())
+                    {
+                        BindingFields(k, target);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -186,7 +224,7 @@ namespace GameUpSDK
             }
         }
 
-        private void BindingFields(string key, object o)
+        protected void BindingFields(string key, object o)
         {
             if(o == null) return;
             var field = o.GetType().GetField(key, BindingFlags.Public | BindingFlags.Instance);
@@ -194,19 +232,25 @@ namespace GameUpSDK
             {
                 if (field.FieldType == typeof(int))
                     field.SetValue(o, (int)_remoteConfig.GetValue(key).LongValue);
+                else if (field.FieldType == typeof(long))
+                    field.SetValue(o, _remoteConfig.GetValue(key).LongValue);
                 else if (field.FieldType == typeof(bool))
                     field.SetValue(o, _remoteConfig.GetValue(key).BooleanValue);
                 else if (field.FieldType == typeof(string))
                     field.SetValue(o, _remoteConfig.GetValue(key).StringValue);
                 else if (field.FieldType == typeof(float))
                 {
-                    field.SetValue(o, (float)_remoteConfig.GetValue(key).LongValue);
+                    field.SetValue(o, (float)_remoteConfig.GetValue(key).DoubleValue);
+                }
+                else if (field.FieldType == typeof(double))
+                {
+                    field.SetValue(o, _remoteConfig.GetValue(key).DoubleValue);
                 }
             }
             Debug.Log($"[GameUp] RemoteConfig UpdateKeys {key}: {_remoteConfig.GetValue(key)}");
         }
 
-        private void BindingFieldsFromDefaults(KeyValuePair<string, object> kv, object o)
+        protected void BindingFieldsFromDefaults(KeyValuePair<string, object> kv, object o)
         {
             if(o == null) return;
             var field = o.GetType().GetField(kv.Key, BindingFlags.Public | BindingFlags.Instance);
@@ -215,12 +259,16 @@ namespace GameUpSDK
                 Debug.Log(kv.Value);
                 if (field.FieldType == typeof(int) && kv.Value is int i)
                     field.SetValue(o, i);
+                else if (field.FieldType == typeof(long) && kv.Value is long l)
+                    field.SetValue(o, l);
                 else if (field.FieldType == typeof(bool) && kv.Value is bool b)
                     field.SetValue(o, b);
                 else if (field.FieldType == typeof(string) && kv.Value is string s)
                     field.SetValue(o, s);
                 else if (field.FieldType == typeof(float) && kv.Value is float f) 
                     field.SetValue(o, f); 
+                else if (field.FieldType == typeof(double) && kv.Value is double d)
+                    field.SetValue(o, d);
                 Debug.Log($"[GameUp] RemoteConfig UpdateKeys {kv.Key}: {kv.Value}");
             }
         }

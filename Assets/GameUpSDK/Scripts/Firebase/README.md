@@ -60,7 +60,19 @@ FirebaseRemoteConfigUtils.Instance.FetchAndActivate(success =>
 | `no_internet_popup_enable` | bool   | true     | Bật/tắt popup yêu cầu kết nối Internet. |
 | `enable_banner`            | bool   | true     | Bật/tắt hiển thị Banner trong game. |
 
-Trên **Firebase Console → Remote Config**, tạo các key trùng tên và set kiểu **Number** (→ map `int`) hoặc **Boolean** (→ map `bool`).
+Trên **Firebase Console → Remote Config**, tạo các key trùng tên và set kiểu phù hợp.
+
+## Cơ chế default & mapping (mới)
+
+- **Default values**: SDK tự build defaults bằng cách quét **tất cả `public` instance field** (kiểu đơn giản) trên các target:
+  - `FirebaseRemoteConfigUtils` (chính nó)
+  - `remoteConfigExtraData` (nếu được gán)
+- **Remote → field mapping**: sau `FetchAndActivate`, SDK duyệt tất cả key từ Remote Config và set vào field có **tên trùng key** (trên các target ở trên).
+- **Kiểu dữ liệu hỗ trợ**:
+  - `int`, `long` ← Firebase **Number**
+  - `float`, `double` ← Firebase **Number**
+  - `bool` ← Firebase **Boolean**
+  - `string` ← Firebase **String**
 
 ## Hành vi đặc biệt
 
@@ -70,13 +82,68 @@ Trên **Firebase Console → Remote Config**, tạo các key trùng tên và set
 
 ## Thêm key mới
 
-1. Thêm **public field** trong `FirebaseRemoteConfigUtils.cs` (tên field = key trên Remote Config):
-   - `int` → key kiểu Number trên Firebase.
-   - `bool` → key kiểu Boolean trên Firebase.
-2. Thêm entry tương ứng vào `defaults` trong `SetupAndFetchAsync` (giá trị mặc định khi chưa fetch được).
-3. Tạo key cùng tên và kiểu trong Firebase Console.
+### Cách 1 (khuyến nghị): Dự án khác kế thừa để thêm field mới (không sửa SDK gốc)
 
-Reflection sẽ tự map key → field khi `UpdateKeysFromRemote()` chạy (sau fetch/activate).
+Tạo class kế thừa và thêm `public` field. Default sẽ tự lấy từ giá trị bạn set trong Inspector/serialized; Remote sẽ tự map theo key trùng tên.
+
+```csharp
+using GameUpSDK;
+using UnityEngine;
+
+public class MyFirebaseRemoteConfig : FirebaseRemoteConfigUtils
+{
+    [Header("My Project Remote Config")]
+    public bool enable_special_event = false;
+    public int event_start_level = 10;
+    public float iap_discount = 0.25f;
+    public string live_ops_message = "hello";
+}
+```
+
+Trên Firebase Console, tạo các key:
+- `enable_special_event` (Boolean)
+- `event_start_level` (Number)
+- `iap_discount` (Number)
+- `live_ops_message` (String)
+
+### Cách 2: Override defaults/targets khi muốn “flex” hơn
+
+Ví dụ bạn muốn chỉ map thêm 1 object khác (ngoài `remoteConfigExtraData`) hoặc muốn thêm/ghi đè default theo logic riêng.
+
+```csharp
+using System.Collections.Generic;
+using GameUpSDK;
+using UnityEngine;
+
+public class MyFirebaseRemoteConfig : FirebaseRemoteConfigUtils
+{
+    [SerializeField] private ScriptableObject myExtraData;
+
+    protected override IEnumerable<object> GetRemoteConfigTargets()
+    {
+        foreach (var t in base.GetRemoteConfigTargets()) yield return t;
+        if (myExtraData != null) yield return myExtraData;
+    }
+
+    protected override Dictionary<string, object> GetDefaultValues()
+    {
+        var defaults = base.GetDefaultValues();
+
+        // Ghi đè 1 key cụ thể (nếu muốn)
+        defaults["inter_capping_time"] = 90;
+
+        // Thêm 1 key “ảo” (nếu bạn có cơ chế bind custom ở nơi khác)
+        // defaults["some_custom_key"] = "value";
+
+        return defaults;
+    }
+}
+```
+
+### Lưu ý
+
+- Mapping chỉ áp dụng với **`public` instance field** (không phải property) và các kiểu hỗ trợ ở trên.
+- Nếu nhiều target có field trùng tên key, **target đầu tiên sẽ thắng** khi build default (mặc định: `this` trước, rồi `remoteConfigExtraData`).
 
 ## API nhanh
 
