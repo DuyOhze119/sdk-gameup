@@ -278,7 +278,7 @@ namespace GameUpSDK
             }
             else
             {
-                GULogger.Warning("GameUpAnalytics", $"Skip FB.LogPurchase - invalid price '{purchasePrice}' or Facebook SDK not initialized.");
+                Debug.LogWarning($"[GameUpAnalytics] Skip FB.LogPurchase - invalid price '{purchasePrice}' or Facebook SDK not initialized.");
             }
 #endif
         }
