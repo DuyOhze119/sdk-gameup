@@ -212,9 +212,9 @@ namespace GameUpSDK
             LogAppsFlyer(AnalyticsEvent.AfCompleteRegistration, p.Count > 0 ? p : null);
         }
 
-        /// <summary> af_purchase </summary>
+        /// <summary> af_purchase; <paramref name="level"/> — level đang chơi khi mua (Firebase/AppsFlyer/Facebook params). </summary>
         public static void LogPurchase(string currencyCode, int quantity, string contentId, string purchasePrice, string orderId,
-            string registrationMethod = null, string customerUserId = null)
+            string registrationMethod = null, string customerUserId = null, int? level = null)
         {
             string normalizedCurrency = string.IsNullOrWhiteSpace(currencyCode) ? "USD" : currencyCode;
             double revenueAmount = 0d;
@@ -227,13 +227,14 @@ namespace GameUpSDK
             var afParams = new Dictionary<string, string>
             {
                 ["af_currency"] = normalizedCurrency,
-                ["af_quantity"] = quantity.ToString(),
-                ["af_content_id"] = contentId ?? "",
-                ["af_order_id"] = orderId ?? "",
+                [AnalyticsEvent.ParamAfQuantity] = quantity.ToString(),
+                [AnalyticsEvent.ParamAfContentId] = contentId ?? "",
+                [AnalyticsEvent.ParamAfOrderId] = orderId ?? "",
                 ["af_revenue"] = hasRevenue ? revenueAmount.ToString(CultureInfo.InvariantCulture) : "0"
             };
             if (!string.IsNullOrEmpty(registrationMethod)) afParams[AnalyticsEvent.ParamAfRegistrationMethod] = registrationMethod;
             if (!string.IsNullOrEmpty(customerUserId)) afParams[AnalyticsEvent.ParamAfCustomerUserId] = customerUserId;
+            if (level.HasValue) afParams[AnalyticsEvent.ParamLevel] = level.Value.ToString();
             LogAppsFlyer(AnalyticsEvent.AfPurchase, afParams);
 
             var firebaseParams = new Dictionary<string, string>
@@ -246,9 +247,12 @@ namespace GameUpSDK
             };
             if (!string.IsNullOrEmpty(registrationMethod)) firebaseParams[AnalyticsEvent.ParamAfRegistrationMethod] = registrationMethod;
             if (!string.IsNullOrEmpty(customerUserId)) firebaseParams[AnalyticsEvent.ParamAfCustomerUserId] = customerUserId;
+            if (level.HasValue) firebaseParams[AnalyticsEvent.ParamLevel] = level.Value.ToString();
             LogFirebaseParams(AnalyticsEvent.AfPurchase, firebaseParams);
+
 #if FACEBOOK_DEPENDENCIES_INSTALLED && !UNITY_EDITOR && (UNITY_ANDROID || UNITY_IOS)
-            if (!FacebookSdkBootstrap.IsInitialized) FacebookSdkBootstrap.TryInitialize();
+            if (!FacebookSdkBootstrap.IsInitialized)
+                FacebookSdkBootstrap.TryInitialize();
 
             if (FB.IsInitialized &&
                 decimal.TryParse(
@@ -267,11 +271,14 @@ namespace GameUpSDK
                 if (!string.IsNullOrEmpty(customerUserId))
                     fbParams[AnalyticsEvent.ParamAfCustomerUserId] = customerUserId;
 
+                if (level.HasValue)
+                    fbParams[AnalyticsEvent.ParamLevel] = level.Value.ToString();
+
                 FB.LogPurchase(purchaseAmount, normalizedCurrency, fbParams);
             }
             else
             {
-                Debug.LogWarning($"[GameUpAnalytics] Skip FB.LogPurchase - invalid price '{purchasePrice}' or Facebook SDK not initialized.");
+                GULogger.Warning("GameUpAnalytics", $"Skip FB.LogPurchase - invalid price '{purchasePrice}' or Facebook SDK not initialized.");
             }
 #endif
         }
