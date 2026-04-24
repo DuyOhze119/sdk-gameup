@@ -51,6 +51,7 @@ namespace GameUpSDK
             }
             else
             {
+                _initialized = true;
                 onInitialized?.Invoke(true);
             }
         }
