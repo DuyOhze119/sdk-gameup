@@ -3,10 +3,17 @@
 SDK tích hợp Quảng cáo (Ads) và Analytics cho game Unity, hỗ trợ:
 
 - **Ads**: IronSource/LevelPlay hoặc AdMob (Banner, Interstitial, Rewarded Video, App Open) với hỗ trợ **Multi IDs theo placement (`where`)**
-- **Analytics**: Firebase Analytics + AppsFlyer MMP; tùy chọn **GameAnalytics** (progression level/wave, design events) qua installer
+- **Analytics**: Firebase Analytics + AppsFlyer MMP; tùy chọn **GameAnalytics** (progression level/wave, design events) và **Facebook SDK** (bootstrap + purchase event) qua installer
 - **Remote Config**: Firebase Remote Config với auto-sync
 
 **Unity**: 2022.3+  |  **Package**: `com.ohze.gameup.sdk`
+
+## Cập nhật gần đây (v1.2.1)
+
+- `package.json` cập nhật lên **1.2.1** và mở rộng metadata theo hướng tích hợp Facebook SDK.
+- `AdsManager` bổ sung/chuẩn hóa luồng **preload sau init** (`RequestAll()`), readiness check theo placement (`Is*ReadyForPlacement`) và callback request-fail (`onRqFail`) cho các API show.
+- Bổ sung API **Collapsible Banner** (`RequestCollapsibleBanner`, `ShowCollapsibleBanner`) cùng overload gọi theo `whereId`.
+- Consent/GDPR được đẩy sớm từ `Awake()` qua `PrivacyManager.Instance.BeginPrivacyFlow(SetAfterCheckGDPR)`; có overload `SetAfterCheckGDPR(bool isConsent)` để forward trạng thái consent cho network hỗ trợ.
 
 ---
 
@@ -89,6 +96,7 @@ Auto-sync sau compile cũng gọi bước tạo asmdef nội bộ, nhưng chạy
 | Google Mobile Ads (AdMob) | 10.7.0 | Cần khi dùng App Open Ads hoặc chọn Primary Mediation = AdMob |
 | AppsFlyer Attribution SDK | 6.17.81 | Attribution & MMP |
 | GameAnalytics SDK | 7.10.6 (unitypackage) | Tùy chọn — progression / funnels; cài qua installer hoặc [tài liệu GA Unity](https://docs.gameanalytics.com/event-tracking-and-integrations/sdks-and-collection-api/game-engine-sdks/unity/) |
+| Facebook Unity SDK | 18.0.0 (unitypackage) | Tùy chọn — bootstrap Facebook runtime + mirror purchase event trên Android/iOS |
 
 ### GameAnalytics — Installer (tùy chọn)
 
@@ -253,6 +261,44 @@ AdsManager.Instance.HideBanner("main");
 > Banner chỉ hiện khi `enable_banner = true` trên Firebase Remote Config.  
 > `enable_banner` có ưu tiên cao hơn `showBannerAfterInit`: nếu Remote Config = `false` thì Banner không hiện dù Inspector = `true`.
 
+### Collapsible Banner
+
+```csharp
+// 1) Request trước để preload (network hỗ trợ)
+AdsManager.Instance.RequestCollapsibleBanner(
+    where: "main",
+    placement: CollapsibleBannerPlacement.Bottom
+);
+
+// 2) Show theo where (string placement key)
+AdsManager.Instance.ShowCollapsibleBanner(
+    where: "main",
+    placement: CollapsibleBannerPlacement.Bottom,
+    onRqFail: () => { /* fallback UI nếu không có ad khả dụng */ }
+);
+
+// 3) Show theo whereId (int -> SDK tự ToString làm placement key)
+AdsManager.Instance.ShowCollapsibleBanner(
+    whereId: 101,
+    placement: CollapsibleBannerPlacement.Bottom,
+    onRqFail: () => { /* fallback UI */ }
+);
+
+// 4) Flow khuyến nghị: check readiness trước khi show
+if (AdsManager.Instance.IsCollapsibleBannerReadyForPlacement("main"))
+{
+    AdsManager.Instance.ShowCollapsibleBanner("main", CollapsibleBannerPlacement.Bottom);
+}
+else
+{
+    AdsManager.Instance.RequestCollapsibleBanner("main", CollapsibleBannerPlacement.Bottom);
+    // Có thể đợi callback/timer rồi thử show lại theo flow game của bạn
+}
+```
+
+> `onRqFail` chạy khi không chọn được network khả dụng cho placement hiện tại.
+> Có overload theo `whereId` tương tự Banner thường.
+
 ### Interstitial
 
 ```csharp
@@ -269,7 +315,8 @@ AdsManager.Instance.ShowInterstitial(
     where: "level_complete",
     currentLevel: currentLevel,
     onSuccess: () => { /* tiếp tục flow game */ },
-    onFail: () => { /* tiếp tục flow game */ }
+    onFail: () => { /* tiếp tục flow game */ },
+    onRqFail: () => { /* không có ad khả dụng ở bước request/select network */ }
 );
 ```
 
@@ -294,7 +341,8 @@ AdsManager.Instance.ShowRewardedVideo(
     where: "revive",
     currentLevel: currentLevel,
     onSuccess: () => { /* trao thưởng */ },
-    onFail: () => { /* không trao thưởng */ }
+    onFail: () => { /* không trao thưởng */ },
+    onRqFail: () => { /* không có ad khả dụng */ }
 );
 ```
 
@@ -308,7 +356,8 @@ AdsManager.Instance.ShowRewardedVideo(
 AdsManager.Instance.ShowAppOpenAds(
     where: "app_foreground",
     onSuccess: () => { /* tiếp tục */ },
-    onFail: () => { /* tiếp tục */ }
+    onFail: () => { /* tiếp tục */ },
+    onRqFail: () => { /* không có ad khả dụng */ }
 );
 ```
 
@@ -337,11 +386,23 @@ AdsManager.Instance.ShowById(
 
 > `ShowById` chỉ hoạt động khi network đang dùng có bật Multi IDs và có dòng `intId` hợp lệ.
 
+### Readiness check theo placement
+
+```csharp
+bool canShowBanner = AdsManager.Instance.IsBannerReadyForPlacement("main");
+bool canShowInterstitial = AdsManager.Instance.IsInterstitialReadyForPlacement("level_complete");
+bool canShowRewarded = AdsManager.Instance.IsRewardedVideoReadyForPlacement("revive");
+bool canShowAppOpen = AdsManager.Instance.IsAppOpenReadyForPlacement("app_foreground");
+```
+
+> Dùng để quyết định prefetch/fallback UI trước khi gọi hàm `Show*`.
+
 ### GDPR / Consent
 
 ```csharp
-// Đã tự động set true trong initialize
-AdsManager.Instance.SetAfterCheckGDPR();
+// Thường không cần gọi tay nếu dùng flow mặc định (AdsManager tự chạy PrivacyManager trong Awake).
+// Có thể gọi tay khi bạn có flow consent riêng:
+AdsManager.Instance.SetAfterCheckGDPR(isConsent: true);
 ```
 
 ---
@@ -439,6 +500,8 @@ GameUpAnalytics.LogPurchase(
 // Mở khóa thành tích (af_achievement_unlocked)
 GameUpAnalytics.LogAchievementUnlocked("first_win", level: 1);
 ```
+
+> Khi `FACEBOOK_DEPENDENCIES_INSTALLED` bật và runtime Facebook đã init (Android/iOS), `LogPurchase(...)` còn mirror sự kiện purchase sang Facebook (`FB.LogPurchase`).
 
 ### Ad Revenue (tự động)
 
