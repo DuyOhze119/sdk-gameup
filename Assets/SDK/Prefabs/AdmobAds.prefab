@@ -44,9 +44,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b6c4f4b9bff0484da41432b3399cd54, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  useMultiAdUnitIds: 0
-  adUnitIds: []
-  bannerAdUnitId: ca-app-pub-3940256099942544/6300978111
-  interstitialAdUnitId: ca-app-pub-3940256099942544/1033173712
-  rewardedAdUnitId: ca-app-pub-3940256099942544/5224354917
-  appOpenAdUnitId: ca-app-pub-3940256099942544/9257395921
+  useMultiAdUnitIds: 1
+  adUnitIdsAndroid: []
+  adUnitIdsIOS:
+  - adType: 0
+    intId: 1
+    nameId: 
+    id: 
+  - adType: 0
+    intId: 2
+    nameId: 
+    id: 
+  bannerAdUnitIdAndroid: ca-app-pub-3940256099942544/6300978111
+  bannerAdUnitIdIOS: 
+  interstitialAdUnitIdAndroid: ca-app-pub-3940256099942544/1033173712
+  interstitialAdUnitIdIOS: 
+  rewardedAdUnitIdAndroid: ca-app-pub-3940256099942544/5224354917
+  rewardedAdUnitIdIOS: 
+  appOpenAdUnitIdAndroid: ca-app-pub-3940256099942544/9257395921
+  appOpenAdUnitIdIOS: 

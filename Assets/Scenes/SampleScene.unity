@@ -133,6 +133,7 @@ GameObject:
   - component: {fileID: 519420032}
   - component: {fileID: 519420031}
   - component: {fileID: 519420029}
+  - component: {fileID: 519420033}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -214,6 +215,29 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &519420033
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 519420028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8fb883ee697fe0d43a1094587d03c61f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fileName: screenshot.png
+  useCustomSize: 1
+  width: 1080
+  height: 1920
+  superSize: 1
+  editorOutputFolder: Screenshots
+  appendTimestampToFileName: 1
+  enableKeyboardShortcut: 1
+  screenshotKey: 293
+  requireLeftControl: 0
+  requireLeftShift: 0
 --- !u!1001 &603961115
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -354,7 +378,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
       propertyPath: useMultiAdUnitIds
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
       propertyPath: adUnitIds.Array.size
@@ -363,6 +387,22 @@ PrefabInstance:
     - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
       propertyPath: interstitialAdUnitId
       value: ca-app-pub-3940256099942544/1033173712
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: bannerAdUnitIdAndroid
+      value: ca-app-pub-3940256099942544/6300978111
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: appOpenAdUnitIdAndroid
+      value: ca-app-pub-3940256099942544/9257395921
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIdsIOS.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: rewardedAdUnitIdAndroid
+      value: ca-app-pub-3940256099942544/5224354917
       objectReference: {fileID: 0}
     - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
       propertyPath: adUnitIds.Array.data[0].id
@@ -379,6 +419,10 @@ PrefabInstance:
     - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
       propertyPath: adUnitIds.Array.data[3].id
       value: ca-app-pub-3940256099942544/9257395921
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: interstitialAdUnitIdAndroid
+      value: ca-app-pub-3940256099942544/1033173712
       objectReference: {fileID: 0}
     - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
       propertyPath: adUnitIds.Array.data[0].intId
@@ -423,6 +467,14 @@ PrefabInstance:
     - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
       propertyPath: adUnitIds.Array.data[3].nameId
       value: main
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIdsIOS.Array.data[0].intId
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3564421296294206596, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
+      propertyPath: adUnitIdsIOS.Array.data[1].intId
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 4275973953013205297, guid: b4ea6dea07b6cc14c872b33b3580d0ee, type: 3}
       propertyPath: m_Name

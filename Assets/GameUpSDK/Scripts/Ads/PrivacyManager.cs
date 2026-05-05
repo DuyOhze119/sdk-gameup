@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Globalization;
 using UnityEngine;
 using GameUpSDK.Singletons;
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IOS)
@@ -52,8 +51,7 @@ namespace GameUpSDK
         private IEnumerator RunPrivacyFlowCoroutine()
         {
 #if UNITY_IOS && !UNITY_EDITOR
-    if (RequiresAttPrompt())
-        yield return RequestAttCoroutine();
+            yield return RequestAttCoroutine();
 #endif
 
             yield return RequestUmpCoroutine();
@@ -72,37 +70,15 @@ namespace GameUpSDK
         }
 
 #if UNITY_IOS && !UNITY_EDITOR
-        private static bool RequiresAttPrompt()
-        {
-            return TryGetIosVersion(out var version) && version >= 14.5f;
-        }
-
-        private static bool TryGetIosVersion(out float version)
-        {
-            version = 0f;
-            var os = SystemInfo.operatingSystem;
-            if (string.IsNullOrEmpty(os))
-                return false;
-
-            var marker = "iPhone OS ";
-            var index = os.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-            if (index < 0)
-                return false;
-
-            var value = os.Substring(index + marker.Length).Trim();
-            var segments = value.Split('.');
-            if (segments.Length < 2)
-                return false;
-
-            var normalized = segments[0] + "." + segments[1];
-            return float.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out version);
-        }
-
         private IEnumerator RequestAttCoroutine()
         {
+            // ATT dialog is more reliable when app is active and one frame has passed.
+            while (!Application.isFocused)
+                yield return null;
+            yield return null;
+
             ATTrackingStatusBinding.AuthorizationTrackingStatus status = ATTrackingStatusBinding.GetAuthorizationTrackingStatus();
-            // NotDetermined = 0 in Unity iOS Support package.
-            if (status == 0)
+            if (status == ATTrackingStatusBinding.AuthorizationTrackingStatus.NOT_DETERMINED)
             {
                 ATTrackingStatusBinding.RequestAuthorizationTracking();
                 const float timeout = 30f;
@@ -112,7 +88,7 @@ namespace GameUpSDK
                     yield return null;
                     elapsed += Time.unscaledDeltaTime;
                     status = ATTrackingStatusBinding.GetAuthorizationTrackingStatus();
-                    if (status != 0)
+                    if (status != ATTrackingStatusBinding.AuthorizationTrackingStatus.NOT_DETERMINED)
                         break;
                 }
             }

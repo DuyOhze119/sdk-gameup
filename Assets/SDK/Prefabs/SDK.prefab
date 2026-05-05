@@ -70,6 +70,7 @@ MonoBehaviour:
   level_start_show_rate_app: 5
   no_internet_popup_enable: 1
   enable_banner: 1
+  remoteConfigExtraData: {fileID: 0}
 --- !u!114 &8238185120996978045
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -101,6 +102,7 @@ MonoBehaviour:
   showBannerAfterInit: 1
   showBannerPlacementAfterInit: main
   showBannerDelaySeconds: 2
+  showBannerInitWaitMaxSeconds: 5
   bannerSize: 1
 --- !u!1001 &6106133546150576619
 PrefabInstance:
@@ -422,12 +424,20 @@ PrefabInstance:
       value: ca-app-pub-3940256099942544/5224354917
       objectReference: {fileID: 0}
     - target: {fileID: 5654628865999889945, guid: 31bc937ccba3a054597bb3a59d97fe52, type: 3}
+      propertyPath: useMultiAdUnitIds
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5654628865999889945, guid: 31bc937ccba3a054597bb3a59d97fe52, type: 3}
       propertyPath: adUnitIds.Array.size
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5654628865999889945, guid: 31bc937ccba3a054597bb3a59d97fe52, type: 3}
       propertyPath: interstitialAdUnitId
       value: ca-app-pub-3940256099942544/1033173712
+      objectReference: {fileID: 0}
+    - target: {fileID: 5654628865999889945, guid: 31bc937ccba3a054597bb3a59d97fe52, type: 3}
+      propertyPath: adUnitIdsIOS.Array.size
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 5654628865999889945, guid: 31bc937ccba3a054597bb3a59d97fe52, type: 3}
       propertyPath: adUnitIds.Array.data[0].id
@@ -488,6 +498,14 @@ PrefabInstance:
     - target: {fileID: 5654628865999889945, guid: 31bc937ccba3a054597bb3a59d97fe52, type: 3}
       propertyPath: adUnitIds.Array.data[3].nameId
       value: main
+      objectReference: {fileID: 0}
+    - target: {fileID: 5654628865999889945, guid: 31bc937ccba3a054597bb3a59d97fe52, type: 3}
+      propertyPath: adUnitIdsIOS.Array.data[0].intId
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5654628865999889945, guid: 31bc937ccba3a054597bb3a59d97fe52, type: 3}
+      propertyPath: adUnitIdsIOS.Array.data[1].intId
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 6167818056696631135, guid: 31bc937ccba3a054597bb3a59d97fe52, type: 3}
       propertyPath: m_Name
