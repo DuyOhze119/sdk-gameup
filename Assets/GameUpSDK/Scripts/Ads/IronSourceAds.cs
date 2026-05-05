@@ -633,7 +633,21 @@ namespace GameUpSDK
             adType = AdUnitType.Interstitial;
             nameId = null;
 
-            var activeAdUnitIds = GetActiveAdUnitIds();
+            var preferred = adUnitIdsAndroid;
+            var fallback = adUnitIdsIOS;
+#if UNITY_IOS || UNITY_IPHONE
+            preferred = adUnitIdsIOS;
+            fallback = adUnitIdsAndroid;
+#elif UNITY_EDITOR
+            if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.iOS)
+            {
+                preferred = adUnitIdsIOS;
+                fallback = adUnitIdsAndroid;
+            }
+#endif
+            var activeAdUnitIds = (preferred != null && preferred.Count > 0)
+                ? preferred
+                : (fallback != null && fallback.Count > 0 ? fallback : preferred);
             if (!useMultiAdUnitIds || activeAdUnitIds == null || activeAdUnitIds.Count == 0)
                 return false;
 
