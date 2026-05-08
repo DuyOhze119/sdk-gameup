@@ -352,6 +352,7 @@ namespace GameUpSDK
 
         public void RequestCollapsibleBanner(string where = null, CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom)
         {
+            Debug.Log("[GameUp] AdsManager RequestCollapsibleBanner | where=" + where + " | placement=" + placement + " | networks=" + _ads.Count);
             foreach (var ad in _ads)
             {
                 try
@@ -380,6 +381,7 @@ namespace GameUpSDK
                     return placementAware.IsBannerAvailable(where);
                 return a.IsBannerAvailable();
             });
+            Debug.Log("[GameUp] AdsManager ShowBanner request | where=" + where + " | network=" + (network != null ? network.GetType().Name : "null"));
             if (network == null)
             {
                 Debug.Log("[GameUp] AdsManager ShowBanner: no network available.");
@@ -414,6 +416,7 @@ namespace GameUpSDK
                     return placementAware.IsCollapsibleBannerAvailable(where);
                 return a.IsCollapsibleBannerAvailable();
             });
+            Debug.Log("[GameUp] AdsManager ShowCollapsibleBanner request | where=" + where + " | placement=" + placement + " | network=" + (network != null ? network.GetType().Name : "null"));
             if (network == null)
             {
                 Debug.Log("[GameUp] AdsManager ShowCollapsibleBanner: no network available.");
@@ -452,6 +455,7 @@ namespace GameUpSDK
                     return placementAware.IsBannerAvailable(where);
                 return a.IsBannerAvailable();
             });
+            Debug.Log("[GameUp] AdsManager HideBanner request | where=" + where + " | network=" + (network != null ? network.GetType().Name : "null"));
             network?.HideBanner(where);
         }
 

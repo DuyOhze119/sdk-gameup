@@ -59,6 +59,7 @@ namespace GameUpSDK
 
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
         private BannerView _bannerView;
+        private BannerView _bannerSwapView;
         private string _bannerUnitIdActive;
         private bool _bannerShouldBeVisible;
         private bool _bannerLoaded;
@@ -70,6 +71,7 @@ namespace GameUpSDK
         private CollapsibleBannerPlacement _pendingBannerCollapsiblePlacement = CollapsibleBannerPlacement.None;
         private string _bannerPlacementForShow;
         private AdPosition _bannerPositionActive = AdPosition.Bottom;
+        private int _bannerSwapToken;
 
         private InterstitialAd _interstitialAd;
         private RewardedAd _rewardedAd;
@@ -167,6 +169,135 @@ namespace GameUpSDK
             {
                 return false;
             }
+        }
+
+        private void TryProcessPendingBannerRequest()
+        {
+            if (string.IsNullOrEmpty(_pendingBannerUnitId))
+                return;
+
+            if (_pendingBannerUnitId == _bannerUnitIdActive &&
+                _pendingBannerCollapsiblePlacement == _bannerCollapsiblePlacementActive)
+                return;
+
+            var pendingUnitId = _pendingBannerUnitId;
+            var pendingPlacement = _pendingBannerCollapsiblePlacement;
+            _pendingBannerUnitId = null;
+            _pendingBannerCollapsiblePlacement = CollapsibleBannerPlacement.None;
+            LogAdTrace("request_pending_apply", AdUnitType.Banner, pendingUnitId, _bannerPlacementForShow, "pendingCollapsible=" + Safe(ToCollapsibleKeyword(pendingPlacement)));
+            RequestBannerInternal(pendingUnitId, pendingPlacement, _bannerPlacementForShow);
+        }
+
+        private void BeginBannerSwapLoad(string unitId, CollapsibleBannerPlacement placement, string where, AdPosition targetPosition)
+        {
+            if (_bannerView == null)
+                return;
+
+            if (_bannerSwapView != null)
+            {
+                _bannerSwapView.Destroy();
+                _bannerSwapView = null;
+            }
+
+            _bannerSwapToken++;
+            var swapToken = _bannerSwapToken;
+            var showWhere = string.IsNullOrEmpty(where) ? "main" : where;
+            var collapsibleKeyword = ToCollapsibleKeyword(placement);
+
+            var adaptiveBannerSize = AdSize.GetCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(AdSize.FullWidth);
+            var swapView = new BannerView(unitId, adaptiveBannerSize, targetPosition);
+            _bannerSwapView = swapView;
+            _bannerLoading = true;
+            _bannerRequestInProgress = true;
+            LogAdTrace("swap_request", AdUnitType.Banner, unitId, where,
+                "keep_current=true,fromUnit=" + Safe(_bannerUnitIdActive) +
+                ",fromCollapsible=" + Safe(ToCollapsibleKeyword(_bannerCollapsiblePlacementActive)) +
+                ",toCollapsible=" + Safe(collapsibleKeyword));
+
+            swapView.OnBannerAdLoaded += () =>
+            {
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (swapToken != _bannerSwapToken || !ReferenceEquals(_bannerSwapView, swapView))
+                        return;
+
+                    var oldView = _bannerView;
+                    _bannerView = swapView;
+                    _bannerSwapView = null;
+                    _bannerUnitIdActive = unitId;
+                    _bannerCollapsiblePlacementActive = placement;
+                    _bannerPositionActive = targetPosition;
+                    _bannerPlacementForShow = showWhere;
+                    _bannerLoaded = true;
+                    _bannerLoading = false;
+                    _bannerRequestInProgress = false;
+                    if (!TryReadIsCollapsible(_bannerView, out _bannerIsCollapsible))
+                        _bannerIsCollapsible = placement != CollapsibleBannerPlacement.None;
+
+                    oldView?.Hide();
+                    oldView?.Destroy();
+
+                    LogAdTrace("swap_success", AdUnitType.Banner, _bannerUnitIdActive, _bannerPlacementForShow,
+                        "requestedCollapsible=" + Safe(collapsibleKeyword) + ", isCollapsible=" + _bannerIsCollapsible);
+                    if (_bannerShouldBeVisible)
+                    {
+                        _bannerView?.Show();
+                        OnBannerShown?.Invoke(_bannerPlacementForShow);
+                        LogAdTrace("show", AdUnitType.Banner, _bannerUnitIdActive, _bannerPlacementForShow,
+                            "from=swap_success,isCollapsible=" + _bannerIsCollapsible);
+                    }
+
+                    TryProcessPendingBannerRequest();
+                });
+            };
+
+            swapView.OnBannerAdLoadFailed += loadError =>
+            {
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (swapToken != _bannerSwapToken || !ReferenceEquals(_bannerSwapView, swapView))
+                        return;
+
+                    var message = loadError?.GetMessage() ?? "unknown";
+                    var code = loadError != null ? loadError.GetCode().ToString() : "unknown";
+
+                    _bannerSwapView = null;
+                    _bannerLoading = false;
+                    _bannerRequestInProgress = false;
+                    swapView.Destroy();
+                    LogAdTrace("swap_fail_keep_current", AdUnitType.Banner, unitId, showWhere,
+                        "code=" + code + ", message=" + message +
+                        ", keepUnit=" + Safe(_bannerUnitIdActive) +
+                        ", keepCollapsible=" + Safe(ToCollapsibleKeyword(_bannerCollapsiblePlacementActive)));
+
+                    if (_bannerShouldBeVisible && _bannerView != null && _bannerLoaded)
+                        _bannerView.Show();
+
+                    TryProcessPendingBannerRequest();
+                });
+            };
+
+            swapView.OnAdPaid += adValue =>
+            {
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (adValue == null)
+                        return;
+                    double value = adValue.Value * 0.000001f;
+                    var data = new AdImpressionData
+                    {
+                        AdNetwork = "Admob",
+                        AdUnit = unitId,
+                        InstanceName = unitId,
+                        AdFormat = "Banner",
+                        Revenue = value
+                    };
+                    AdsEvent.RaiseImpressionDataReady(data);
+                });
+            };
+
+            var request = BuildBannerRequest(placement);
+            swapView.LoadAd(request);
         }
 
         private void ShowBannerInternal(string where, CollapsibleBannerPlacement placement)
@@ -322,6 +453,17 @@ namespace GameUpSDK
                 }
 
                 var targetPosition = GetBannerPosition(placement);
+                var requiresReplacementForVisibleBanner = _bannerView != null &&
+                                                         (_bannerUnitIdActive != unitId ||
+                                                          _bannerCollapsiblePlacementActive != placement ||
+                                                          _bannerPositionActive != targetPosition);
+
+                if (requiresReplacementForVisibleBanner && _bannerShouldBeVisible && _bannerLoaded)
+                {
+                    BeginBannerSwapLoad(unitId, placement, where, targetPosition);
+                    return;
+                }
+
                 if (_bannerView != null && (_bannerUnitIdActive != unitId || _bannerPositionActive != targetPosition))
                 {
                     _bannerView.Destroy();
@@ -372,15 +514,7 @@ namespace GameUpSDK
                                 OnBannerShown?.Invoke(string.IsNullOrEmpty(_bannerPlacementForShow) ? "main" : _bannerPlacementForShow);
                             }
 
-                            if (!string.IsNullOrEmpty(_pendingBannerUnitId) &&
-                                (_pendingBannerUnitId != _bannerUnitIdActive || _pendingBannerCollapsiblePlacement != _bannerCollapsiblePlacementActive))
-                            {
-                                var pendingUnitId = _pendingBannerUnitId;
-                                var pendingPlacement = _pendingBannerCollapsiblePlacement;
-                                _pendingBannerUnitId = null;
-                                _pendingBannerCollapsiblePlacement = CollapsibleBannerPlacement.None;
-                                RequestBannerInternal(pendingUnitId, pendingPlacement, _bannerPlacementForShow);
-                            }
+                            TryProcessPendingBannerRequest();
                         });
                     };
                     _bannerView.OnBannerAdLoadFailed += loadError =>
@@ -401,14 +535,7 @@ namespace GameUpSDK
                             if (_bannerShouldBeVisible)
                                 OnBannerShowFailed?.Invoke(string.IsNullOrEmpty(_bannerPlacementForShow) ? "main" : _bannerPlacementForShow);
 
-                            if (!string.IsNullOrEmpty(_pendingBannerUnitId))
-                            {
-                                var pendingUnitId = _pendingBannerUnitId;
-                                var pendingPlacement = _pendingBannerCollapsiblePlacement;
-                                _pendingBannerUnitId = null;
-                                _pendingBannerCollapsiblePlacement = CollapsibleBannerPlacement.None;
-                                RequestBannerInternal(pendingUnitId, pendingPlacement, _bannerPlacementForShow);
-                            }
+                            TryProcessPendingBannerRequest();
                         });
                     };
                     _bannerView.OnAdPaid += adValue =>
@@ -845,6 +972,7 @@ namespace GameUpSDK
             {
                 _bannerShouldBeVisible = false;
                 _bannerView?.Hide();
+                _bannerSwapView?.Hide();
             });
 #endif
         }
@@ -1037,6 +1165,7 @@ namespace GameUpSDK
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             _bannerView?.Destroy();
+            _bannerSwapView?.Destroy();
             _interstitialAd?.Destroy();
             _rewardedAd?.Destroy();
             _appOpenAd?.Destroy();

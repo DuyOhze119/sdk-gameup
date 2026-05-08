@@ -80,6 +80,8 @@ namespace GameUpSDK
 
         [Header("Utility Defaults")]
         [SerializeField] private string utilityBannerWhere = "main";
+        [SerializeField] private string utilityCollabBannerWhere = "collab";
+        [SerializeField] private CollapsibleBannerPlacement utilityCollabPlacement = CollapsibleBannerPlacement.Bottom;
 
         private Vector2 _scrollPos;
         private GUIStyle _windowStyle;
@@ -155,18 +157,55 @@ namespace GameUpSDK
                 Debug.Log("[GameUp] AdsTester -> RequestAll");
             }
 
+            if (GUILayout.Button("ShowBanner (Normal)", _buttonStyle, GUILayout.Height(34f * scale)))
+            {
+                string where = NormalizeWhere(utilityBannerWhere);
+                AdsManager.Instance?.ShowBanner(where);
+                Debug.Log("[GameUp] AdsTester -> ShowBanner (Normal) | where=" + where);
+            }
+
             if (GUILayout.Button("RequestCollapsibleBanner (Bottom)", _buttonStyle, GUILayout.Height(34f * scale)))
             {
-                string where = string.IsNullOrEmpty(utilityBannerWhere) ? "main" : utilityBannerWhere;
+                string where = NormalizeWhere(utilityCollabBannerWhere);
                 AdsManager.Instance?.RequestCollapsibleBanner(where, CollapsibleBannerPlacement.Bottom);
                 Debug.Log("[GameUp] AdsTester -> RequestCollapsibleBanner Bottom | where=" + where);
             }
 
             if (GUILayout.Button("RequestCollapsibleBanner (Top)", _buttonStyle, GUILayout.Height(34f * scale)))
             {
-                string where = string.IsNullOrEmpty(utilityBannerWhere) ? "main" : utilityBannerWhere;
+                string where = NormalizeWhere(utilityCollabBannerWhere);
                 AdsManager.Instance?.RequestCollapsibleBanner(where, CollapsibleBannerPlacement.Top);
                 Debug.Log("[GameUp] AdsTester -> RequestCollapsibleBanner Top | where=" + where);
+            }
+
+            if (GUILayout.Button("ShowCollapsibleBanner (Collab)", _buttonStyle, GUILayout.Height(34f * scale)))
+            {
+                string where = NormalizeWhere(utilityCollabBannerWhere);
+                var placement = utilityCollabPlacement == CollapsibleBannerPlacement.None
+                    ? CollapsibleBannerPlacement.Bottom
+                    : utilityCollabPlacement;
+                AdsManager.Instance?.ShowCollapsibleBanner(where, placement);
+                Debug.Log("[GameUp] AdsTester -> ShowCollapsibleBanner (Collab) | where=" + where + " | placement=" + placement);
+            }
+
+            if (GUILayout.Button("Test Takeover: Normal -> Collab", _buttonStyle, GUILayout.Height(34f * scale)))
+            {
+                string normalWhere = NormalizeWhere(utilityBannerWhere);
+                string collabWhere = NormalizeWhere(utilityCollabBannerWhere);
+                var placement = utilityCollabPlacement == CollapsibleBannerPlacement.None
+                    ? CollapsibleBannerPlacement.Bottom
+                    : utilityCollabPlacement;
+                AdsManager.Instance?.ShowBanner(normalWhere);
+                Debug.Log("[GameUp] AdsTester -> TakeoverFlow step1 ShowBanner | where=" + normalWhere);
+                AdsManager.Instance?.ShowCollapsibleBanner(collabWhere, placement);
+                Debug.Log("[GameUp] AdsTester -> TakeoverFlow step2 ShowCollapsibleBanner | where=" + collabWhere + " | placement=" + placement);
+            }
+
+            if (GUILayout.Button("HideBanner", _buttonStyle, GUILayout.Height(34f * scale)))
+            {
+                string where = NormalizeWhere(utilityBannerWhere);
+                AdsManager.Instance?.HideBanner(where);
+                Debug.Log("[GameUp] AdsTester -> HideBanner | where=" + where);
             }
 
             if (GUILayout.Button("Reset Interstitial Capping", _buttonStyle, GUILayout.Height(34f * scale)))
@@ -177,6 +216,11 @@ namespace GameUpSDK
 
             if (GUILayout.Button("Auto Build Items From Ads Config", _buttonStyle, GUILayout.Height(34f * scale)))
                 AutoBuildMultiItemsFromAdsConfig();
+        }
+
+        private static string NormalizeWhere(string where)
+        {
+            return string.IsNullOrWhiteSpace(where) ? "main" : where.Trim();
         }
 
         private void EnsureStyles(float scale)
