@@ -210,6 +210,22 @@ namespace GameUpSDK.Editor
             return AssetDatabase.LoadAssetAtPath<GameObject>(WritablePrefabsRoot + "/SDK.prefab") == null;
         }
 
+        /// <summary>Setup chỉ được phép khi đã có bản prefab clone có thể ghi dưới Assets/SDK/Prefabs.</summary>
+        private static bool CanSetupFromWritablePrefabs(out string reason)
+        {
+            var writableSdkPath = (WritablePrefabsRoot + "/SDK.prefab").Replace('\\', '/');
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(writableSdkPath) == null)
+            {
+                reason =
+                    "Chưa có prefab clone tại " + writableSdkPath + ".\n" +
+                    "Hãy clone prefab sang Assets trước, sau đó mới có thể đọc/chỉnh/sync cấu hình.";
+                return false;
+            }
+
+            reason = null;
+            return true;
+        }
+
         private void OnGUI()
         {
             _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
@@ -229,16 +245,14 @@ namespace GameUpSDK.Editor
             if (RequiresPrefabCloneBeforeSetup())
             {
                 EditorGUILayout.HelpBox(
-                    "SDK đang nằm trong Packages (read-only) nên không thể lưu cấu hình vào prefab.\n\n" +
-                    "Bạn vẫn có thể cấu hình bình thường. Khi bấm \"Save Configuration\", hệ thống sẽ ưu tiên " +
-                    "tự clone prefab sang Assets/SDK/Prefabs để lưu cấu hình bền vững, kể cả khi đang ở scene không có SDK.\n\n" +
-                    "Nếu clone không thực hiện được thì cấu hình sẽ được lưu trực tiếp lên SDK object hiện có trong Scene (prefab instance overrides).\n\n" +
-                    "Nếu bạn muốn có một bản prefab có thể chỉnh sửa trong project, hãy clone prefab từ:\n" +
+                    "Setup đang bị khóa vì chưa có prefab clone có thể ghi trong project.\n\n" +
+                    "Tool chỉ đọc dữ liệu setup từ prefab clone trong Assets, không đọc từ scene object.\n" +
+                    "Bạn cần clone prefab từ:\n" +
                     GetPackagePrefabDirectory().Replace('\\', '/') + "\n" +
                     "sang:\n" + WritablePrefabsRoot,
-                    MessageType.Info);
+                    MessageType.Warning);
                 EditorGUILayout.Space(8);
-                if (GUILayout.Button("Clone Prefab từ Package → Assets/SDK/Prefabs (tùy chọn)", GUILayout.Height(30)))
+                if (GUILayout.Button("Clone Prefab từ Package → Assets/SDK/Prefabs", GUILayout.Height(30)))
                 {
                     if (TryClonePackagePrefabsToWritable(out var cloneErr))
                     {
@@ -269,14 +283,25 @@ namespace GameUpSDK.Editor
 
             if (_activeTab < 0) _activeTab = 0;
             if (_activeTab >= _tabs.Length) _activeTab = _tabs.Length - 1;
+            bool canSetup = CanSetupFromWritablePrefabs(out var lockReason);
+            EditorGUI.BeginDisabledGroup(!canSetup);
             if (_tabDrawers.TryGetValue(_activeTab, out var draw))
                 draw?.Invoke();
+            EditorGUI.EndDisabledGroup();
+
+            if (!canSetup && !string.IsNullOrEmpty(lockReason))
+            {
+                EditorGUILayout.Space(6);
+                EditorGUILayout.HelpBox(lockReason, MessageType.Warning);
+            }
 
             EditorGUILayout.Space(16);
+            EditorGUI.BeginDisabledGroup(!canSetup);
             if (GUILayout.Button("Save Configuration", GUILayout.Height(32)))
             {
                 SaveConfiguration();
             }
+            EditorGUI.EndDisabledGroup();
 
             EditorGUILayout.Space(8);
             EditorGUILayout.HelpBox("Thêm SDK vào scene hiện tại (sẽ tạo instance từ prefab SDK).", MessageType.None);
@@ -1347,17 +1372,14 @@ namespace GameUpSDK.Editor
         private void LoadFromSceneOrPrefabs()
         {
             _loadErrors = null;
-            if (TryGetSdkSceneRoot(out var sdkRoot))
+            if (!CanSetupFromWritablePrefabs(out var lockReason))
             {
-                LoadFromSceneSdk(sdkRoot);
+                _loadErrors = lockReason;
                 return;
             }
 
-            // Không có SDK trong Scene → fallback load từ prefab/assets (read-only vẫn load được).
-            if (!RequiresPrefabCloneBeforeSetup())
-                LoadFromPrefabs();
-            else
-                LoadFromPrefabs();
+            // Chỉ đọc dữ liệu setup từ prefab clone trong Assets để đảm bảo single-source-of-truth.
+            LoadFromPrefabs();
         }
 
         private void LoadFromSceneSdk(GameObject sdkRoot)
@@ -1857,45 +1879,15 @@ namespace GameUpSDK.Editor
 
         private void SaveConfiguration()
         {
+            if (!CanSetupFromWritablePrefabs(out var lockReason))
+            {
+                _saveErrors = lockReason;
+                return;
+            }
+
             var errors = new System.Collections.Generic.List<string>();
-            var hasSceneSdk = TryGetSdkSceneRoot(out var sdkRoot);
 
-            // Không có SDK trong scene và prefab hiện tại nằm trong Packages (read-only):
-            // tự clone prefab sang Assets để vẫn lưu được cấu hình (đặc biệt cho AdMob) khi đang ở scene bất kỳ.
-            if (!hasSceneSdk && !IsPrefabAssetPathWritable(PathSDK))
-            {
-                if (!TryClonePackagePrefabsToWritable(out var cloneErr))
-                {
-                    if (!string.IsNullOrEmpty(cloneErr))
-                        errors.Add(cloneErr);
-                    errors.Add(
-                        "Không tìm thấy SDK trong Scene và không clone được prefab ghi được từ Packages. " +
-                        "Hãy thử bấm \"Clone Prefab từ Package → Assets/SDK/Prefabs\" thủ công.");
-                }
-            }
-
-            if (hasSceneSdk)
-            {
-                if (!SaveSceneAppsFlyerObject(sdkRoot)) errors.Add("SDK in Scene (AppsFlyerObjectScript)");
-                if (!SaveSceneFirebaseRemoteConfigUtils(sdkRoot)) errors.Add("SDK in Scene (FirebaseRemoteConfigUtils)");
-                if (!SaveSceneAdsManager(sdkRoot)) errors.Add("SDK in Scene (AdsManager)");
-#if LEVELPLAY_DEPENDENCIES_INSTALLED
-                if (IsIronSourceSetupSectionAvailable() && !SaveSceneIronSource(sdkRoot))
-                    errors.Add("SDK in Scene (IronSourceAds)");
-#endif
-                if (!SaveSceneAdMob(sdkRoot)) errors.Add("SDK in Scene (AdmobAds)");
-
-                EditorSceneManager.MarkSceneDirty(sdkRoot.scene);
-                EditorSceneManager.SaveOpenScenes();
-            }
-            else if (!IsPrefabAssetPathWritable(PathSDK))
-            {
-                errors.Add(
-                    "Không tìm thấy SDK trong Scene và prefab SDK không ghi được (thường do nằm trong Packages/). " +
-                    "Hãy clone prefab sang Assets/SDK/Prefabs hoặc dùng \"Tạo SDK trong Scene hiện tại\".");
-            }
-
-            // Ghi lên file .prefab dưới Assets/ (đồng bộ với scene hoặc khi chỉnh không có instance trong scene).
+            // Luôn ghi vào prefab clone trước.
             SaveConfigurationToWritablePrefabAssets(errors);
 
             // Các settings asset vẫn lưu như cũ
@@ -1907,10 +1899,66 @@ namespace GameUpSDK.Editor
             SaveGameAnalyticsSettingsAsset();
             SaveFacebookSettingsAsset();
 
+            // Sau khi save prefab, truyền ngược dữ liệu lên scene instance tương ứng để đồng bộ ngay.
+            if (TryGetSdkSceneRootMatchingPrefab(PathSDK, out var sdkRoot))
+            {
+                if (!SaveSceneAppsFlyerObject(sdkRoot)) errors.Add("Scene sync (AppsFlyerObjectScript)");
+                if (!SaveSceneFirebaseRemoteConfigUtils(sdkRoot)) errors.Add("Scene sync (FirebaseRemoteConfigUtils)");
+                if (!SaveSceneAdsManager(sdkRoot)) errors.Add("Scene sync (AdsManager)");
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
+                if (IsIronSourceSetupSectionAvailable() && !SaveSceneIronSource(sdkRoot))
+                    errors.Add("Scene sync (IronSourceAds)");
+#endif
+                if (!SaveSceneAdMob(sdkRoot)) errors.Add("Scene sync (AdmobAds)");
+
+                EditorSceneManager.MarkSceneDirty(sdkRoot.scene);
+                EditorSceneManager.SaveOpenScenes();
+            }
+            else if (TryGetSdkSceneRoot(out var anySceneSdk))
+            {
+                errors.Add(
+                    "Có SDK trong scene nhưng không tham chiếu prefab setup hiện tại (" + PathSDK + "). " +
+                    "Scene sẽ không được sync tự động.");
+            }
+
             if (errors.Count > 0)
-                _saveErrors = "Asset/Prefab not found at:\n" + string.Join("\n", errors);
+                _saveErrors = string.Join("\n", errors);
             else
                 Debug.Log("[GameUpSDK] Configuration Saved!");
+        }
+
+        private static bool TryGetSdkSceneRootMatchingPrefab(string prefabPath, out GameObject sdkRoot)
+        {
+            sdkRoot = null;
+            if (string.IsNullOrEmpty(prefabPath)) return false;
+            var normalizedPrefabPath = prefabPath.Replace('\\', '/');
+
+            try
+            {
+                var all = Resources.FindObjectsOfTypeAll<GameUpSDK.AdsManager>();
+                foreach (var am in all)
+                {
+                    if (am == null) continue;
+                    if (EditorUtility.IsPersistent(am)) continue;
+                    var go = am.gameObject;
+                    if (go == null || !go.scene.IsValid()) continue;
+
+                    var source = PrefabUtility.GetCorrespondingObjectFromSource(go);
+                    if (source == null) continue;
+                    var sourcePath = AssetDatabase.GetAssetPath(source).Replace('\\', '/');
+                    if (string.Equals(sourcePath, normalizedPrefabPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        sdkRoot = go;
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+
+            return false;
         }
 
         private static bool TryGetSdkSceneRoot(out GameObject sdkRoot)

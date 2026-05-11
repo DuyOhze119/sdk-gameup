@@ -971,6 +971,8 @@ namespace GameUpSDK.Installer
             var pm = GetPrimaryMediationFromDefines();
             var planned = GetPackagesForSdkSetup(pm);
             var missingAuto = planned.Where(p => !p.IsInstalled && CanAutoInstall(p)).ToList();
+            var missingAutoCore = missingAuto.Where(p => !p.IsAdMobMediationAdapter).ToList();
+            var missingAutoAdapters = missingAuto.Where(p => p.IsAdMobMediationAdapter).ToList();
             var missingManual = planned.Where(p => !p.IsInstalled && !CanAutoInstall(p)).ToList();
 
             string planDesc = pm == AdsManager.PrimaryMediation.AdMob
@@ -997,11 +999,17 @@ namespace GameUpSDK.Installer
                     MessageType.Warning);
             }
 
-            if (missingAuto.Count > 0)
+            if (missingAutoCore.Count > 0)
             {
                 EditorGUILayout.HelpBox(
-                    $"Còn {missingAuto.Count} mục có thể cài tự động — bấm \"Cài tất cả\" hoặc \"Cài pack\" lần lượt từ trên xuống trong danh sách.",
+                    $"Còn {missingAutoCore.Count} mục chính có thể cài tự động — bấm \"Cài tất cả\" hoặc \"Cài pack\" lần lượt từ trên xuống trong danh sách.",
                     MessageType.Warning);
+            }
+            else if (missingAutoAdapters.Count > 0)
+            {
+                EditorGUILayout.HelpBox(
+                    $"Còn {missingAutoAdapters.Count} AdMob mediation adapter chưa cài (tùy chọn, có thể bỏ qua nếu không dùng network tương ứng).",
+                    MessageType.None);
             }
             else
             {
