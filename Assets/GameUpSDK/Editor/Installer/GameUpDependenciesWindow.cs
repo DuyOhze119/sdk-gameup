@@ -544,6 +544,7 @@ namespace GameUpSDK.Installer
         /// <summary>Bật khi batch bắt đầu từ &quot;Cài tất cả&quot; — gợi ý menu Ensure GameAnalytics asmdef khi xong.</summary>
         private bool _gameAnalyticsSetupHintAfterBatch;
         private bool _wasCompiling;
+        private bool _wasBusy;
 
         // Queue PackageManager (GitUrl / ScopedRegistry)
         private readonly Queue<PackageDef> _installQueue = new Queue<PackageDef>();
@@ -706,6 +707,7 @@ namespace GameUpSDK.Installer
         {
             RefreshStatus();
             _wasCompiling = EditorApplication.isCompiling;
+            _wasBusy = IsInstallOrDownloadBusy();
             EditorApplication.update += EditorUpdateRepaintWhenBusy;
 
             // Khi đổi Scripting Define Symbols, Unity sẽ trigger compile + domain reload.
@@ -798,30 +800,50 @@ namespace GameUpSDK.Installer
         private void EditorUpdateRepaintWhenBusy()
         {
             bool compiling = EditorApplication.isCompiling;
+            bool busy = IsInstallOrDownloadBusy();
 
             // Compile vừa kết thúc → assemblies đã reload, refresh trạng thái package một lần.
             if (_wasCompiling && !compiling)
                 RefreshStatus();
 
-            _wasCompiling = compiling;
+            // Khi các job cài/tải vừa kết thúc, refresh lại ngay để bật lại nút gỡ/cài.
+            if (_wasBusy && !busy)
+                RefreshStatus();
 
-            if (compiling || IsInstallOrDownloadBusy())
+            bool stateChanged = (_wasCompiling != compiling) || (_wasBusy != busy);
+            _wasCompiling = compiling;
+            _wasBusy = busy;
+
+            if (compiling || busy || stateChanged)
                 Repaint();
         }
 
         private bool IsInstallOrDownloadBusy()
         {
-            if (_isBatchInstalling) return true;
-            if (_installQueue.Count > 0) return true;
-            if (_currentAddRequest != null) return true;
-            if (_admobLatestReleaseRequest != null) return true;
-            if (_parallelTasks != null && _parallelTasks.Count > 0) return true;
-            foreach (var p in s_packages)
+            bool hasQueueItems = _installQueue.Count > 0;
+            bool hasRunningAddRequest = _currentAddRequest != null && !_currentAddRequest.IsCompleted;
+            bool hasResolvingAdMobLatest = _admobLatestReleaseRequest != null && !_admobLatestReleaseRequest.isDone;
+            bool hasRunningParallelDownloads = _parallelTasks?.Any(t => !t.IsDone && t.Request != null && !t.Request.isDone) == true;
+            bool hasInstallingPackage = s_packages.Any(p => p.IsInstalling);
+
+            // Tự phục hồi cờ batch nếu không còn tác vụ nào thực sự chạy.
+            if (_isBatchInstalling
+                && !hasQueueItems
+                && !hasRunningAddRequest
+                && !hasResolvingAdMobLatest
+                && !hasRunningParallelDownloads
+                && !hasInstallingPackage)
             {
-                if (p.IsInstalling) return true;
+                _isBatchInstalling = false;
+                _batchScope = null;
             }
 
-            return false;
+            return _isBatchInstalling
+                   || hasQueueItems
+                   || hasRunningAddRequest
+                   || hasResolvingAdMobLatest
+                   || hasRunningParallelDownloads
+                   || hasInstallingPackage;
         }
 
         /// <summary>Khóa mọi thao tác: đang compile hoặc đang cài/tải package.</summary>
@@ -2413,10 +2435,19 @@ namespace GameUpSDK.Installer
 
         private static bool IsPackageInstalled(PackageDef pkg)
         {
+            if (pkg == null)
+                return false;
+
             bool byAssembly = !string.IsNullOrEmpty(pkg.AssemblyName) && IsAssemblyLoaded(pkg.AssemblyName);
             bool byAssetPath = HasInstalledAssetPath(pkg);
             bool byType = !string.IsNullOrEmpty(pkg.InstalledTypeFullName) &&
                           IsTypeInAnyLoadedAssembly(pkg.InstalledTypeFullName);
+
+            // AdMob mediation adapters cần phản ánh trạng thái thư mục asset thực tế.
+            // Assembly có thể còn loaded trong AppDomain một lúc sau khi xóa asset.
+            if (pkg.IsAdMobMediationAdapter)
+                return byAssetPath;
+
             if (!string.IsNullOrEmpty(pkg.InstalledTypeFullName))
                 return byAssembly || byType || byAssetPath;
             if (!string.IsNullOrEmpty(pkg.InstalledAssetPath))
@@ -2445,7 +2476,16 @@ namespace GameUpSDK.Installer
             if (pkg == null || string.IsNullOrEmpty(pkg.InstalledAssetPath))
                 return false;
 
-            return !string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(pkg.InstalledAssetPath));
+            string path = pkg.InstalledAssetPath.Replace('\\', '/');
+
+            // Với path thư mục (đa số adapter), chỉ coi là "đã cài" khi folder thực sự tồn tại.
+            if (!Path.HasExtension(path))
+                return AssetDatabase.IsValidFolder(path);
+
+            if (string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(path)))
+                return false;
+
+            return AssetDatabase.LoadMainAssetAtPath(path) != null;
         }
 
         private static List<string> GetRemovableAssetPaths(PackageDef pkg)
