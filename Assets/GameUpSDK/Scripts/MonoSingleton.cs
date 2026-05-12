@@ -10,12 +10,16 @@ namespace GameUpSDK.Singletons
             get
             {
                 if (_instance) return _instance;
-                Debug.Log($"Dont has InstanceOf {typeof(T).Name} class");
                 _instance = FindObjectOfType<T>(true);
-                if (!_instance)
+                if (_instance) return _instance;
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
                 {
-                    _instance = new GameObject(typeof(T).Name + " Singleton").AddComponent<T>();
+                    Debug.LogWarning($"[GameUp] {typeof(T).Name}.Instance requested while not in Play Mode. Returning null instead of creating singleton.");
+                    return null;
                 }
+#endif
+                _instance = new GameObject(typeof(T).Name + " Singleton").AddComponent<T>();
                 return _instance;
             }
         }
