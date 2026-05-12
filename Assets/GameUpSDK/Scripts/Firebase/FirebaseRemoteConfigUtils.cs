@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -119,6 +120,71 @@ namespace GameUpSDK
             }
 
             return defaults;
+        }
+
+        protected void BindingFieldsFromDefaults(KeyValuePair<string, object> kv, object o)
+        {
+            if(o == null) return;
+            var field = o.GetType().GetField(kv.Key, BindingFlags.Public | BindingFlags.Instance);
+            if (field == null) return;
+
+            try
+            {
+                object value = ConvertDefaultValue(kv.Value, field.FieldType);
+                if (value == null && field.FieldType.IsValueType)
+                {
+                    // Value types cannot be assigned null.
+                    return;
+                }
+
+                field.SetValue(o, value);
+                Debug.Log($"[GameUp] RemoteConfig UpdateKeys {kv.Key}: {kv.Value}");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[GameUp] RemoteConfig BindingDefaults {kv.Key} failed: {ex.Message}");
+            }
+        }
+
+        private static object ConvertDefaultValue(object value, Type targetType)
+        {
+            if (targetType == null) return null;
+            if (value == null) return null;
+
+            if (targetType.IsInstanceOfType(value))
+            {
+                return value;
+            }
+
+            try
+            {
+                if (targetType == typeof(int))
+                    return Convert.ToInt32(value, CultureInfo.InvariantCulture);
+                if (targetType == typeof(long))
+                    return Convert.ToInt64(value, CultureInfo.InvariantCulture);
+                if (targetType == typeof(bool))
+                {
+                    if (value is string s)
+                    {
+                        if (bool.TryParse(s, out var parsedBool)) return parsedBool;
+                        if (int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedInt)) return parsedInt != 0;
+                    }
+                    if (value is IConvertible)
+                        return Convert.ToInt32(value, CultureInfo.InvariantCulture) != 0;
+                }
+                if (targetType == typeof(string))
+                    return value.ToString();
+                if (targetType == typeof(float))
+                    return Convert.ToSingle(value, CultureInfo.InvariantCulture);
+                if (targetType == typeof(double))
+                    return Convert.ToDouble(value, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                // Let caller handle the fallback path.
+            }
+
+            return null;
         }
 
 #if FIREBASE_DEPENDENCIES_INSTALLED
@@ -248,29 +314,6 @@ namespace GameUpSDK
                 }
             }
             Debug.Log($"[GameUp] RemoteConfig UpdateKeys {key}: {_remoteConfig.GetValue(key)}");
-        }
-
-        protected void BindingFieldsFromDefaults(KeyValuePair<string, object> kv, object o)
-        {
-            if(o == null) return;
-            var field = o.GetType().GetField(kv.Key, BindingFlags.Public | BindingFlags.Instance);
-            if (field != null)
-            {
-                Debug.Log(kv.Value);
-                if (field.FieldType == typeof(int) && kv.Value is int i)
-                    field.SetValue(o, i);
-                else if (field.FieldType == typeof(long) && kv.Value is long l)
-                    field.SetValue(o, l);
-                else if (field.FieldType == typeof(bool) && kv.Value is bool b)
-                    field.SetValue(o, b);
-                else if (field.FieldType == typeof(string) && kv.Value is string s)
-                    field.SetValue(o, s);
-                else if (field.FieldType == typeof(float) && kv.Value is float f) 
-                    field.SetValue(o, f); 
-                else if (field.FieldType == typeof(double) && kv.Value is double d)
-                    field.SetValue(o, d);
-                Debug.Log($"[GameUp] RemoteConfig UpdateKeys {kv.Key}: {kv.Value}");
-            }
         }
 
         /// <summary>Fetch và activate config (gọi lại khi cần refresh).</summary>
