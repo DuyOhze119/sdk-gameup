@@ -124,7 +124,7 @@ namespace GameUpSDK
 
         protected void BindingFieldsFromDefaults(KeyValuePair<string, object> kv, object o)
         {
-            if(o == null) return;
+            if (o == null) return;
             var field = o.GetType().GetField(kv.Key, BindingFlags.Public | BindingFlags.Instance);
             if (field == null) return;
 
@@ -277,7 +277,7 @@ namespace GameUpSDK
             foreach (string k in _remoteConfig.Keys)
             {
                 try
-                { 
+                {
                     foreach (var target in GetRemoteConfigTargets())
                     {
                         BindingFields(k, target);
@@ -292,28 +292,41 @@ namespace GameUpSDK
 
         protected void BindingFields(string key, object o)
         {
-            if(o == null) return;
+            if (o == null) return;
+
             var field = o.GetType().GetField(key, BindingFlags.Public | BindingFlags.Instance);
-            if (field != null)
+            if (field == null) return;
+
+            var configValue = _remoteConfig.GetValue(key);
+            object assignedValue;
+
+            switch (Type.GetTypeCode(field.FieldType))
             {
-                if (field.FieldType == typeof(int))
-                    field.SetValue(o, (int)_remoteConfig.GetValue(key).LongValue);
-                else if (field.FieldType == typeof(long))
-                    field.SetValue(o, _remoteConfig.GetValue(key).LongValue);
-                else if (field.FieldType == typeof(bool))
-                    field.SetValue(o, _remoteConfig.GetValue(key).BooleanValue);
-                else if (field.FieldType == typeof(string))
-                    field.SetValue(o, _remoteConfig.GetValue(key).StringValue);
-                else if (field.FieldType == typeof(float))
-                {
-                    field.SetValue(o, (float)_remoteConfig.GetValue(key).DoubleValue);
-                }
-                else if (field.FieldType == typeof(double))
-                {
-                    field.SetValue(o, _remoteConfig.GetValue(key).DoubleValue);
-                }
+                case TypeCode.Int32:
+                    assignedValue = (int)configValue.LongValue;
+                    break;
+                case TypeCode.Int64:
+                    assignedValue = configValue.LongValue;
+                    break;
+                case TypeCode.Boolean:
+                    assignedValue = configValue.BooleanValue;
+                    break;
+                case TypeCode.String:
+                    assignedValue = configValue.StringValue;
+                    break;
+                case TypeCode.Single: // float
+                    assignedValue = (float)configValue.DoubleValue;
+                    break;
+                case TypeCode.Double:
+                    assignedValue = configValue.DoubleValue;
+                    break;
+                default:
+                    Debug.LogWarning($"[GameUp] RemoteConfig key '{key}' unsupported type: {field.FieldType}");
+                    return;
             }
-            Debug.Log($"[GameUp] RemoteConfig UpdateKeys {key}: {_remoteConfig.GetValue(key)}");
+
+            field.SetValue(o, assignedValue);
+            Debug.Log($"[GameUp] RemoteConfig UpdateKeys {key}: {assignedValue} (source={configValue.Source})");
         }
 
         /// <summary>Fetch và activate config (gọi lại khi cần refresh).</summary>
