@@ -235,7 +235,14 @@ namespace GameUpSDK
             if (!string.IsNullOrEmpty(registrationMethod)) afParams[AnalyticsEvent.ParamAfRegistrationMethod] = registrationMethod;
             if (!string.IsNullOrEmpty(customerUserId)) afParams[AnalyticsEvent.ParamAfCustomerUserId] = customerUserId;
             if (level.HasValue) afParams[AnalyticsEvent.ParamLevel] = level.Value.ToString();
-            LogAppsFlyer(AnalyticsEvent.AfPurchase, afParams);
+            if (!AppsFlyerUtils.ShouldSkipManualPurchaseRevenueEvent())
+            {
+                LogAppsFlyer(AnalyticsEvent.AfPurchase, afParams);
+            }
+            else
+            {
+                Debug.Log("[GameUpAnalytics] Skip manual af_purchase for iOS because ROI360 Purchase Connector is enabled.");
+            }
 
             var firebaseParams = new Dictionary<string, string>
             {
