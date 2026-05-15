@@ -100,6 +100,14 @@ namespace GameUpSDK
         private IEnumerator RequestUmpCoroutine()
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IOS)
+#if UNITY_IOS && !UNITY_EDITOR
+            if(ATTrackingStatusBinding.GetAuthorizationTrackingStatus() == ATTrackingStatusBinding.AuthorizationTrackingStatus.DENIED)
+            {
+                _consentGranted = false;
+                Debug.Log("[GameUp] PrivacyManager ATT denied -> consent = false");
+                yield break;
+            }
+#endif
             bool done = false;
             bool canRequestAds = true;
 
