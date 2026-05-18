@@ -19,6 +19,7 @@ namespace GameUpSDK
         private string sdkKey = "";
         
         [Header("Test Device")]
+        [SerializeField]
         private List<string> testDevices = new List<string>();
 
         [Header("Ad Unit IDs")]
