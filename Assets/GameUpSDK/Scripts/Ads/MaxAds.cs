@@ -310,7 +310,7 @@ namespace GameUpSDK
             void HandleReward(string id, MaxSdkBase.Reward reward, MaxSdkBase.AdInfo info)
             {
                 if (id == unitId) rewardedEarned = true;
-                Debug.Log($"[GameUp] Handle Rewarded Video reward: {id}");
+                Debug.Log($"[GameUp] Handle Rewarded Video reward: id {id} - unit id: {unitId}");
             }
 
             void HandleHidden(string id, MaxSdkBase.AdInfo info)
