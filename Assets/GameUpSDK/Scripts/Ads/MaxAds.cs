@@ -310,6 +310,7 @@ namespace GameUpSDK
             void HandleReward(string id, MaxSdkBase.Reward reward, MaxSdkBase.AdInfo info)
             {
                 if (id == unitId) rewardedEarned = true;
+                Debug.Log($"[GameUp] Handle Rewarded Video reward: {id}");
             }
 
             void HandleHidden(string id, MaxSdkBase.AdInfo info)
@@ -317,13 +318,25 @@ namespace GameUpSDK
                 if (id != unitId) return;
                 MaxSdkCallbacks.Rewarded.OnAdReceivedRewardEvent -= HandleReward;
                 MaxSdkCallbacks.Rewarded.OnAdHiddenEvent -= HandleHidden;
+                Debug.Log($"[GameUp] Handle Rewarded Video Hidden: {id}");
+
                 MainThreadDispatcher.Enqueue(() =>
                 {
                     AdsRules.EndInterstitialCappingPause();
-                    if (rewardedEarned) onSuccess?.Invoke();
-                    else onFail?.Invoke();
+                    if (rewardedEarned)
+                    {
+                        onSuccess?.Invoke();
+                        Debug.Log($"[GameUp] Rewarded Video Earned");
+                    }
+                    else
+                    {
+                        onFail?.Invoke();
+                        Debug.Log($"[GameUp] Rewarded Video Failed");
+                    }
+                    
+                    MaxSdk.LoadRewardedAd(unitId);
+                    Debug.Log($"[GameUp] Load new Video Rewarded");
                 });
-                MaxSdk.LoadRewardedAd(unitId);
             }
 #else
             onFail?.Invoke();
