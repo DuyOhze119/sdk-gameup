@@ -315,6 +315,7 @@ namespace GameUpSDK
 
             void HandleHidden(string id, MaxSdkBase.AdInfo info)
             {
+                Debug.Log($"[GameUp] Video Hidden id: {id} - unit id: {unitId}");
                 if (id != unitId) return;
                 MaxSdkCallbacks.Rewarded.OnAdReceivedRewardEvent -= HandleReward;
                 MaxSdkCallbacks.Rewarded.OnAdHiddenEvent -= HandleHidden;
