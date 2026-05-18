@@ -7,7 +7,9 @@
         "GoogleMobileAds.Mediation.UnityAds.Api",
         "GoogleMobileAds.Mediation.IronSource.Api",
         "GameAnalyticsSDK",
-        "Unity.Advertisement.IosSupport"
+        "Unity.Advertisement.IosSupport",
+        "MaxSdk.Scripts",
+        "AppMetrica"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

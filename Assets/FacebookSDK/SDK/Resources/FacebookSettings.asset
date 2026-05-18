@@ -14,17 +14,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   selectedAppIndex: 0
   clientTokens:
-  - 
+  - df3024c97ae71444a47d455c199f2897
   appIds:
-  - 0
+  - 1548624680017043
   appLabels:
-  - sdk-gameup
+  - Backpack Tower Defense
   cookie: 1
   logging: 1
   status: 1
   xfbml: 0
   frictionlessRequests: 1
-  androidKeystorePath: 
+  androidKeystorePath: ./com.gu.backpack.towerdefense.keystore
   iosURLSuffix: 
   appLinkSchemes:
   - list: []

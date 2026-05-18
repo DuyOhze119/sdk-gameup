@@ -45,6 +45,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   levelPlayAppKey: 
-  bannerAdUnitId: 
-  interstitialAdUnitId: 
-  rewardedVideoAdUnitId: 
+  useMultiAdUnitIds: 0
+  adUnitIdsAndroid: []
+  adUnitIdsIOS: []
+  bannerAdUnitIdAndroid: 
+  bannerAdUnitIdIOS: 
+  interstitialAdUnitIdAndroid: 
+  interstitialAdUnitIdIOS: 
+  rewardedVideoAdUnitIdAndroid: 
+  rewardedVideoAdUnitIdIOS: 

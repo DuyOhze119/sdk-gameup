@@ -205,6 +205,23 @@ namespace GameUpSDK.Installer
             },
             new PackageDef
             {
+                DisplayName = "MaxSDK SDK",
+                Description = "Tùy chọn. Cần nếu bạn chọn Primary Mediation = Max trong AdsManager.",
+                Required = false,
+                AssemblyName = "MaxSdk.Scripts",
+                Method = InstallMethod.UnityPackage,
+                BundledFileNames = new[] { "AppLovin-MAX-Unity-Plugin-8.6.3-Android-13.6.2-iOS-13.6.2.unitypackage" },
+                HostedUrls = new[]
+                {
+                    "https://github.com/AppLovin/AppLovin-MAX-Unity-Plugin/releases/download/release_8_6_3/AppLovin-MAX-Unity-Plugin-8.6.3-Android-13.6.2-iOS-13.6.2.unitypackage",
+                },
+                DownloadUrl = "https://developers.is.com/ironsource-mobile/unity/unity-plugin/",
+                DownloadLabel = "Tải Max SDK →",
+                RemoveAssetPaths = new[] { "Assets/MaxSdk" },
+                InstallPriority = 33,
+            },
+            new PackageDef
+            {
                 // Firebase gồm 3 file riêng trong subfolder Firebase/
                 // EDM4U (Google.VersionHandler) được bundle kèm trong FirebaseAnalytics
                 DisplayName      = "AppsFlyer Attribution SDK",
@@ -239,6 +256,25 @@ namespace GameUpSDK.Installer
                 DownloadLabel = "GameAnalytics Unity SDK →",
                 RemoveAssetPaths = new[] { "Assets/GameAnalytics" },
                 InstallPriority = 46,
+            },
+            
+            new PackageDef
+            {
+                DisplayName = "Appmetrica SDK",
+                Description = "Tùy chọn. Analytics sản phẩm thay thế Firebase",
+                Required = false,
+                AssemblyName = "AppMetrica",
+                InstalledTypeFullName = "AppMetrica",
+                Method = InstallMethod.UnityPackage,
+                BundledFileNames = new[] { "Appmetrica.unitypackage" },
+                HostedUrls = new[]
+                {
+                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/Appmetrica.unitypackage",
+                },
+                DownloadUrl = "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/Appmetrica.unitypackage",
+                DownloadLabel = "Appmetrica SDK →",
+                RemoveAssetPaths = new[] { "Assets/Appmetrica" },
+                InstallPriority = 60,
             },
 
             new PackageDef
@@ -575,11 +611,13 @@ namespace GameUpSDK.Installer
         private bool _foldoutAdMobMediationAdapters = true;
         private WindowTab _activeTab = WindowTab.SetupDependencies;
         private const string LevelPlayDepsDefine = "LEVELPLAY_DEPENDENCIES_INSTALLED";
+        private const string MaxSdkDepsDefine = "MAXSDK_DEPENDENCIES_INSTALLED";
         private const string AdMobDepsDefine = "ADMOB_DEPENDENCIES_INSTALLED";
         private const string FirebaseDepsDefine = "FIREBASE_DEPENDENCIES_INSTALLED";
         private const string AppsFlyerDepsDefine = "APPSFLYER_DEPENDENCIES_INSTALLED";
         private const string GameAnalyticsDepsDefine = "GAMEANALYTICS_DEPENDENCIES_INSTALLED";
         private const string FacebookDepsDefine = "FACEBOOK_DEPENDENCIES_INSTALLED";
+        private const string AppmetricaDepsDefine = "APPMETRICA_DEPENDENCIES_INSTALLED";
         private const string AdMobReleaseApiUrl = "https://api.github.com/repos/googleads/googleads-mobile-unity/releases/latest";
         private const string AdMobUnityPackagePrefix = "GoogleMobileAds-v";
         private const string AdMobUnityPackageSuffix = ".unitypackage";
@@ -1195,6 +1233,7 @@ namespace GameUpSDK.Installer
         private static AdsManager.PrimaryMediation GetPrimaryMediationFromDefines()
         {
             if (HasDefine(GUDefinetion.PrimaryMediationAdMob)) return AdsManager.PrimaryMediation.AdMob;
+            if(HasDefine(GUDefinetion.PrimaryMediationMax)) return AdsManager.PrimaryMediation.Max;
             return AdsManager.PrimaryMediation.LevelPlay;
         }
 
@@ -1202,6 +1241,7 @@ namespace GameUpSDK.Installer
         {
             SetDefine(GUDefinetion.PrimaryMediationAdMob, mediation == AdsManager.PrimaryMediation.AdMob);
             SetDefine(GUDefinetion.PrimaryMediationLevelPlay, mediation == AdsManager.PrimaryMediation.LevelPlay);
+            SetDefine(GUDefinetion.PrimaryMediationMax, mediation == AdsManager.PrimaryMediation.Max);
         }
 
         /// <summary>Đảm bảo có đúng một define mediation (mặc định LevelPlay nếu chưa có).</summary>
@@ -2401,6 +2441,13 @@ namespace GameUpSDK.Installer
                 SetDefine(LevelPlayDepsDefine, true);
             else if (!levelPlayInstalled && HasDefine(LevelPlayDepsDefine))
                 SetDefine(LevelPlayDepsDefine, false);
+            
+            // Auto set/clear LevelPlay define theo trạng thái package
+            bool maxInstalled = IsAssemblyLoaded("MaxSdk.Scripts");
+            if (maxInstalled && !HasDefine(MaxSdkDepsDefine))
+                SetDefine(MaxSdkDepsDefine, true);
+            else if (!maxInstalled && HasDefine(MaxSdkDepsDefine))
+                SetDefine(MaxSdkDepsDefine, false);
 
             // Auto set/clear AdMob define theo AdMob core package.
             // Adapter mediation không ảnh hưởng define này.
@@ -2416,6 +2463,12 @@ namespace GameUpSDK.Installer
                 SetDefine(FirebaseDepsDefine, true);
             else if (!firebaseInstalled && HasDefine(FirebaseDepsDefine))
                 SetDefine(FirebaseDepsDefine, false);
+            
+            bool appMetricaInstalled = IsAssemblyLoaded("AppMetrica");
+            if (appMetricaInstalled && !HasDefine(AppmetricaDepsDefine))
+                SetDefine(AppmetricaDepsDefine, true);
+            else if (!appMetricaInstalled && HasDefine(AppmetricaDepsDefine))
+                SetDefine(AppmetricaDepsDefine, false);
 
             // Auto set/clear AppsFlyer define theo trạng thái package
             bool appsFlyerInstalled = IsAssemblyLoaded("AppsFlyer");
@@ -2694,7 +2747,9 @@ namespace GameUpSDK.Installer
         {
             SetDefine(LevelPlayDepsDefine, false);
             SetDefine(AdMobDepsDefine, false);
+            SetDefine(MaxSdkDepsDefine, false);
             SetDefine(FirebaseDepsDefine, false);
+            SetDefine(AppmetricaDepsDefine, false);
             SetDefine(AppsFlyerDepsDefine, false);
             SetDefine(GameAnalyticsDepsDefine, false);
             SetDefine(FacebookDepsDefine, false);
@@ -2702,6 +2757,7 @@ namespace GameUpSDK.Installer
 
             // Reset mediation về mặc định an toàn sau khi gỡ toàn bộ dependencies.
             SetDefine(GUDefinetion.PrimaryMediationAdMob, false);
+            SetDefine(GUDefinetion.PrimaryMediationMax, false);
             SetDefine(GUDefinetion.PrimaryMediationLevelPlay, true);
         }
 
