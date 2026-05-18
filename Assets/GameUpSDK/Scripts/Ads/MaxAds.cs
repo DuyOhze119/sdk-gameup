@@ -17,6 +17,9 @@ namespace GameUpSDK
         [Tooltip("AppLovin SDK Key. Nếu đã cấu hình trong AppLovin Integration Manager thì có thể bỏ trống.")]
         [SerializeField]
         private string sdkKey = "";
+        
+        [Header("Test Device")]
+        private List<string> testDevices = new List<string>();
 
         [Header("Ad Unit IDs")]
         [Tooltip("Bật để dùng nhiều Ad Unit theo placement key (where). Tắt = dùng 1 ID/format.")]
@@ -76,6 +79,7 @@ namespace GameUpSDK
                 MaxSdk.SetSdkKey(sdkKey);
             }
 
+            MaxSdk.SetTestDeviceAdvertisingIdentifiers(testDevices.ToArray());
             MaxSdk.InitializeSdk();
             MaxSdkCallbacks.OnSdkInitializedEvent += (MaxSdkBase.SdkConfiguration sdkConfiguration) =>
             {
@@ -91,6 +95,7 @@ namespace GameUpSDK
                     RequestInterstitial();
                     RequestRewardedVideo();
                     RequestAppOpenAds();
+                    MaxSdk.ShowMediationDebugger();
                 });
             };
 #else
@@ -100,21 +105,41 @@ namespace GameUpSDK
         }
 
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            
+        private int _retryInterstitialAttempt = 0;
+        private int _retryRewardedAttempt = 0;
         private void SetupCallbacks()
         {
             // Interstitial Callbacks
             MaxSdkCallbacks.Interstitial.OnAdLoadedEvent += (adUnitId, adInfo) =>
+            {
+                _retryInterstitialAttempt = 0;
                 MainThreadDispatcher.Enqueue(() => OnInterstitialLoaded?.Invoke());
+            };
             MaxSdkCallbacks.Interstitial.OnAdLoadFailedEvent += (adUnitId, errorInfo) =>
+            {
+                _retryInterstitialAttempt++;
+                double retryDelay = Math.Pow(2, Math.Min(6, _retryInterstitialAttempt));
+                
+                Invoke(nameof(RequestInterstitial), (float) retryDelay);
                 MainThreadDispatcher.Enqueue(() => OnInterstitialLoadFailed?.Invoke(errorInfo.Message));
+            };
             MaxSdkCallbacks.Interstitial.OnAdRevenuePaidEvent +=
                 (adUnitId, adInfo) => TrackRevenue(adUnitId, adInfo, "Interstitial");
 
             // Rewarded Callbacks
             MaxSdkCallbacks.Rewarded.OnAdLoadedEvent += (adUnitId, adInfo) =>
+            {
+                _retryRewardedAttempt = 0;
                 MainThreadDispatcher.Enqueue(() => OnRewardedLoaded?.Invoke());
+            };
             MaxSdkCallbacks.Rewarded.OnAdLoadFailedEvent += (adUnitId, errorInfo) =>
+            {
+                _retryRewardedAttempt++;
+                double retryDelay = Math.Pow(2, Math.Min(6, _retryRewardedAttempt));
+                Invoke(nameof(RequestRewardedVideo), (float) retryDelay);
                 MainThreadDispatcher.Enqueue(() => OnRewardedLoadFailed?.Invoke(errorInfo.Message));
+            };
             MaxSdkCallbacks.Rewarded.OnAdRevenuePaidEvent +=
                 (adUnitId, adInfo) => TrackRevenue(adUnitId, adInfo, "Rewarded");
 
