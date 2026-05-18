@@ -15,20 +15,25 @@ namespace GameUpSDK
     {
         [Header("SDK Settings")]
         [Tooltip("AppLovin SDK Key. Nếu đã cấu hình trong AppLovin Integration Manager thì có thể bỏ trống.")]
-        [SerializeField] private string sdkKey = "";
+        [SerializeField]
+        private string sdkKey = "";
 
         [Header("Ad Unit IDs")]
         [Tooltip("Bật để dùng nhiều Ad Unit theo placement key (where). Tắt = dùng 1 ID/format.")]
-        [SerializeField] private bool useMultiAdUnitIds;
+        [SerializeField]
+        private bool useMultiAdUnitIds;
 
-        [Tooltip("Danh sách mapping Android: (AdType, NameId=where, Id=ad unit id).")]
-        [SerializeField] private System.Collections.Generic.List<AdUnitIdEntry> adUnitIdsAndroid = new System.Collections.Generic.List<AdUnitIdEntry>();
+        [Tooltip("Danh sách mapping Android: (AdType, NameId=where, Id=ad unit id).")] [SerializeField]
+        private System.Collections.Generic.List<AdUnitIdEntry> adUnitIdsAndroid =
+            new System.Collections.Generic.List<AdUnitIdEntry>();
 
-        [Tooltip("Danh sách mapping iOS: (AdType, NameId=where, Id=ad unit id).")]
-        [SerializeField] private System.Collections.Generic.List<AdUnitIdEntry> adUnitIdsIOS = new System.Collections.Generic.List<AdUnitIdEntry>();
+        [Tooltip("Danh sách mapping iOS: (AdType, NameId=where, Id=ad unit id).")] [SerializeField]
+        private System.Collections.Generic.List<AdUnitIdEntry> adUnitIdsIOS =
+            new System.Collections.Generic.List<AdUnitIdEntry>();
 
-        [Header("Single IDs (Fallback)")]
-        [SerializeField] private string bannerAdUnitIdAndroid;
+        [Header("Single IDs (Fallback)")] [SerializeField]
+        private string bannerAdUnitIdAndroid;
+
         [SerializeField] private string bannerAdUnitIdIOS;
 
         [SerializeField] private string interstitialAdUnitIdAndroid;
@@ -78,7 +83,7 @@ namespace GameUpSDK
                 {
                     _initialized = true;
                     Debug.Log("[GameUp] MaxAds Initialized.");
-                    
+
                     SetupCallbacks();
 
                     // Preload ads
@@ -98,28 +103,32 @@ namespace GameUpSDK
         private void SetupCallbacks()
         {
             // Interstitial Callbacks
-            MaxSdkCallbacks.Interstitial.OnAdLoadedEvent += (adUnitId, adInfo) => 
+            MaxSdkCallbacks.Interstitial.OnAdLoadedEvent += (adUnitId, adInfo) =>
                 MainThreadDispatcher.Enqueue(() => OnInterstitialLoaded?.Invoke());
-            MaxSdkCallbacks.Interstitial.OnAdLoadFailedEvent += (adUnitId, errorInfo) => 
+            MaxSdkCallbacks.Interstitial.OnAdLoadFailedEvent += (adUnitId, errorInfo) =>
                 MainThreadDispatcher.Enqueue(() => OnInterstitialLoadFailed?.Invoke(errorInfo.Message));
-            MaxSdkCallbacks.Interstitial.OnAdRevenuePaidEvent += (adUnitId, adInfo) => TrackRevenue(adUnitId, adInfo, "Interstitial");
+            MaxSdkCallbacks.Interstitial.OnAdRevenuePaidEvent +=
+                (adUnitId, adInfo) => TrackRevenue(adUnitId, adInfo, "Interstitial");
 
             // Rewarded Callbacks
-            MaxSdkCallbacks.Rewarded.OnAdLoadedEvent += (adUnitId, adInfo) => 
+            MaxSdkCallbacks.Rewarded.OnAdLoadedEvent += (adUnitId, adInfo) =>
                 MainThreadDispatcher.Enqueue(() => OnRewardedLoaded?.Invoke());
-            MaxSdkCallbacks.Rewarded.OnAdLoadFailedEvent += (adUnitId, errorInfo) => 
+            MaxSdkCallbacks.Rewarded.OnAdLoadFailedEvent += (adUnitId, errorInfo) =>
                 MainThreadDispatcher.Enqueue(() => OnRewardedLoadFailed?.Invoke(errorInfo.Message));
-            MaxSdkCallbacks.Rewarded.OnAdRevenuePaidEvent += (adUnitId, adInfo) => TrackRevenue(adUnitId, adInfo, "Rewarded");
+            MaxSdkCallbacks.Rewarded.OnAdRevenuePaidEvent +=
+                (adUnitId, adInfo) => TrackRevenue(adUnitId, adInfo, "Rewarded");
 
             // Banner Callbacks
-            MaxSdkCallbacks.Banner.OnAdLoadedEvent += (adUnitId, adInfo) => 
+            MaxSdkCallbacks.Banner.OnAdLoadedEvent += (adUnitId, adInfo) =>
                 MainThreadDispatcher.Enqueue(() => OnBannerShown?.Invoke(_bannerPlacementForShow));
-            MaxSdkCallbacks.Banner.OnAdLoadFailedEvent += (adUnitId, errorInfo) => 
+            MaxSdkCallbacks.Banner.OnAdLoadFailedEvent += (adUnitId, errorInfo) =>
                 MainThreadDispatcher.Enqueue(() => OnBannerShowFailed?.Invoke(_bannerPlacementForShow));
-            MaxSdkCallbacks.Banner.OnAdRevenuePaidEvent += (adUnitId, adInfo) => TrackRevenue(adUnitId, adInfo, "Banner");
+            MaxSdkCallbacks.Banner.OnAdRevenuePaidEvent +=
+                (adUnitId, adInfo) => TrackRevenue(adUnitId, adInfo, "Banner");
 
             // App Open Callbacks
-            MaxSdkCallbacks.AppOpen.OnAdRevenuePaidEvent += (adUnitId, adInfo) => TrackRevenue(adUnitId, adInfo, "AppOpen");
+            MaxSdkCallbacks.AppOpen.OnAdRevenuePaidEvent +=
+                (adUnitId, adInfo) => TrackRevenue(adUnitId, adInfo, "AppOpen");
         }
 
         private void TrackRevenue(string adUnitId, MaxSdkBase.AdInfo adInfo, string format)
@@ -163,14 +172,17 @@ namespace GameUpSDK
 #endif
         }
 
-        public void RequestCollapsibleBanner(string where, CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom)
+        public void RequestCollapsibleBanner(string where,
+            CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom)
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (!_initialized) return;
             string unitId = ResolveUnitId(AdUnitType.Banner, where);
             if (string.IsNullOrEmpty(unitId)) return;
 
-            var pos = placement == CollapsibleBannerPlacement.Top ? MaxSdkBase.BannerPosition.TopCenter : MaxSdkBase.BannerPosition.BottomCenter;
+            var pos = placement == CollapsibleBannerPlacement.Top
+                ? MaxSdkBase.BannerPosition.TopCenter
+                : MaxSdkBase.BannerPosition.BottomCenter;
             MaxSdk.CreateBanner(unitId, pos);
 #endif
         }
@@ -209,7 +221,8 @@ namespace GameUpSDK
 #endif
         }
 
-        public void ShowCollapsibleBanner(string where, CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom)
+        public void ShowCollapsibleBanner(string where,
+            CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom)
         {
             ShowBanner(where);
         }
@@ -321,15 +334,59 @@ namespace GameUpSDK
         // ---- AVAILABILITY ----
         public bool IsBannerAvailable() => _initialized;
         public bool IsCollapsibleBannerAvailable() => _initialized;
-        public bool IsInterstitialAvailable() => MaxSdk.IsInterstitialReady(ResolveUnitId(AdUnitType.Interstitial, null));
-        public bool IsRewardedVideoAvailable() => MaxSdk.IsRewardedAdReady(ResolveUnitId(AdUnitType.RewardedVideo, null));
-        public bool IsAppOpenAdsAvailable() => MaxSdk.IsAppOpenAdReady(ResolveUnitId(AdUnitType.AppOpen, null));
+
+        public bool IsInterstitialAvailable()
+        {
+#if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            return MaxSdk.IsInterstitialReady(ResolveUnitId(AdUnitType.Interstitial, null));
+#endif
+            return false;
+        }
+
+        public bool IsRewardedVideoAvailable()
+        {
+#if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            return MaxSdk.IsRewardedAdReady(ResolveUnitId(AdUnitType.RewardedVideo, null));
+#endif
+            return false;
+        }
+
+        public bool IsAppOpenAdsAvailable()
+        {
+#if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            return MaxSdk.IsAppOpenAdReady(ResolveUnitId(AdUnitType.AppOpen, null));
+#endif
+            return false;
+        }
 
         public bool IsBannerAvailable(string where) => !string.IsNullOrEmpty(ResolveUnitId(AdUnitType.Banner, where));
-        public bool IsCollapsibleBannerAvailable(string where) => !string.IsNullOrEmpty(ResolveUnitId(AdUnitType.Banner, where));
-        public bool IsInterstitialAvailable(string where) => MaxSdk.IsInterstitialReady(ResolveUnitId(AdUnitType.Interstitial, where));
-        public bool IsRewardedVideoAvailable(string where) => MaxSdk.IsRewardedAdReady(ResolveUnitId(AdUnitType.RewardedVideo, where));
-        public bool IsAppOpenAdsAvailable(string where) => MaxSdk.IsAppOpenAdReady(ResolveUnitId(AdUnitType.AppOpen, where));
+
+        public bool IsCollapsibleBannerAvailable(string where) =>
+            !string.IsNullOrEmpty(ResolveUnitId(AdUnitType.Banner, where));
+
+        public bool IsInterstitialAvailable(string where)
+        {
+#if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            return MaxSdk.IsInterstitialReady(ResolveUnitId(AdUnitType.Interstitial, where));
+#endif
+            return false;
+        }
+
+        public bool IsRewardedVideoAvailable(string where)
+        {
+#if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            return MaxSdk.IsRewardedAdReady(ResolveUnitId(AdUnitType.RewardedVideo, where));
+#endif
+            return false;
+        }
+
+        public bool IsAppOpenAdsAvailable(string where)
+        {
+#if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            return MaxSdk.IsAppOpenAdReady(ResolveUnitId(AdUnitType.AppOpen, where));
+#endif
+            return false;
+        }
 
         // ---- RESOLVERS / HELPERS ----
         private void ExecuteForAllUnits(AdUnitType type, Action<string> action)
@@ -356,10 +413,12 @@ namespace GameUpSDK
                 for (int i = 0; i < activeAdUnitIds.Count; i++)
                 {
                     var e = activeAdUnitIds[i];
-                    if (e != null && e.AdType == type && e.IsValid() && string.Equals(e.NameId?.Trim(), normalizedWhere, StringComparison.OrdinalIgnoreCase))
+                    if (e != null && e.AdType == type && e.IsValid() && string.Equals(e.NameId?.Trim(), normalizedWhere,
+                            StringComparison.OrdinalIgnoreCase))
                         return e.Id;
                 }
             }
+
             return GetSingleUnitId(type);
         }
 
@@ -376,7 +435,12 @@ namespace GameUpSDK
             };
         }
 
-        private enum RuntimeAdPlatform { Android, IOS }
+        private enum RuntimeAdPlatform
+        {
+            Android,
+            IOS
+        }
+
         private static RuntimeAdPlatform GetRuntimeAdPlatform()
         {
 #if UNITY_ANDROID
@@ -414,6 +478,7 @@ namespace GameUpSDK
                     return true;
                 }
             }
+
             return false;
         }
     }
