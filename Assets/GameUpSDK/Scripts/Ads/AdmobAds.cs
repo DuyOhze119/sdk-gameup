@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
@@ -256,11 +257,20 @@ namespace GameUpSDK
                 {
                     _initialized = true;
                     Debug.Log("[GameUp] AdmobAds initialized.");
-                    // Request ads ngay khi SDK sẵn sàng (tránh gọi RequestAll() trước khi init xong).
-                    RequestBanner();
-                    RequestInterstitial();
-                    RequestRewardedVideo();
-                    RequestAppOpenAds();
+                    
+                    Dictionary<string, AdapterStatus> map = initStatus.getAdapterStatusMap();
+                    foreach (KeyValuePair<string, AdapterStatus> keyValuePair in map)
+                    {
+                        string className = keyValuePair.Key;
+                        AdapterStatus status = keyValuePair.Value;
+                        Debug.Log($"Adapter: {className} - status: {status.InitializationState} - latency: {status.Latency}");
+
+                        // Request ads ngay khi SDK sẵn sàng (tránh gọi RequestAll() trước khi init xong).
+                        RequestBanner();
+                        RequestInterstitial();
+                        RequestRewardedVideo();
+                        RequestAppOpenAds();
+                    }
                 });
             });
 #else
@@ -279,8 +289,8 @@ namespace GameUpSDK
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             // Forward UMP decision to mediation adapters.
             Debug.Log("[GameUp] AdmobAds SetAfterCheckGDPR called. consent=" + isConsent);
-            GoogleMobileAds.Mediation.UnityAds.Api.UnityAds.SetConsentMetaData("gdpr.consent", isConsent);
-            GoogleMobileAds.Mediation.IronSource.Api.IronSource.SetMetaData("do_not_sell", isConsent ? "false" : "true");
+            //GoogleMobileAds.Mediation.UnityAds.Api.UnityAds.SetConsentMetaData("gdpr.consent", isConsent);
+            //GoogleMobileAds.Mediation.IronSource.Api.IronSource.SetMetaData("do_not_sell", isConsent ? "false" : "true");
 #endif
         }
 
