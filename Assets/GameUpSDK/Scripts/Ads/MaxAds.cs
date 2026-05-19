@@ -1,10 +1,6 @@
 using System;
 using UnityEngine;
-using UnityEngine.Serialization;
-
-#if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
 using System.Collections.Generic;
-#endif
 
 namespace GameUpSDK
 {
