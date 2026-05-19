@@ -78,8 +78,8 @@ namespace GameUpSDK
             DontDestroyOnLoad(gameObject);
             CollectAdsFromChildren();
             BuildAdsList();
-            Initialize();
             PrivacyManager.Instance.BeginPrivacyFlow(SetAfterCheckGDPR);
+            Initialize();
         }
 
         /// <summary>
