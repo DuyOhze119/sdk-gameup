@@ -81,6 +81,10 @@ namespace GameUpSDK
         private readonly System.Collections.Generic.Dictionary<string, DateTime> _appOpenExpireByWhere = new System.Collections.Generic.Dictionary<string, DateTime>();
         private DateTime _appOpenExpireTime = DateTime.MinValue;
         private const int AppOpenTimeoutHours = 4;
+
+        private int _retryInterstitialAttempt;
+        private int _retryRewardedAttempt;
+        private const int LoadRetryExponentCap = 6;
 #endif
 
         private static string Safe(string value)
@@ -503,6 +507,62 @@ namespace GameUpSDK
         }
 
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+        private void ResetInterstitialLoadRetry()
+        {
+            _retryInterstitialAttempt = 0;
+            CancelInvoke(nameof(RequestInterstitial));
+        }
+
+        private void ResetRewardedLoadRetry()
+        {
+            _retryRewardedAttempt = 0;
+            CancelInvoke(nameof(RequestRewardedVideo));
+        }
+
+        private void ScheduleInterstitialLoadRetry()
+        {
+            _retryInterstitialAttempt++;
+            var retryDelay = (float)Math.Pow(2, Math.Min(LoadRetryExponentCap, _retryInterstitialAttempt));
+            CancelInvoke(nameof(RequestInterstitial));
+            Invoke(nameof(RequestInterstitial), retryDelay);
+            LogAdTrace("load_retry_scheduled", AdUnitType.Interstitial, null, null, "delaySeconds=" + retryDelay + ",attempt=" + _retryInterstitialAttempt);
+        }
+
+        private void ScheduleRewardedLoadRetry()
+        {
+            _retryRewardedAttempt++;
+            var retryDelay = (float)Math.Pow(2, Math.Min(LoadRetryExponentCap, _retryRewardedAttempt));
+            CancelInvoke(nameof(RequestRewardedVideo));
+            Invoke(nameof(RequestRewardedVideo), retryDelay);
+            LogAdTrace("load_retry_scheduled", AdUnitType.RewardedVideo, null, null, "delaySeconds=" + retryDelay + ",attempt=" + _retryRewardedAttempt);
+        }
+
+        private void RequestInterstitialAfterNotReady(string where)
+        {
+            if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
+            {
+                var unitId = ResolveUnitId(AdUnitType.Interstitial, where);
+                if (!string.IsNullOrEmpty(unitId))
+                    RequestInterstitialInternal(unitId, where);
+                return;
+            }
+
+            RequestInterstitial();
+        }
+
+        private void RequestRewardedAfterNotReady(string where)
+        {
+            if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
+            {
+                var unitId = ResolveUnitId(AdUnitType.RewardedVideo, where);
+                if (!string.IsNullOrEmpty(unitId))
+                    RequestRewardedInternal(unitId, where);
+                return;
+            }
+
+            RequestRewardedVideo();
+        }
+
         private void RequestInterstitialInternal(string unitId, string where)
         {
             LogAdTrace("request", AdUnitType.Interstitial, unitId, where);
@@ -517,8 +577,11 @@ namespace GameUpSDK
                         var code = error != null ? error.GetCode().ToString() : "unknown";
                         Debug.LogWarning("[GameUp] AdmobAds load_fail | type=Interstitial | where=" + Safe(where) + " | unitId=" + Safe(unitId) + " | code=" + code + " | message=" + source);
                         OnInterstitialLoadFailed?.Invoke(source);
+                        ScheduleInterstitialLoadRetry();
                         return;
                     }
+
+                    ResetInterstitialLoadRetry();
 
                     if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
                     {
@@ -553,8 +616,11 @@ namespace GameUpSDK
                         var code = error != null ? error.GetCode().ToString() : "unknown";
                         Debug.LogWarning("[GameUp] AdmobAds load_fail | type=RewardedVideo | where=" + Safe(where) + " | unitId=" + Safe(unitId) + " | code=" + code + " | message=" + source);
                         OnRewardedLoadFailed?.Invoke(source);
+                        ScheduleRewardedLoadRetry();
                         return;
                     }
+
+                    ResetRewardedLoadRetry();
 
                     if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
                     {
@@ -858,6 +924,7 @@ namespace GameUpSDK
                 {
                     LogAdTrace("show_fail", AdUnitType.Interstitial, ResolveUnitId(AdUnitType.Interstitial, where), where, "reason=not_ready");
                     onFail?.Invoke();
+                    RequestInterstitialAfterNotReady(where);
                     return;
                 }
 
@@ -873,6 +940,7 @@ namespace GameUpSDK
             {
                 LogAdTrace("show_fail", AdUnitType.Interstitial, GetSingleUnitId(AdUnitType.Interstitial), where, "reason=not_ready");
                 onFail?.Invoke();
+                RequestInterstitialAfterNotReady(where);
                 return;
             }
 
@@ -896,6 +964,7 @@ namespace GameUpSDK
                 {
                     LogAdTrace("show_fail", AdUnitType.RewardedVideo, ResolveUnitId(AdUnitType.RewardedVideo, where), where, "reason=not_ready");
                     onFail?.Invoke();
+                    RequestRewardedAfterNotReady(where);
                     return;
                 }
 
@@ -935,6 +1004,7 @@ namespace GameUpSDK
             {
                 LogAdTrace("show_fail", AdUnitType.RewardedVideo, GetSingleUnitId(AdUnitType.RewardedVideo), where, "reason=not_ready");
                 onFail?.Invoke();
+                RequestRewardedAfterNotReady(where);
                 return;
             }
 
@@ -1036,6 +1106,8 @@ namespace GameUpSDK
         private void OnDestroy()
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            CancelInvoke(nameof(RequestInterstitial));
+            CancelInvoke(nameof(RequestRewardedVideo));
             _bannerView?.Destroy();
             _interstitialAd?.Destroy();
             _rewardedAd?.Destroy();
