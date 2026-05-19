@@ -261,16 +261,14 @@ namespace GameUpSDK
                     Dictionary<string, AdapterStatus> map = initStatus.getAdapterStatusMap();
                     foreach (KeyValuePair<string, AdapterStatus> keyValuePair in map)
                     {
-                        string className = keyValuePair.Key;
                         AdapterStatus status = keyValuePair.Value;
-                        Debug.Log($"Adapter: {className} - status: {status.InitializationState} - latency: {status.Latency}");
-
-                        // Request ads ngay khi SDK sẵn sàng (tránh gọi RequestAll() trước khi init xong).
-                        RequestBanner();
-                        RequestInterstitial();
-                        RequestRewardedVideo();
-                        RequestAppOpenAds();
+                        Debug.Log($"Adapter: {status.Description} - status: {status.InitializationState} - latency: {status.Latency}");
                     }
+                    // Request ads ngay khi SDK sẵn sàng (tránh gọi RequestAll() trước khi init xong).
+                    RequestBanner();
+                    RequestInterstitial();
+                    RequestRewardedVideo();
+                    RequestAppOpenAds();
                 });
             });
 #else
