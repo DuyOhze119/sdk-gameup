@@ -355,6 +355,29 @@ namespace GameUpSDK
             Debug.Log("[GameUp] AdsManager LogAdsEventManager: " + eventName + " | adType=" + adType + " | placement=" + placement + " | failReason=" + failReason);
         }
 
+        private static void LogAppMetricaVideoAdsAvailableOnRequest(string adType, string where, bool isReady)
+        {
+            string placement = VideoAdsAppMetricaTracker.NormalizePlacement(where);
+            bool connection = VideoAdsAppMetricaTracker.HasInternetConnection();
+            string result = isReady ? AppMetricaEvent.ResultSuccess : AppMetricaEvent.ResultNotAvailable;
+            GameUpAnalytics.LogVideoAdsAvailable(adType, placement, result, connection);
+            VideoAdsAppMetricaTracker.BeginShowSession(placement, adType, isReady);
+        }
+
+        private static void LogAppMetricaVideoAdsStartedOnShow(string adType, string where, string result)
+        {
+            string placement = VideoAdsAppMetricaTracker.NormalizePlacement(where);
+            bool connection = VideoAdsAppMetricaTracker.HasInternetConnection();
+            GameUpAnalytics.LogVideoAdsStarted(adType, placement, result, connection);
+        }
+
+        private static void LogAppMetricaVideoAdsWatchOnEnd(string adType, string where, string result)
+        {
+            string placement = VideoAdsAppMetricaTracker.NormalizePlacement(where);
+            bool connection = VideoAdsAppMetricaTracker.HasInternetConnection();
+            GameUpAnalytics.LogVideoAdsWatch(adType, placement, result, connection);
+        }
+
         private static string BuildShowFailExceptionReason(Exception exception)
         {
             if (exception == null)
@@ -562,7 +585,9 @@ namespace GameUpSDK
                     return placementAware.IsInterstitialAvailable(where);
                 return a.IsInterstitialAvailable();
             });
-            if (network == null)
+            bool isReady = network != null;
+            LogAppMetricaVideoAdsAvailableOnRequest(AppMetricaEvent.AdTypeInterstitial, where, isReady);
+            if (!isReady)
             {
                 Debug.Log("[GameUp] AdsManager ShowInterstitial: no network available.");
                 LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeInterstitial, where, "network_null");
@@ -574,18 +599,26 @@ namespace GameUpSDK
             try
             {
                 LogAdsEvent(AdsEvent.InterShow, where, null, AdsEvent.AfInterShow);
+                LogAppMetricaVideoAdsStartedOnShow(AppMetricaEvent.AdTypeInterstitial, where, AppMetricaEvent.ResultStart);
                 Action wrappedSuccess = () =>
                 {
                     AdsRules.RecordInterstitialShown();
                     LogAdsEventWithLevel(AdsEvent.InterShowComplete, where, currentLevel, AdsEvent.AfInterDisplayed);
+                    LogAppMetricaVideoAdsWatchOnEnd(AppMetricaEvent.AdTypeInterstitial, where, AppMetricaEvent.ResultWatched);
                     onSuccess?.Invoke();
                 };
-                network.ShowInterstitial(where, wrappedSuccess, onFail);
+                Action wrappedFail = () =>
+                {
+                    LogAppMetricaVideoAdsWatchOnEnd(AppMetricaEvent.AdTypeInterstitial, where, AppMetricaEvent.ResultFailed);
+                    onFail?.Invoke();
+                };
+                network.ShowInterstitial(where, wrappedSuccess, wrappedFail);
             }
             catch (Exception e)
             {
                 Debug.LogError("[GameUp] AdsManager ShowInterstitial: " + e);
                 LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeInterstitial, where, BuildShowFailExceptionReason(e));
+                LogAppMetricaVideoAdsStartedOnShow(AppMetricaEvent.AdTypeInterstitial, where, AppMetricaEvent.ResultFailed);
                 onFail?.Invoke();
             }
         }
@@ -611,7 +644,9 @@ namespace GameUpSDK
                     return placementAware.IsRewardedVideoAvailable(where);
                 return a.IsRewardedVideoAvailable();
             });
-            if (network == null)
+            bool isReady = network != null;
+            LogAppMetricaVideoAdsAvailableOnRequest(AppMetricaEvent.AdTypeRewarded, where, isReady);
+            if (!isReady)
             {
                 Debug.Log("[GameUp] AdsManager ShowRewardedVideo: no ads available.");
                 LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeRewardedVideo, where, "no_ads_available");
@@ -623,15 +658,18 @@ namespace GameUpSDK
             try
             {
                 LogAdsEvent(AdsEvent.RewardShow, where, null, AdsEvent.AfRewardShow);
+                LogAppMetricaVideoAdsStartedOnShow(AppMetricaEvent.AdTypeRewarded, where, AppMetricaEvent.ResultStart);
                 Action wrappedSuccess = () =>
                 {
                     LogAdsEventWithLevel(AdsEvent.RewardShowComplete, where, currentLevel, AdsEvent.AfRewardDisplayed);
+                    LogAppMetricaVideoAdsWatchOnEnd(AppMetricaEvent.AdTypeRewarded, where, AppMetricaEvent.ResultWatched);
                     onSuccess?.Invoke();
                 };
                 // onFail khi không có network, display failed, hoặc user thoát quảng cáo không xem hết (không nhận reward)
                 Action wrappedFail = () =>
                 {
                     LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeRewardedVideo, where);
+                    LogAppMetricaVideoAdsWatchOnEnd(AppMetricaEvent.AdTypeRewarded, where, AppMetricaEvent.ResultCanceled);
                     onFail?.Invoke();
                 };
                 network.ShowRewardedVideo(where, wrappedSuccess, wrappedFail);
@@ -640,6 +678,7 @@ namespace GameUpSDK
             {
                 Debug.LogError("[GameUp] AdsManager ShowRewardedVideo: " + e);
                 LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeRewardedVideo, where, BuildShowFailExceptionReason(e));
+                LogAppMetricaVideoAdsStartedOnShow(AppMetricaEvent.AdTypeRewarded, where, AppMetricaEvent.ResultFailed);
                 onFail?.Invoke();
             }
         }

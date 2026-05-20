@@ -14,7 +14,7 @@ using Facebook.Unity;
 namespace GameUpSDK
 {
     /// <summary>
-    /// Game analytics: Firebase và/hoặc AppsFlyer (MMP). GameAnalytics: progression (Start / Complete / Fail) theo
+    /// Game analytics: Firebase, AppsFlyer (MMP), AppMetrica (tùy chọn), GameAnalytics progression (Start / Complete / Fail) theo
     /// <see href="https://docs.gameanalytics.com/event-tracking-and-integrations/sdks-and-collection-api/game-engine-sdks/unity/event-tracking">GA Unity — Progression events</see>
     /// (world <c>main</c> → level → wave). Cần init GameAnalytics + keys trong scene.
     /// </summary>
@@ -63,50 +63,119 @@ namespace GameUpSDK
             AppsFlyerUtils.LogEvents(eventName, eventValues);
         }
 
+        private static void LogAppMetrica(string eventName, Dictionary<string, string> parameters = null)
+        {
+            if (string.IsNullOrEmpty(eventName)) return;
+            AppMetricaUtils.LogEvent(eventName, parameters);
+        }
+
+        private static void LogAppMetrica(string eventName, string paramName, string paramValue)
+        {
+            if (string.IsNullOrEmpty(eventName)) return;
+            Dictionary<string, string> p = null;
+            if (!string.IsNullOrEmpty(paramName))
+                p = new Dictionary<string, string> { [paramName] = paramValue ?? "" };
+            AppMetricaUtils.LogEvent(eventName, p);
+        }
+
+        private static Dictionary<string, string> BuildVideoAdsParams(
+            string adType,
+            string placement,
+            string result,
+            bool hasConnection)
+        {
+            var p = new Dictionary<string, string>
+            {
+                [AppMetricaEvent.ParamAdType] = adType ?? "",
+                [AppMetricaEvent.ParamPlacement] = placement ?? "",
+                [AppMetricaEvent.ParamResult] = result ?? "",
+                [AppMetricaEvent.ParamConnection] = hasConnection ? "true" : "false"
+            };
+            return p;
+        }
+
+        /// <summary>AppMetrica: video_ads_available — mỗi lần user request show (IDLE spec).</summary>
+        public static void LogVideoAdsAvailable(string adType, string placement, string result, bool hasConnection)
+        {
+            if (!VideoAdsAppMetricaTracker.ShouldSendAvailable(placement, adType, result)) return;
+            LogAppMetrica(AppMetricaEvent.VideoAdsAvailable,
+                BuildVideoAdsParams(adType, placement, result, hasConnection));
+        }
+
+        /// <summary>AppMetrica: video_ads_started — khi ad bắt đầu hiển thị (chỉ sau available success).</summary>
+        public static void LogVideoAdsStarted(string adType, string placement, string result, bool hasConnection)
+        {
+            if (!VideoAdsAppMetricaTracker.CanSendStarted(placement, adType)) return;
+            LogAppMetrica(AppMetricaEvent.VideoAdsStarted,
+                BuildVideoAdsParams(adType, placement, result, hasConnection));
+        }
+
+        /// <summary>AppMetrica: video_ads_watch — sau khi ad kết thúc (watched / canceled / failed).</summary>
+        public static void LogVideoAdsWatch(string adType, string placement, string result, bool hasConnection)
+        {
+            LogAppMetrica(AppMetricaEvent.VideoAdsWatch,
+                BuildVideoAdsParams(adType, placement, result, hasConnection));
+            VideoAdsAppMetricaTracker.ClearSession();
+        }
+
         // ---------- Firebase: Virtual currency ----------
 
         /// <summary> start_level_1 - khi bắt đầu level 1 </summary>
         public static void LogStartLevel1()
         {
             LogFirebase(AnalyticsEvent.StartLevel1);
+            LogAppMetrica(AnalyticsEvent.StartLevel1);
             LogGameAnalyticsProgression(GaProgressionStatus.Start, 1, GaWholeLevelWave);
         }
 
         public static void LogCompleteLevel1()
         {
             LogFirebase(AnalyticsEvent.CompleteLevel1);
+            LogAppMetrica(AnalyticsEvent.CompleteLevel1);
             LogGameAnalyticsProgression(GaProgressionStatus.Complete, 1, GaWholeLevelWave);
         }
 
         /// <summary> earn_virtual_currency: virtual_currency_name, value, source </summary>
         public static void LogEarnVirtualCurrency(string virtualCurrencyName, string value, string source)
         {
-            LogFirebaseParams(AnalyticsEvent.EarnVirtualCurrency, new Dictionary<string, string>
+            var p = new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamVirtualCurrencyName] = virtualCurrencyName ?? "",
                 [AnalyticsEvent.ParamValue] = value ?? "",
                 [AnalyticsEvent.ParamSource] = source ?? ""
-            });
+            };
+            LogFirebaseParams(AnalyticsEvent.EarnVirtualCurrency, p);
+            LogAppMetrica(AnalyticsEvent.EarnVirtualCurrency, p);
         }
 
         /// <summary> spend_virtual_currency: virtual_currency_name, value, source </summary>
         public static void LogSpendVirtualCurrency(string virtualCurrencyName, string value, string source)
         {
-            LogFirebaseParams(AnalyticsEvent.SpendVirtualCurrency, new Dictionary<string, string>
+            var p = new Dictionary<string, string>
             {
                 [AnalyticsEvent.ParamVirtualCurrencyName] = virtualCurrencyName ?? "",
                 [AnalyticsEvent.ParamValue] = value ?? "",
                 [AnalyticsEvent.ParamSource] = source ?? ""
-            });
+            };
+            LogFirebaseParams(AnalyticsEvent.SpendVirtualCurrency, p);
+            LogAppMetrica(AnalyticsEvent.SpendVirtualCurrency, p);
         }
 
         // ---------- Firebase: Loading ----------
 
         /// <summary> start_loading - khi bắt đầu loading </summary>
-        public static void LogStartLoading() => LogFirebase(AnalyticsEvent.StartLoading);
+        public static void LogStartLoading()
+        {
+            LogFirebase(AnalyticsEvent.StartLoading);
+            LogAppMetrica(AnalyticsEvent.StartLoading);
+        }
 
         /// <summary> complete_loading - khi hoàn thành loading, vào màn hình home </summary>
-        public static void LogCompleteLoading() => LogFirebase(AnalyticsEvent.CompleteLoading);
+        public static void LogCompleteLoading()
+        {
+            LogFirebase(AnalyticsEvent.CompleteLoading);
+            LogAppMetrica(AnalyticsEvent.CompleteLoading);
+        }
 
         // ---------- Level (Firebase + AppsFlyer af_level_achieved - chung mục đích) ----------
 
@@ -119,6 +188,8 @@ namespace GameUpSDK
                 [AnalyticsEvent.ParamIndex] = index.ToString()
             };
             LogFirebaseParams(AnalyticsEvent.LevelStart, p);
+            LogAppMetrica(AppMetricaEvent.LevelStart, p);
+            AppMetricaUtils.SendEventsBuffer();
             LogGameAnalyticsProgression(GaProgressionStatus.Start, level, GaWholeLevelWave, stringFields: p);
         }
 
@@ -132,6 +203,7 @@ namespace GameUpSDK
                 [AnalyticsEvent.ParamTime] = timeSeconds.ToString("F0")
             };
             LogFirebaseParams(AnalyticsEvent.LevelFail, p);
+            LogAppMetrica(AnalyticsEvent.LevelFail, p);
             LogGameAnalyticsProgression(GaProgressionStatus.Fail, level, GaWholeLevelWave, stringFields: p);
         }
 
@@ -145,6 +217,9 @@ namespace GameUpSDK
                 [AnalyticsEvent.ParamTime] = timeSeconds.ToString("F0")
             };
             LogFirebaseParams(AnalyticsEvent.LevelComplete, fb);
+            LogAppMetrica(AnalyticsEvent.LevelComplete, fb);
+            LogAppMetrica(AppMetricaEvent.LevelFinish, fb);
+            AppMetricaUtils.SendEventsBuffer();
 
             var af = new Dictionary<string, string> { [AnalyticsEvent.ParamAfLevel] = level.ToString() };
             if (score.HasValue) af[AnalyticsEvent.ParamAfScore] = score.Value.ToString();
@@ -161,7 +236,11 @@ namespace GameUpSDK
         // ---------- Firebase: Button ----------
 
         /// <summary> button_click: source (tên button, bao gồm vị trí) </summary>
-        public static void LogButtonClick(string source) => LogFirebase(AnalyticsEvent.ButtonClick, AnalyticsEvent.ParamSource, source ?? "");
+        public static void LogButtonClick(string source)
+        {
+            LogFirebase(AnalyticsEvent.ButtonClick, AnalyticsEvent.ParamSource, source ?? "");
+            LogAppMetrica(AnalyticsEvent.ButtonClick, AnalyticsEvent.ParamSource, source ?? "");
+        }
 
         // ---------- Firebase: Wave ----------
 
@@ -174,6 +253,7 @@ namespace GameUpSDK
                 [AnalyticsEvent.ParamWave] = wave.ToString()
             };
             LogFirebaseParams(AnalyticsEvent.WaveStart, p);
+            LogAppMetrica(AnalyticsEvent.WaveStart, p);
             LogGameAnalyticsProgression(GaProgressionStatus.Start, level, wave, stringFields: p);
         }
 
@@ -186,6 +266,7 @@ namespace GameUpSDK
                 [AnalyticsEvent.ParamWave] = wave.ToString()
             };
             LogFirebaseParams(AnalyticsEvent.WaveFail, p);
+            LogAppMetrica(AnalyticsEvent.WaveFail, p);
             LogGameAnalyticsProgression(GaProgressionStatus.Fail, level, wave, stringFields: p);
         }
 
@@ -198,6 +279,7 @@ namespace GameUpSDK
                 [AnalyticsEvent.ParamWave] = wave.ToString()
             };
             LogFirebaseParams(AnalyticsEvent.WaveComplete, p);
+            LogAppMetrica(AnalyticsEvent.WaveComplete, p);
             LogGameAnalyticsProgression(GaProgressionStatus.Complete, level, wave, stringFields: p);
         }
 
@@ -256,6 +338,8 @@ namespace GameUpSDK
             if (!string.IsNullOrEmpty(customerUserId)) firebaseParams[AnalyticsEvent.ParamAfCustomerUserId] = customerUserId;
             if (level.HasValue) firebaseParams[AnalyticsEvent.ParamLevel] = level.Value.ToString();
             LogFirebaseParams(AnalyticsEvent.AfPurchase, firebaseParams);
+            AppMetricaUtils.LogAfPurchaseEvent(afParams);
+            AppMetricaUtils.LogPurchaseRevenue(normalizedCurrency, quantity, contentId, purchasePrice, orderId, level);
 
 #if FACEBOOK_DEPENDENCIES_INSTALLED && !UNITY_EDITOR && (UNITY_ANDROID || UNITY_IOS)
             if (!FacebookSdkBootstrap.IsInitialized)
@@ -375,6 +459,7 @@ namespace GameUpSDK
 
             AppsFlyerUtils.LogAdRevenue(adRevenueData, adRevenueParams.Count > 0 ? adRevenueParams : null);
 #endif
+            AppMetricaUtils.LogAdRevenue(data);
             Debug.Log($"[GameUpAnalytics] Logged Ad Revenue: {revenue} {currency}, network: {adNetwork}");
         }
     }

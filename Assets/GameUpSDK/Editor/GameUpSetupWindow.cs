@@ -138,6 +138,7 @@ namespace GameUpSDK.Editor
         // Appmetrica
         private string _appmetricaApikey = "";
         private bool _appmetricaEnbaleLogs = false;
+        private bool _appmetricaEnableEventLogging = true;
 
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
         // IronSource
@@ -660,7 +661,11 @@ namespace GameUpSDK.Editor
         {
             EditorGUILayout.LabelField("Appmetrica", EditorStyles.boldLabel);
             _appmetricaApikey = EditorGUILayout.TextField("API Key", _appmetricaApikey);
-            _appmetricaEnbaleLogs = EditorGUILayout.Toggle("Debug Mode", _appmetricaEnbaleLogs);
+            _appmetricaEnableEventLogging = EditorGUILayout.Toggle("Send game events", _appmetricaEnableEventLogging);
+            EditorGUILayout.HelpBox(
+                "Send game events: gửi level/wave/IAP/ad revenue qua GameUpAnalytics → AppMetrica (ReportEvent / ReportRevenue / ReportAdRevenue).",
+                MessageType.None);
+            _appmetricaEnbaleLogs = EditorGUILayout.Toggle("SDK debug logs", _appmetricaEnbaleLogs);
         }
 
         // ---- GAME ANALYTICS (RESTORED TO 100%) ----
@@ -1197,6 +1202,7 @@ namespace GameUpSDK.Editor
             var so = new SerializedObject(comp);
             _appmetricaApikey = so.FindProperty("apiKey")?.stringValue ?? "";
             _appmetricaEnbaleLogs = so.FindProperty("enableLogs")?.boolValue ?? false;
+            _appmetricaEnableEventLogging = so.FindProperty("enableEventLogging")?.boolValue ?? true;
             return true;
         }
 
@@ -1466,6 +1472,7 @@ namespace GameUpSDK.Editor
             var so = new SerializedObject(comp);
             Set(so, "apiKey", _appmetricaApikey);
             SetBool(so, "enableLogs", _appmetricaEnbaleLogs);
+            SetBool(so, "enableEventLogging", _appmetricaEnableEventLogging);
             so.ApplyModifiedPropertiesWithoutUndo();
             PrefabUtility.RecordPrefabInstancePropertyModifications(comp);
             return true;
@@ -1562,6 +1569,7 @@ namespace GameUpSDK.Editor
             TrySaveMaxPrefabAsset(errors);
 #endif
             TrySaveAdMobPrefabAsset(errors);
+            TrySaveAppmetricaPrefabAsset(errors);
             AssetDatabase.SaveAssets();
         }
 
@@ -1667,6 +1675,27 @@ namespace GameUpSDK.Editor
             }
         }
 #endif
+
+        private void TrySaveAppmetricaPrefabAsset(List<string> errors)
+        {
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(PathAppmetrica) == null) return;
+            var root = PrefabUtility.LoadPrefabContents(PathAppmetrica);
+            try
+            {
+                var comp = root.GetComponent<AppMetricaActivator>();
+                if (comp == null) return;
+                var so = new SerializedObject(comp);
+                Set(so, "apiKey", _appmetricaApikey);
+                SetBool(so, "enableLogs", _appmetricaEnbaleLogs);
+                SetBool(so, "enableEventLogging", _appmetricaEnableEventLogging);
+                so.ApplyModifiedPropertiesWithoutUndo();
+                PrefabUtility.SaveAsPrefabAsset(root, PathAppmetrica);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
 
         private void TrySaveAdMobPrefabAsset(List<string> errors)
         {
