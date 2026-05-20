@@ -51,6 +51,9 @@ namespace GameUpSDK
         [SerializeField] private string nativeAdUnitIdAndroid;
         [SerializeField] private string nativeAdUnitIdIOS;
         
+        [Header("Test Device")]
+        [SerializeField] private List<string> testDevices;
+        
         public int OrderExecute { get; set; }
 
         public event Action OnInterstitialLoaded;
@@ -256,6 +259,13 @@ namespace GameUpSDK
                 return;
             }
 
+            List<String> testDeviceIds = new List<string>();
+            RequestConfiguration configuration = new RequestConfiguration
+            {
+                TestDeviceIds = testDeviceIds,
+            };
+            MobileAds.SetRequestConfiguration(configuration);
+            
             MobileAds.Initialize(initStatus =>
             {
                 MobileAdsEventExecutor.ExecuteInUpdate(() =>
