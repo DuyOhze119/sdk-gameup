@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "740133822101",
+    "project_id": "backpack-tower-defense",
+    "storage_bucket": "backpack-tower-defense.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:740133822101:android:a359d3eb9f241b428d059c",
+        "android_client_info": {
+          "package_name": "com.gu.backpack.towerdefense"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBLCe1RJLrDlsYaC_p1DPdE6FoeD_GniBM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
