@@ -587,17 +587,34 @@ namespace GameUpSDK
         public void RequestInterstitial() { }
         public void RequestRewardedVideo() { }
         public void RequestAppOpenAds() { }
+        public void RequestNativeAd()
+        {
+        }
+
         public bool IsBannerAvailable() => false;
         public bool IsCollapsibleBannerAvailable() => false;
         public bool IsInterstitialAvailable() => false;
         public bool IsRewardedVideoAvailable() => false;
         public bool IsAppOpenAdsAvailable() => false;
+        public bool IsNativeAdAvailable()
+        {
+            return false;
+        }
+
         public void ShowBanner(string where) { }
         public void ShowCollapsibleBanner(string where, CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom) { }
         public void HideBanner(string where) { }
         public void ShowInterstitial(string where, Action onSuccess, Action onFail) => onFail?.Invoke();
         public void ShowRewardedVideo(string where, Action onSuccess, Action onFail) => onFail?.Invoke();
         public void ShowAppOpenAds(string where, Action onSuccess, Action onFail) => onFail?.Invoke();
+        public void ShowNativeAd(string where, Action onSuccess, Action onFail)
+        {
+            onFail?.Invoke();
+        }
+
+        public void HideNativeAd(string where)
+        {
+        }
 #endif
 
         bool IPlacementAwareAds.IsBannerAvailable(string where)
