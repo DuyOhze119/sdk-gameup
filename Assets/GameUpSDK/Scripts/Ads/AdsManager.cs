@@ -793,6 +793,7 @@ namespace GameUpSDK
                     LogAdsEvent(AdsEvent.RewardStartLoad, null, null);
                     ad.RequestRewardedVideo();
                     ad.RequestAppOpenAds();
+                    ad.RequestNativeAd();
                 }
                 catch (Exception e)
                 {

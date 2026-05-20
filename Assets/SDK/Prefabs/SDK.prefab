@@ -313,6 +313,22 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 2771652189409630104}
     m_Modifications:
+    - target: {fileID: 64426498629635161, guid: b4a19724631194efab514a96f4c1ec3e, type: 3}
+      propertyPath: sdkKey
+      value: abc
+      objectReference: {fileID: 0}
+    - target: {fileID: 64426498629635161, guid: b4a19724631194efab514a96f4c1ec3e, type: 3}
+      propertyPath: bannerAdUnitIdAndroid
+      value: abcasasdasdas
+      objectReference: {fileID: 0}
+    - target: {fileID: 64426498629635161, guid: b4a19724631194efab514a96f4c1ec3e, type: 3}
+      propertyPath: rewardedAdUnitIdAndroid
+      value: abcas
+      objectReference: {fileID: 0}
+    - target: {fileID: 64426498629635161, guid: b4a19724631194efab514a96f4c1ec3e, type: 3}
+      propertyPath: interstitialAdUnitIdAndroid
+      value: abcasasd
+      objectReference: {fileID: 0}
     - target: {fileID: 6548062604066111936, guid: b4a19724631194efab514a96f4c1ec3e, type: 3}
       propertyPath: m_Name
       value: MaxAds
@@ -448,6 +464,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 2771652189409630104}
     m_Modifications:
+    - target: {fileID: 1377681042000036482, guid: d7583edcde6f1ed429611699b3c73856, type: 3}
+      propertyPath: devKey
+      value: "\u01B0qeq\u01B0ew"
+      objectReference: {fileID: 0}
     - target: {fileID: 5458321834648806955, guid: d7583edcde6f1ed429611699b3c73856, type: 3}
       propertyPath: m_Name
       value: AppsFlyerObject
@@ -553,6 +573,22 @@ PrefabInstance:
     - target: {fileID: 5654628865999889945, guid: d1ada41b073285c4f93b0f660f181616, type: 3}
       propertyPath: bannerAdUnitId
       value: 111
+      objectReference: {fileID: 0}
+    - target: {fileID: 5654628865999889945, guid: d1ada41b073285c4f93b0f660f181616, type: 3}
+      propertyPath: bannerAdUnitIdAndroid
+      value: ca-app-pub-5834708693511951/8624092135
+      objectReference: {fileID: 0}
+    - target: {fileID: 5654628865999889945, guid: d1ada41b073285c4f93b0f660f181616, type: 3}
+      propertyPath: appOpenAdUnitIdAndroid
+      value: ca-app-pub-5834708693511951/8419896167
+      objectReference: {fileID: 0}
+    - target: {fileID: 5654628865999889945, guid: d1ada41b073285c4f93b0f660f181616, type: 3}
+      propertyPath: rewardedAdUnitIdAndroid
+      value: ca-app-pub-5834708693511951/6254047265
+      objectReference: {fileID: 0}
+    - target: {fileID: 5654628865999889945, guid: d1ada41b073285c4f93b0f660f181616, type: 3}
+      propertyPath: interstitialAdUnitIdAndroid
+      value: ca-app-pub-5834708693511951/4665633428
       objectReference: {fileID: 0}
     - target: {fileID: 6167818056696631135, guid: d1ada41b073285c4f93b0f660f181616, type: 3}
       propertyPath: m_Name

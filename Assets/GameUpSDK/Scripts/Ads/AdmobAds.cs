@@ -281,6 +281,7 @@ namespace GameUpSDK
                     }
                     RequestAppOpenAds();
                     RequestBanner();
+                    RequestNativeAd();
                     RequestInterstitial();
                     RequestRewardedVideo();
                 });
@@ -634,11 +635,6 @@ namespace GameUpSDK
             if (ad != null)
             {
                 Debug.Log("Rendering Native Overlay ad.");
-
-                var scale = MobileAds.Utils.GetDeviceScale();
-                var widthDp = (int)(Screen.width / scale);
-                var heightDp = (int)(Screen.height / scale);
-                var fullScreenSize = new AdSize(widthDp, heightDp);
                 
                 // Define a native template style with a custom style.
                 var style = new NativeTemplateStyle
@@ -654,7 +650,7 @@ namespace GameUpSDK
                     }
                 };
                 
-                ad.RenderTemplate(style, fullScreenSize, AdPosition.Center);
+                ad.RenderTemplate(style, AdSize.Leaderboard, AdPosition.Center);
             }
         }
 #endif

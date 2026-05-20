@@ -150,6 +150,20 @@ namespace GameUpSDK
                     onRqFail: () => LogStatus("App Open Ad chưa được tải xong.")
                 );
             }
+            
+            GUILayout.Box("6. Native Ad", GUILayout.ExpandWidth(true));
+
+            if (GUILayout.Button("Show Native Ad", GUILayout.Height(35)))
+            {
+                LogStatus("Yêu cầu hiển thị Native Ad...");
+                
+                AdsManager.Instance.ShowNativeAd(
+                    where: "resume_app",
+                    onSuccess: () => LogStatus("Đã đóng Native Ad -> Tiếp tục game."),
+                    onFail: () => LogStatus("Hiển thị Native Ad lỗi hoặc hết hạn (4 tiếng)."),
+                    onRqFail: () => LogStatus("Native Ad chưa được tải xong.")
+                );
+            }
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
