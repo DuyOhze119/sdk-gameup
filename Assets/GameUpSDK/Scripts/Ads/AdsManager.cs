@@ -698,6 +698,8 @@ namespace GameUpSDK
                 LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeNativeAd, where, "network_null");
                 onRqFail?.Invoke();
                 onFail?.Invoke();
+                
+                _ads.ForEach(s => s.RequestNativeAd()); 
                 return;
             }
             LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeNativeAd, where);

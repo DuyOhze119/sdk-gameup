@@ -269,11 +269,10 @@ namespace GameUpSDK
                         AdapterStatus status = keyValuePair.Value;
                         Debug.Log($"Adapter: {status.Description} - status: {status.InitializationState} - latency: {status.Latency}");
                     }
-                    // Request ads ngay khi SDK sẵn sàng (tránh gọi RequestAll() trước khi init xong).
+                    RequestAppOpenAds();
                     RequestBanner();
                     RequestInterstitial();
                     RequestRewardedVideo();
-                    RequestAppOpenAds();
                 });
             });
 #else
