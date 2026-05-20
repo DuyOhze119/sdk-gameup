@@ -203,12 +203,19 @@ namespace GameUpSDK
         public void RequestInterstitial() { _interstitialAd?.LoadAd(); }
         public void RequestRewardedVideo() { _rewardedAd?.LoadAd(); }
         public void RequestAppOpenAds() { }
+        public void RequestNativeAd()
+        {
+        }
 
         public bool IsBannerAvailable() => _bannerAd != null && _bannerLoaded;
         public bool IsCollapsibleBannerAvailable() => false;
         public bool IsInterstitialAvailable() => _interstitialAd != null && _interstitialAd.IsAdReady();
         public bool IsRewardedVideoAvailable() => _rewardedAd != null && _rewardedAd.IsAdReady();
         public bool IsAppOpenAdsAvailable() => false;
+        public bool IsNativeAdAvailable()
+        {
+            return false;
+        }
 
         public void ShowBanner(string where)
         {
@@ -310,6 +317,14 @@ namespace GameUpSDK
         {
             Debug.Log("[CtySDK] UnityAds ShowAppOpenAds: not supported by LevelPlay.");
             onFail?.Invoke();
+        }
+
+        public void ShowNativeAd(string where, Action onSuccess, Action onFail)
+        {
+        }
+
+        public void HideNativeAd(string where)
+        {
         }
 
         private void OnDestroy()

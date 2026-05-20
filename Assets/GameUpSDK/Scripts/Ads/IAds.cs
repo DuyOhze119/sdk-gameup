@@ -14,7 +14,8 @@ namespace GameUpSDK
         Banner,
         Interstitial,
         RewardedVideo,
-        AppOpen
+        AppOpen,
+        NativeAd
     }
 
     /// <summary>
@@ -52,6 +53,7 @@ namespace GameUpSDK
         bool IsInterstitialAvailable(string where);
         bool IsRewardedVideoAvailable(string where);
         bool IsAppOpenAdsAvailable(string where);
+        bool IsNativeAdAvailable(string where);
     }
 
     /// <summary>

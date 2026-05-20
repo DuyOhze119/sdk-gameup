@@ -78,8 +78,8 @@ namespace GameUpSDK
             DontDestroyOnLoad(gameObject);
             CollectAdsFromChildren();
             BuildAdsList();
-            Initialize();
             PrivacyManager.Instance.BeginPrivacyFlow(SetAfterCheckGDPR);
+            Initialize();
         }
 
         /// <summary>
@@ -719,6 +719,47 @@ namespace GameUpSDK
             {
                 Debug.LogError("[GameUp] AdsManager ShowAppOpenAds: " + e);
                 LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeAppOpen, where, BuildShowFailExceptionReason(e));
+                onFail?.Invoke();
+            }
+        }
+
+        public void ShowNativeAd(string where, Action onSuccess = null, Action onFail = null, Action onRqFail = null)
+        {
+            LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeNativeAd, where);
+            var network = _ads.FirstOrDefault(a =>
+            {
+                if (a is IPlacementAwareAds placementAware)
+                    return placementAware.IsNativeAdAvailable(where);
+                return a.IsNativeAdAvailable();
+            });
+            if (network == null)
+            {
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeNativeAd, where, "network_null");
+                onRqFail?.Invoke();
+                onFail?.Invoke();
+                
+                _ads.ForEach(s => s.RequestNativeAd()); 
+                return;
+            }
+            LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeNativeAd, where);
+            try
+            {
+                network.ShowNativeAd(where,
+                    () =>
+                    {
+                        LogAdsEventManager(AdsEvent.AdsShowSuccess, AdsEvent.AdTypeNativeAd, where);
+                        onSuccess?.Invoke();
+                    },
+                    () =>
+                    {
+                        LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeNativeAd, where);
+                        onFail?.Invoke();
+                    });
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[GameUp] AdsManager Native: " + e);
+                LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeNativeAd, where, BuildShowFailExceptionReason(e));
                 onFail?.Invoke();
             }
         }

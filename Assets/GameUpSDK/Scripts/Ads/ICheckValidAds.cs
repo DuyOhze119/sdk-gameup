@@ -10,5 +10,6 @@ namespace GameUpSDK
         bool IsInterstitialAvailable();
         bool IsRewardedVideoAvailable();
         bool IsAppOpenAdsAvailable();
+        bool IsNativeAdAvailable();
     }
 }

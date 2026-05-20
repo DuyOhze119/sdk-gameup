@@ -13,5 +13,7 @@ namespace GameUpSDK
         void ShowInterstitial(string where, Action onSuccess, Action onFail);
         void ShowRewardedVideo(string where, Action onSuccess, Action onFail);
         void ShowAppOpenAds(string where, Action onSuccess, Action onFail);
+        void ShowNativeAd(string where, Action onSuccess, Action onFail);
+        void HideNativeAd(string where);
     }
 }

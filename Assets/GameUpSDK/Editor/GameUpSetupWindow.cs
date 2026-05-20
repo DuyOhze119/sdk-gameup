@@ -930,6 +930,7 @@ namespace GameUpSDK.Editor
                     GetSelectedAdmobInterstitialId()));
                 SetSelectedAdmobRewardedId(EditorGUILayout.TextField("Rewarded ID", GetSelectedAdmobRewardedId()));
                 SetSelectedAdmobAppOpenId(EditorGUILayout.TextField("App Open ID", GetSelectedAdmobAppOpenId()));
+                SetSelectedAdmobNativeAdId(EditorGUILayout.TextField("Native Ad ID", GetSelectedAdmobNativeAdId()));
             }
 
             _googleMobileAdsAndroidAppId = EditorGUILayout.TextField("Android App ID", _googleMobileAdsAndroidAppId);
@@ -1011,6 +1012,10 @@ namespace GameUpSDK.Editor
         private string GetSelectedAdmobAppOpenId() => _admobEditorPlatform == AdMobIdEditorPlatform.Android
             ? _admobAppOpenIdAndroid
             : _admobAppOpenIdIOS;
+        
+        private string GetSelectedAdmobNativeAdId() => _admobEditorPlatform == AdMobIdEditorPlatform.Android
+            ? _admobNativeAdIdAndroid
+            : _admobNativeAdIdIOS;
 
         private void SetSelectedAdmobBannerId(string val)
         {
@@ -1034,6 +1039,12 @@ namespace GameUpSDK.Editor
         {
             if (_admobEditorPlatform == AdMobIdEditorPlatform.Android) _admobAppOpenIdAndroid = val;
             else _admobAppOpenIdIOS = val;
+        } 
+        
+        private void SetSelectedAdmobNativeAdId(string val)
+        {
+            if (_admobEditorPlatform == AdMobIdEditorPlatform.Android) _admobNativeAdIdAndroid = val;
+            else _admobNativeAdIdIOS = val;
         }
 
         private List<GameUpSDK.AdUnitIdEntry> GetSelectedAdmobAdUnitIdList() =>
@@ -1870,6 +1881,8 @@ namespace GameUpSDK.Editor
         }
 #endif
 
+        private string _admobNativeAdIdAndroid;
+        private string _admobNativeAdIdIOS;
         private void AssignAdmobSingleIds(SerializedObject so)
         {
             Assign(so, "bannerAdUnitIdAndroid", ref _admobBannerIdAndroid);
@@ -1880,6 +1893,8 @@ namespace GameUpSDK.Editor
             Assign(so, "interstitialAdUnitIdIOS", ref _admobInterstitialIdIOS);
             Assign(so, "rewardedAdUnitIdIOS", ref _admobRewardedIdIOS);
             Assign(so, "appOpenAdUnitIdIOS", ref _admobAppOpenIdIOS);
+            Assign(so, "nativeAdUnitIdAndroid", ref _admobNativeAdIdAndroid);
+            Assign(so, "nativeAdUnitIdIOS", ref _admobNativeAdIdIOS);
         }
 
         private void SetAdmobSingleIds(SerializedObject so)
@@ -1892,6 +1907,8 @@ namespace GameUpSDK.Editor
             Set(so, "interstitialAdUnitIdIOS", _admobInterstitialIdIOS);
             Set(so, "rewardedAdUnitIdIOS", _admobRewardedIdIOS);
             Set(so, "appOpenAdUnitIdIOS", _admobAppOpenIdIOS);
+            Assign(so, "nativeAdUnitIdAndroid", ref _admobNativeAdIdAndroid);
+            Assign(so, "nativeAdUnitIdIOS", ref _admobNativeAdIdIOS);
         }
 
         private void AssignAdmobMultiIds(SerializedObject so)

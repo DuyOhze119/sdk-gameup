@@ -384,12 +384,19 @@ namespace GameUpSDK
             _rewardedAd?.LoadAd();
         }
         public void RequestAppOpenAds() { }
+        public void RequestNativeAd()
+        {
+        }
 
         public bool IsBannerAvailable() => _bannerAd != null && _bannerLoaded;
         public bool IsCollapsibleBannerAvailable() => false;
         public bool IsInterstitialAvailable() => _interstitialAd != null && _interstitialAd.IsAdReady();
         public bool IsRewardedVideoAvailable() => _rewardedAd != null && _rewardedAd.IsAdReady();
         public bool IsAppOpenAdsAvailable() => false;
+        public bool IsNativeAdAvailable()
+        {
+            return false;
+        }
 
         public void ShowBanner(string where)
         {
@@ -548,6 +555,14 @@ namespace GameUpSDK
         }
 
         public void ShowAppOpenAds(string where, Action onSuccess, Action onFail) { onFail?.Invoke(); }
+        public void ShowNativeAd(string where, Action onSuccess, Action onFail)
+        {
+            
+        }
+
+        public void HideNativeAd(string where)
+        {
+        }
 
         private void OnDestroy()
         {
@@ -627,6 +642,10 @@ namespace GameUpSDK
         }
 
         bool IPlacementAwareAds.IsAppOpenAdsAvailable(string where) => false;
+        public bool IsNativeAdAvailable(string where)
+        {
+            return false;
+        }
 
         bool IAdUnitIdResolver.TryResolve(int intId, out AdUnitType adType, out string nameId)
         {
