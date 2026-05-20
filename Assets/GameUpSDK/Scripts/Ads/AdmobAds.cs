@@ -47,6 +47,10 @@ namespace GameUpSDK
         [SerializeField] private string appOpenAdUnitIdAndroid;
         [SerializeField] private string appOpenAdUnitIdIOS;
 
+        [FormerlySerializedAs("nativeAdUnitId")]
+        [SerializeField] private string nativeAdUnitIdAndroid;
+        [SerializeField] private string nativeAdUnitIdIOS;
+        
         public int OrderExecute { get; set; }
 
         public event Action OnInterstitialLoaded;
@@ -75,11 +79,12 @@ namespace GameUpSDK
         private InterstitialAd _interstitialAd;
         private RewardedAd _rewardedAd;
         private AppOpenAd _appOpenAd;
+        private NativeOverlayAd _nativeAd;
 
         private readonly System.Collections.Generic.Dictionary<string, InterstitialAd> _interstitialByWhere = new System.Collections.Generic.Dictionary<string, InterstitialAd>();
         private readonly System.Collections.Generic.Dictionary<string, RewardedAd> _rewardedByWhere = new System.Collections.Generic.Dictionary<string, RewardedAd>();
         private readonly System.Collections.Generic.Dictionary<string, AppOpenAd> _appOpenByWhere = new System.Collections.Generic.Dictionary<string, AppOpenAd>();
-        private readonly System.Collections.Generic.Dictionary<string, DateTime> _appOpenExpireByWhere = new System.Collections.Generic.Dictionary<string, DateTime>();
+        private readonly System.Collections.Generic.Dictionary<string, NativeOverlayAd> _nativeOverlayAdsByWhere = new System.Collections.Generic.Dictionary<string, NativeOverlayAd>();        private readonly System.Collections.Generic.Dictionary<string, DateTime> _appOpenExpireByWhere = new System.Collections.Generic.Dictionary<string, DateTime>();
         private DateTime _appOpenExpireTime = DateTime.MinValue;
         private const int AppOpenTimeoutHours = 4;
 
@@ -514,6 +519,137 @@ namespace GameUpSDK
 #endif
         }
 
+ #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+
+        // 3. Logic Internal Request chuyên biệt cho Native Overlay
+        private void RequestNativeInternal(string unitId, string where)
+        {
+            Debug.Log($"[GameUp] AdmobAds request | type=Native | where={Safe(where)} | unitId={Safe(unitId)}");
+
+            if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
+            {
+                if (_nativeOverlayAdsByWhere.TryGetValue(where, out var old) && old != null) old.Destroy();
+                _nativeOverlayAdsByWhere.Remove(where);
+            }
+            else
+            {
+                if (_nativeAd != null)
+                {
+                    _nativeAd.Destroy();
+                    _nativeAd = null;
+                }
+            }
+
+            var request = new AdRequest();
+            
+            // Cấu hình Native Overlay - Mặc định hiện ở Botton (Có thể đổi tuỳ UI dự án)
+
+            var options = new NativeAdOptions
+            {
+                AdChoicesPlacement = AdChoicesPlacement.TopRightCorner,
+                MediaAspectRatio = MediaAspectRatio.Any,
+            };
+
+            NativeOverlayAd.Load(unitId, request, options, (ad, error) =>
+            {
+                MainThreadDispatcher.Enqueue(() =>
+                {
+                    if (error != null || ad == null)
+                    {
+                        var message = error?.GetMessage() ?? "unknown";
+                        var code = error != null ? error.GetCode().ToString() : "unknown";
+                        Debug.LogWarning($"[GameUp] AdmobAds load_fail | type=Native | where={Safe(where)} | unitId={Safe(unitId)} | code={code} | message={message}");
+                        return;
+                    }
+
+                    if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
+                    {
+                        _nativeOverlayAdsByWhere[where] = ad;
+                    }
+                    else
+                    {
+                        _nativeAd = ad;
+                    }
+
+                    ad.OnAdPaid += adValue =>
+                    {
+                        MainThreadDispatcher.Enqueue(() =>
+                        {
+                            if (adValue == null) return;
+                            double value = adValue.Value * 0.000001f;
+                            var data = new AdImpressionData
+                            {
+                                AdNetwork = "Admob",
+                                AdUnit = unitId,
+                                InstanceName = unitId,
+                                AdFormat = "NativeOverlay",
+                                Revenue = value
+                            };
+                            AdsEvent.RaiseImpressionDataReady(data);
+                        });
+                    };
+
+                    Debug.Log($"[GameUp] AdmobAds load_success | type=Native | where={Safe(where)} | unitId={unitId}");
+                });
+            });
+        }
+#endif
+
+        public void RequestNativeAd()
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            if (!_initialized) return;
+
+            if (!useMultiAdUnitIds)
+            {
+                var singleId = GetSingleUnitId(AdUnitType.NativeAd);
+                if (string.IsNullOrEmpty(singleId)) return;
+                RequestNativeInternal(singleId, null);
+                return;
+            }
+
+            foreach (var e in GetActiveAdUnitIds())
+            {
+                // Thay thế "Native" bằng enum AdUnitType tương ứng của hệ thống bạn
+                if (e == null || e.AdType.ToString() != "Native" || !e.IsValid()) continue; 
+                RequestNativeInternal(e.Id, e.NameId);
+            }
+#endif
+        }
+        
+
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+        public void RenderAd(NativeOverlayAd ad)
+        {
+
+            if (ad != null)
+            {
+                Debug.Log("Rendering Native Overlay ad.");
+
+                var scale = MobileAds.Utils.GetDeviceScale();
+                var widthDp = (int)(Screen.width / scale);
+                var heightDp = (int)(Screen.height / scale);
+                var fullScreenSize = new AdSize(widthDp, heightDp);
+                
+                // Define a native template style with a custom style.
+                var style = new NativeTemplateStyle
+                {
+                    TemplateId = NativeTemplateId.Medium,
+                    MainBackgroundColor = Color.black,
+                    CallToActionText = new NativeTemplateTextStyle()
+                    {
+                        BackgroundColor = Color.green,
+                        TextColor = Color.white,
+                        FontSize = 9,
+                        Style = NativeTemplateFontStyle.Bold
+                    }
+                };
+                
+                ad.RenderTemplate(style, fullScreenSize, AdPosition.Center);
+            }
+        }
+#endif
+
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
         private void ResetInterstitialLoadRetry()
         {
@@ -889,6 +1025,15 @@ namespace GameUpSDK
 #endif
         }
 
+        public bool IsNativeAdAvailable()
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            return _nativeAd != null;
+#else
+            return false;
+#endif
+        }
+
         public bool IsCollapsibleBannerAvailable()
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
@@ -1111,6 +1256,58 @@ namespace GameUpSDK
 #endif
         }
 
+        public void ShowNativeAd(string where = null, Action onSuccess = null, Action onFail = null)
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (useMultiAdUnitIds)
+                {
+                    if (string.IsNullOrEmpty(where) || !_nativeOverlayAdsByWhere.TryGetValue(where, out var multiAd) || multiAd == null)
+                    {
+                        Debug.LogWarning($"[GameUp] AdmobAds show_fail | type=Native | where={Safe(where)} | reason=not_ready");
+                        RequestNativeAd(); 
+                        return;
+                    }
+
+                    Debug.Log($"[GameUp] AdmobAds show | type=Native | where={Safe(where)}");
+                    RenderAd(multiAd);
+                    multiAd.Show();
+                    return;
+                }
+
+                if (_nativeAd == null)
+                {
+                    Debug.LogWarning($"[GameUp] AdmobAds show_fail | type=Native | where=null | reason=not_ready");
+                    RequestNativeAd();
+                    return;
+                }
+                RenderAd(_nativeAd);
+                _nativeAd.Show();
+            });
+#endif
+        }
+        
+        public void HideNativeAd(string where = null)
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
+                {
+                    if (_nativeOverlayAdsByWhere.TryGetValue(where, out var multiAd) && multiAd != null)
+                    {
+                        multiAd.Hide();
+                    }
+                }
+                else
+                {
+                    _nativeAd?.Hide();
+                }
+            });
+#endif
+        }
+        
         private void OnDestroy()
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
@@ -1192,6 +1389,8 @@ namespace GameUpSDK
                     return isAndroid ? rewardedAdUnitIdAndroid : rewardedAdUnitIdIOS;
                 case AdUnitType.AppOpen:
                     return isAndroid ? appOpenAdUnitIdAndroid : appOpenAdUnitIdIOS;
+                case AdUnitType.NativeAd:
+                    return isAndroid ? nativeAdUnitIdAndroid : nativeAdUnitIdIOS;
                 default:
                     return null;
             }
@@ -1289,6 +1488,18 @@ namespace GameUpSDK
                    _appOpenExpireByWhere.TryGetValue(where, out var exp) &&
                    DateTime.Now < exp &&
                    ad.CanShowAd();
+#else
+            return false;
+#endif
+        }
+
+        public bool IsNativeAdAvailable(string where)
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
+            if (!useMultiAdUnitIds) return IsNativeAdAvailable();
+            return !string.IsNullOrEmpty(where) &&
+                   _nativeOverlayAdsByWhere.TryGetValue(where, out var ad) &&
+                   ad != null;
 #else
             return false;
 #endif

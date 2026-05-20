@@ -65,5 +65,6 @@ namespace GameUpSDK
         public const string AdTypeInterstitial = "interstitial";
         public const string AdTypeRewardedVideo = "rewarded_video";
         public const string AdTypeAppOpen = "app_open";
+        public const string AdTypeNativeAd = "native_ad";
     }
 }

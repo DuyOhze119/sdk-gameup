@@ -233,6 +233,10 @@ namespace GameUpSDK
 #endif
         }
 
+        public void RequestNativeAd()
+        {
+        }
+
         // ---- SHOWS ----
         public void ShowBanner(string where)
         {
@@ -365,6 +369,14 @@ namespace GameUpSDK
 #endif
         }
 
+        public void ShowNativeAd(string where, Action onSuccess, Action onFail)
+        {
+        }
+
+        public void HideNativeAd(string where)
+        {
+        }
+
         // ---- AVAILABILITY ----
         public bool IsBannerAvailable() => _initialized;
         public bool IsCollapsibleBannerAvailable() => _initialized;
@@ -390,6 +402,11 @@ namespace GameUpSDK
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             return MaxSdk.IsAppOpenAdReady(ResolveUnitId(AdUnitType.AppOpen, null));
 #endif
+            return false;
+        }
+
+        public bool IsNativeAdAvailable()
+        {
             return false;
         }
 
@@ -419,6 +436,11 @@ namespace GameUpSDK
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             return MaxSdk.IsAppOpenAdReady(ResolveUnitId(AdUnitType.AppOpen, where));
 #endif
+            return false;
+        }
+
+        public bool IsNativeAdAvailable(string where)
+        {
             return false;
         }
 

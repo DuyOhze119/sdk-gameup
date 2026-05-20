@@ -10,5 +10,6 @@ namespace GameUpSDK
         void RequestInterstitial();
         void RequestRewardedVideo();
         void RequestAppOpenAds();
+        void RequestNativeAd();
     }
 }
