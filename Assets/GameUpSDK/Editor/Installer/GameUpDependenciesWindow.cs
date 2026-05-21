@@ -247,17 +247,17 @@ namespace GameUpSDK.Installer
                 AssemblyName = "GameAnalyticsSDK",
                 InstalledTypeFullName = "GameAnalyticsSDK.GameAnalytics",
                 Method = InstallMethod.UnityPackage,
-                BundledFileNames = new[] { "GameAnalytics/GA_SDK_UNITY_7.10.6.unitypackage" },
+                BundledFileNames = new[] { "GameAnalytics.unitypackage" },
                 HostedUrls = new[]
                 {
-                    "https://download.gameanalytics.com/unity/7.10.6/GA_SDK_UNITY.unitypackage",
+                    "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/GameAnalytics.unitypackage",
                 },
-                DownloadUrl = "https://docs.gameanalytics.com/event-tracking-and-integrations/sdks-and-collection-api/game-engine-sdks/unity/",
+                DownloadUrl = "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/GameAnalytics.unitypackage",
                 DownloadLabel = "GameAnalytics Unity SDK →",
                 RemoveAssetPaths = new[] { "Assets/GameAnalytics" },
                 InstallPriority = 46,
             },
-            
+
             new PackageDef
             {
                 DisplayName = "Appmetrica SDK",
@@ -1233,7 +1233,7 @@ namespace GameUpSDK.Installer
         private static AdsManager.PrimaryMediation GetPrimaryMediationFromDefines()
         {
             if (HasDefine(GUDefinetion.PrimaryMediationAdMob)) return AdsManager.PrimaryMediation.AdMob;
-            if(HasDefine(GUDefinetion.PrimaryMediationMax)) return AdsManager.PrimaryMediation.Max;
+            if (HasDefine(GUDefinetion.PrimaryMediationMax)) return AdsManager.PrimaryMediation.Max;
             return AdsManager.PrimaryMediation.LevelPlay;
         }
 
@@ -2441,7 +2441,7 @@ namespace GameUpSDK.Installer
                 SetDefine(LevelPlayDepsDefine, true);
             else if (!levelPlayInstalled && HasDefine(LevelPlayDepsDefine))
                 SetDefine(LevelPlayDepsDefine, false);
-            
+
             // Auto set/clear LevelPlay define theo trạng thái package
             bool maxInstalled = IsAssemblyLoaded("MaxSdk.Scripts");
             if (maxInstalled && !HasDefine(MaxSdkDepsDefine))
@@ -2463,7 +2463,7 @@ namespace GameUpSDK.Installer
                 SetDefine(FirebaseDepsDefine, true);
             else if (!firebaseInstalled && HasDefine(FirebaseDepsDefine))
                 SetDefine(FirebaseDepsDefine, false);
-            
+
             bool appMetricaInstalled = IsAssemblyLoaded("AppMetrica");
             if (appMetricaInstalled && !HasDefine(AppmetricaDepsDefine))
                 SetDefine(AppmetricaDepsDefine, true);
