@@ -17,6 +17,8 @@ namespace GameUpSDK
         [Header("Test Device")]
         [SerializeField]
         private List<string> testDevices = new List<string>();
+        [SerializeField]
+        private bool showMediationDebugger = false;
 
         [Header("Ad Unit IDs")]
         [Tooltip("Bật để dùng nhiều Ad Unit theo placement key (where). Tắt = dùng 1 ID/format.")]
@@ -92,7 +94,10 @@ namespace GameUpSDK
                     RequestInterstitial();
                     RequestRewardedVideo();
                     RequestAppOpenAds();
-                    MaxSdk.ShowMediationDebugger();
+                    if (showMediationDebugger)
+                    {
+                        MaxSdk.ShowMediationDebugger();
+                    }
                 });
             };
 #else
