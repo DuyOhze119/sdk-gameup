@@ -859,7 +859,8 @@ namespace GameUpSDK.Editor
         {
             EditorGUILayout.LabelField("IronSource (LevelPlay) Mediation", EditorStyles.boldLabel);
             _ironSourceAppKey = EditorGUILayout.TextField("App Key", _ironSourceAppKey);
-            _ironSourceUseMultiAdUnitIds = EditorGUILayout.Toggle("Use Multi IDs", _ironSourceUseMultiAdUnitIds);
+            _ironSourceUseMultiAdUnitIds =
+                EditorGUILayout.Toggle("Use Multi Ad Unit IDs (AdMulti)", _ironSourceUseMultiAdUnitIds);
             _ironSourceEditorPlatform =
                 (AdMobIdEditorPlatform)EditorGUILayout.EnumPopup("ID Platform", _ironSourceEditorPlatform);
 
@@ -889,7 +890,8 @@ namespace GameUpSDK.Editor
         {
             EditorGUILayout.LabelField("AppLovin MAX Mediation", EditorStyles.boldLabel);
             _maxSdkKey = EditorGUILayout.TextField("SDK Key", _maxSdkKey);
-            _maxUseMultiAdUnitIds = EditorGUILayout.Toggle("Use Multi IDs", _maxUseMultiAdUnitIds);
+            _maxUseMultiAdUnitIds =
+                EditorGUILayout.Toggle("Use Multi Ad Unit IDs (AdMulti)", _maxUseMultiAdUnitIds);
             _maxEditorPlatform = (AdMobIdEditorPlatform)EditorGUILayout.EnumPopup("ID Platform", _maxEditorPlatform);
 
             if (_maxUseMultiAdUnitIds)
@@ -915,7 +917,8 @@ namespace GameUpSDK.Editor
             EditorGUILayout.LabelField("AdMob Fallback/AppOpen", EditorStyles.boldLabel);
             _admobEditorPlatform =
                 (AdMobIdEditorPlatform)EditorGUILayout.EnumPopup("ID Platform", _admobEditorPlatform);
-            _admobUseMultiAdUnitIds = EditorGUILayout.Toggle("Use Multi IDs", _admobUseMultiAdUnitIds);
+            _admobUseMultiAdUnitIds =
+                EditorGUILayout.Toggle("Use Multi Ad Unit IDs (AdMulti)", _admobUseMultiAdUnitIds);
 
             if (_admobUseMultiAdUnitIds)
             {
@@ -941,15 +944,26 @@ namespace GameUpSDK.Editor
         {
             if (list == null) list = new List<GameUpSDK.AdUnitIdEntry>();
             NormalizeIntIds(list);
+
+            EditorGUILayout.HelpBox(
+                "Chế độ AdMulti — mỗi dòng là một placement:\n" +
+                "• Where: khóa placement khi gọi ShowXxx(where) (vd. main, revive, level_end)\n" +
+                "• Ad Unit ID: placement / ad unit id từ network (LevelPlay, MAX, AdMob…)\n" +
+                "• Ad Type: định dạng quảng cáo\n" +
+                "• #: intId dùng cho ShowById(intId) (tự gán theo thứ tự dòng)",
+                MessageType.Info);
+
             EditorGUILayout.BeginVertical("box");
+            DrawAdUnitIdListHeaderRow();
+
             for (int i = 0; i < list.Count; i++)
             {
                 var e = list[i] ?? (list[i] = new GameUpSDK.AdUnitIdEntry());
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField(e.intId.ToString(), GUILayout.Width(30));
-                e.adType = (GameUpSDK.AdUnitType)EditorGUILayout.EnumPopup(e.adType, GUILayout.Width(100));
-                e.nameId = EditorGUILayout.TextField(e.nameId ?? "", GUILayout.Width(100));
-                e.id = EditorGUILayout.TextField(e.id ?? "", GUILayout.MinWidth(120));
+                EditorGUILayout.LabelField(e.intId.ToString(), GUILayout.Width(AdUnitIdColIntId));
+                e.adType = (GameUpSDK.AdUnitType)EditorGUILayout.EnumPopup(e.adType, GUILayout.Width(AdUnitIdColAdType));
+                e.nameId = EditorGUILayout.TextField(e.nameId ?? "", GUILayout.Width(AdUnitIdColWhere));
+                e.id = EditorGUILayout.TextField(e.id ?? "", GUILayout.MinWidth(AdUnitIdColUnitIdMin));
                 if (GUILayout.Button("-", GUILayout.Width(24)))
                 {
                     list.RemoveAt(i);
@@ -959,8 +973,28 @@ namespace GameUpSDK.Editor
                 EditorGUILayout.EndHorizontal();
             }
 
-            if (GUILayout.Button("+ Add")) list.Add(new GameUpSDK.AdUnitIdEntry());
+            if (GUILayout.Button("+ Thêm placement")) list.Add(new GameUpSDK.AdUnitIdEntry());
             EditorGUILayout.EndVertical();
+        }
+
+        private const float AdUnitIdColIntId = 28f;
+        private const float AdUnitIdColAdType = 108f;
+        private const float AdUnitIdColWhere = 120f;
+        private const float AdUnitIdColUnitIdMin = 160f;
+
+        private static void DrawAdUnitIdListHeaderRow()
+        {
+            var header = EditorStyles.miniLabel;
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label(new GUIContent("#", "intId — dùng ShowById(intId)"), header,
+                GUILayout.Width(AdUnitIdColIntId));
+            GUILayout.Label("Ad Type", header, GUILayout.Width(AdUnitIdColAdType));
+            GUILayout.Label(new GUIContent("Where", "Placement key — truyền vào ShowBanner(where), ShowInterstitial(where), …"),
+                header, GUILayout.Width(AdUnitIdColWhere));
+            GUILayout.Label(new GUIContent("Ad Unit ID", "ID placement / ad unit từ dashboard network"), header,
+                GUILayout.MinWidth(AdUnitIdColUnitIdMin));
+            GUILayout.Label("", GUILayout.Width(24));
+            EditorGUILayout.EndHorizontal();
         }
 
         private static void NormalizeIntIds(List<GameUpSDK.AdUnitIdEntry> list)
