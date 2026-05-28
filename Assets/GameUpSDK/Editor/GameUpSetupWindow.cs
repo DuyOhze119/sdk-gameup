@@ -134,7 +134,7 @@ namespace GameUpSDK.Editor
         private string _appsFlyerDevKey = "";
         private string _appsFlyerAppId = "";
         private bool _appsFlyerIsDebug = false;
-        
+
         // Appmetrica
         private string _appmetricaApikey = "";
         private bool _appmetricaEnbaleLogs = false;
@@ -979,7 +979,7 @@ namespace GameUpSDK.Editor
 
         private const float AdUnitIdColIntId = 28f;
         private const float AdUnitIdColAdType = 108f;
-        private const float AdUnitIdColWhere = 120f;
+        private const float AdUnitIdColWhere = 300f;
         private const float AdUnitIdColUnitIdMin = 160f;
 
         private static void DrawAdUnitIdListHeaderRow()
@@ -1046,7 +1046,7 @@ namespace GameUpSDK.Editor
         private string GetSelectedAdmobAppOpenId() => _admobEditorPlatform == AdMobIdEditorPlatform.Android
             ? _admobAppOpenIdAndroid
             : _admobAppOpenIdIOS;
-        
+
         private string GetSelectedAdmobNativeAdId() => _admobEditorPlatform == AdMobIdEditorPlatform.Android
             ? _admobNativeAdIdAndroid
             : _admobNativeAdIdIOS;
@@ -1073,8 +1073,8 @@ namespace GameUpSDK.Editor
         {
             if (_admobEditorPlatform == AdMobIdEditorPlatform.Android) _admobAppOpenIdAndroid = val;
             else _admobAppOpenIdIOS = val;
-        } 
-        
+        }
+
         private void SetSelectedAdmobNativeAdId(string val)
         {
             if (_admobEditorPlatform == AdMobIdEditorPlatform.Android) _admobNativeAdIdAndroid = val;
@@ -1237,7 +1237,7 @@ namespace GameUpSDK.Editor
             _appsFlyerIsDebug = so.FindProperty("isDebug")?.boolValue ?? false;
             return true;
         }
-        
+
         private bool LoadAppmetrica()
         {
             var go = AssetDatabase.LoadAssetAtPath<GameObject>(PathAppmetrica);
@@ -1509,7 +1509,7 @@ namespace GameUpSDK.Editor
             PrefabUtility.RecordPrefabInstancePropertyModifications(comp);
             return true;
         }
-        
+
         private bool SaveSceneAppmetricaObject(GameObject sdkRoot)
         {
             var comp = sdkRoot.GetComponentInChildren<AppMetricaActivator>(true);
