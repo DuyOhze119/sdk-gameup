@@ -73,23 +73,27 @@ public class UnityNativeFullScreen {
         });
     }
 
-    private static void renderFullScreenAd(final Activity activity, final NativeAd nativeAd) {
+private static void renderFullScreenAd(final Activity activity, final NativeAd nativeAd) {
+        // 1. Tạo Root Container phủ toàn màn hình nền đen
         mainContainer = new FrameLayout(activity);
         mainContainer.setBackgroundColor(Color.BLACK);
         FrameLayout.LayoutParams rootParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         activity.addContentView(mainContainer, rootParams);
 
+        // 2. Tạo NativeAdView
         NativeAdView adView = new NativeAdView(activity);
         adView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
+        // 3. Tạo MediaView hiển thị Video hoặc Ảnh chính
         MediaView mediaView = new MediaView(activity);
         mediaView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         adView.addView(mediaView);
         adView.setMediaView(mediaView);
 
+        // 4. Tạo Tiêu đề (Headline)
         TextView txtHeadline = new TextView(activity);
         txtHeadline.setText(nativeAd.getHeadline());
         txtHeadline.setTextColor(Color.WHITE);
@@ -102,6 +106,7 @@ public class UnityNativeFullScreen {
         adView.addView(txtHeadline);
         adView.setHeadlineView(txtHeadline);
 
+        // 5. Tạo nút Kêu gọi hành động (Call To Action)
         Button btnCta = new Button(activity);
         btnCta.setText(nativeAd.getCallToAction());
         btnCta.setBackgroundColor(Color.parseColor("#FF4081"));
@@ -117,20 +122,54 @@ public class UnityNativeFullScreen {
         mainContainer.addView(adView);
         adView.setNativeAd(nativeAd);
 
-        Button btnClose = new Button(activity);
-        btnClose.setText("X");
+        // 6. Nút Đóng đếm ngược dạng vòng tròn
+        android.graphics.drawable.GradientDrawable circleBackground = new android.graphics.drawable.GradientDrawable();
+        circleBackground.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        circleBackground.setColor(Color.parseColor("#88000000")); 
+        circleBackground.setStroke(3, Color.WHITE); 
+
+        // 2. Khởi tạo Button
+        final Button btnClose = new Button(activity);
+        btnClose.setBackground(circleBackground);
         btnClose.setTextColor(Color.WHITE);
-        btnClose.setBackgroundColor(Color.TRANSPARENT);
-        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(120, 120);
+        btnClose.setTextSize(14); // Giảm nhẹ size chữ số xuống 14
+        btnClose.setGravity(Gravity.CENTER);
+        btnClose.setPadding(0, 0, 0, 0); // Xóa padding mặc định để chữ căn đúng tâm
+        
+        // GIẢM SIZE: Thay đổi kích thước từ 120x120 xuống 90x90
+        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(90, 90);
         closeParams.gravity = Gravity.TOP | Gravity.END;
-        closeParams.setMargins(0, 60, 40, 0);
+        closeParams.setMargins(0, 60, 40, 0); // Giữ nguyên vị trí góc phải
         btnClose.setLayoutParams(closeParams);
-        btnClose.setOnClickListener(new View.OnClickListener() {
+
+        // Cấu hình đếm ngược
+        final int[] secondsLeft = {3};
+        btnClose.setText(String.valueOf(secondsLeft[0]));
+        btnClose.setEnabled(false);
+
+        final android.os.Handler handler = new android.os.Handler();
+        final Runnable countdownRunnable = new Runnable() {
             @Override
-            public void onClick(View v) {
-                hideAd(activity);
+            public void run() {
+                secondsLeft[0]--;
+                if (secondsLeft[0] > 0) {
+                    btnClose.setText(String.valueOf(secondsLeft[0]));
+                    handler.postDelayed(this, 1000);
+                } else {
+                    // Khi hiện chữ X, để size 16 là vừa khít với vòng tròn 90x90
+                    btnClose.setText("X");
+                    btnClose.setTextSize(16); 
+                    btnClose.setEnabled(true);
+                    btnClose.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            hideAd(activity);
+                        }
+                    });
+                }
             }
-        });
+        };
+        handler.postDelayed(countdownRunnable, 1000);
         mainContainer.addView(btnClose);
     }
 

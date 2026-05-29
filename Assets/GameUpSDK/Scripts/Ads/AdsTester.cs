@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.Serialization;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -19,8 +20,8 @@ namespace GameUpSDK
         public bool useIntId;
         public int intId;
 
-        [Header("Call by adType + where")]
-        public AdUnitType adType = AdUnitType.Interstitial;
+        [FormerlySerializedAs("adType")] [Header("Call by adType + where")]
+        public AdUnitTypeV1 adTypeV1 = AdUnitTypeV1.Interstitial;
         public string where = "main";
 
         [Header("Banner Options")]
@@ -40,10 +41,10 @@ namespace GameUpSDK
             if (useIntId)
                 return "ShowById: " + intId;
 
-            if (adType == AdUnitType.Banner && useCollapsibleBanner)
+            if (adTypeV1 == AdUnitTypeV1.Banner && useCollapsibleBanner)
                 return "CollapsibleBanner(" + collapsiblePlacement + "): " + where;
 
-            return adType + ": " + where;
+            return adTypeV1 + ": " + where;
         }
     }
 
@@ -233,9 +234,9 @@ namespace GameUpSDK
             }
 
             string where = item.where ?? string.Empty;
-            switch (item.adType)
+            switch (item.adTypeV1)
             {
-                case AdUnitType.Banner:
+                case AdUnitTypeV1.Banner:
                     if (item.useCollapsibleBanner)
                     {
                         AdsManager.Instance.ShowCollapsibleBanner(where, item.collapsiblePlacement);
@@ -247,23 +248,23 @@ namespace GameUpSDK
                         Debug.Log("[GameUp] AdsTester show -> Banner " + where);
                     }
                     break;
-                case AdUnitType.Interstitial:
+                case AdUnitTypeV1.Interstitial:
                     AdsManager.Instance.ShowInterstitial(where, Mathf.Max(0, item.currentLevel),
                         () => Debug.Log("[GameUp] AdsTester success -> Interstitial " + where),
                         () => Debug.LogWarning("[GameUp] AdsTester fail -> Interstitial " + where));
                     break;
-                case AdUnitType.RewardedVideo:
+                case AdUnitTypeV1.RewardedVideo:
                     AdsManager.Instance.ShowRewardedVideo(where, Mathf.Max(0, item.currentLevel),
                         () => Debug.Log("[GameUp] AdsTester success -> Rewarded " + where),
                         () => Debug.LogWarning("[GameUp] AdsTester fail -> Rewarded " + where));
                     break;
-                case AdUnitType.AppOpen:
+                case AdUnitTypeV1.AppOpen:
                     AdsManager.Instance.ShowAppOpenAds(where,
                         () => Debug.Log("[GameUp] AdsTester success -> AppOpen " + where),
                         () => Debug.LogWarning("[GameUp] AdsTester fail -> AppOpen " + where));
                     break;
                 default:
-                    Debug.LogWarning("[GameUp] AdsTester unsupported ad type: " + item.adType);
+                    Debug.LogWarning("[GameUp] AdsTester unsupported ad type: " + item.adTypeV1);
                     break;
             }
         }
@@ -352,10 +353,10 @@ namespace GameUpSDK
                 return;
             }
 
-            AddSingleItemIfValid(AdUnitType.Banner, "main", ReadPlatformSingleId(src, "bannerAdUnitIdAndroid", "bannerAdUnitIdIOS", "bannerAdUnitId"), "AdMob");
-            AddSingleItemIfValid(AdUnitType.Interstitial, "main", ReadPlatformSingleId(src, "interstitialAdUnitIdAndroid", "interstitialAdUnitIdIOS", "interstitialAdUnitId"), "AdMob");
-            AddSingleItemIfValid(AdUnitType.RewardedVideo, "main", ReadPlatformSingleId(src, "rewardedAdUnitIdAndroid", "rewardedAdUnitIdIOS", "rewardedAdUnitId"), "AdMob");
-            AddSingleItemIfValid(AdUnitType.AppOpen, "main", ReadPlatformSingleId(src, "appOpenAdUnitIdAndroid", "appOpenAdUnitIdIOS", "appOpenAdUnitId"), "AdMob");
+            AddSingleItemIfValid(AdUnitTypeV1.Banner, "main", ReadPlatformSingleId(src, "bannerAdUnitIdAndroid", "bannerAdUnitIdIOS", "bannerAdUnitId"), "AdMob");
+            AddSingleItemIfValid(AdUnitTypeV1.Interstitial, "main", ReadPlatformSingleId(src, "interstitialAdUnitIdAndroid", "interstitialAdUnitIdIOS", "interstitialAdUnitId"), "AdMob");
+            AddSingleItemIfValid(AdUnitTypeV1.RewardedVideo, "main", ReadPlatformSingleId(src, "rewardedAdUnitIdAndroid", "rewardedAdUnitIdIOS", "rewardedAdUnitId"), "AdMob");
+            AddSingleItemIfValid(AdUnitTypeV1.AppOpen, "main", ReadPlatformSingleId(src, "appOpenAdUnitIdAndroid", "appOpenAdUnitIdIOS", "appOpenAdUnitId"), "AdMob");
         }
 
         private void BuildFromIronSource(IronSourceAds src, HashSet<string> uniqueKeys)
@@ -370,12 +371,12 @@ namespace GameUpSDK
                 return;
             }
 
-            AddSingleItemIfValid(AdUnitType.Banner, "main", ReadPlatformSingleId(src, "bannerAdUnitIdAndroid", "bannerAdUnitIdIOS", "bannerAdUnitId"), "LevelPlay");
-            AddSingleItemIfValid(AdUnitType.Interstitial, "main", ReadPlatformSingleId(src, "interstitialAdUnitIdAndroid", "interstitialAdUnitIdIOS", "interstitialAdUnitId"), "LevelPlay");
-            AddSingleItemIfValid(AdUnitType.RewardedVideo, "main", ReadPlatformSingleId(src, "rewardedVideoAdUnitIdAndroid", "rewardedVideoAdUnitIdIOS", "rewardedVideoAdUnitId"), "LevelPlay");
+            AddSingleItemIfValid(AdUnitTypeV1.Banner, "main", ReadPlatformSingleId(src, "bannerAdUnitIdAndroid", "bannerAdUnitIdIOS", "bannerAdUnitId"), "LevelPlay");
+            AddSingleItemIfValid(AdUnitTypeV1.Interstitial, "main", ReadPlatformSingleId(src, "interstitialAdUnitIdAndroid", "interstitialAdUnitIdIOS", "interstitialAdUnitId"), "LevelPlay");
+            AddSingleItemIfValid(AdUnitTypeV1.RewardedVideo, "main", ReadPlatformSingleId(src, "rewardedVideoAdUnitIdAndroid", "rewardedVideoAdUnitIdIOS", "rewardedVideoAdUnitId"), "LevelPlay");
         }
 
-        private void AddMultiItems(List<AdUnitIdEntry> entries, string source, HashSet<string> uniqueKeys)
+        private void AddMultiItems(List<AdUnitIdEntryV1> entries, string source, HashSet<string> uniqueKeys)
         {
             if (entries == null)
                 return;
@@ -385,40 +386,40 @@ namespace GameUpSDK
                 var e = entries[i];
                 if (e == null || !e.IsValid())
                     continue;
-                AddItemIfMissing(e.AdType, e.NameId, source, uniqueKeys);
+                AddItemIfMissing(e.AdTypeV1, e.NameId, source, uniqueKeys);
             }
         }
 
-        private void AddItemIfMissing(AdUnitType adType, string where, string source, HashSet<string> uniqueKeys)
+        private void AddItemIfMissing(AdUnitTypeV1 adTypeV1, string where, string source, HashSet<string> uniqueKeys)
         {
             if (string.IsNullOrEmpty(where))
                 return;
 
-            if (adType == AdUnitType.Banner)
+            if (adTypeV1 == AdUnitTypeV1.Banner)
             {
                 AddBannerItems(where, source, uniqueKeys);
                 return;
             }
 
-            string unique = adType + "|" + where + "|normal";
+            string unique = adTypeV1 + "|" + where + "|normal";
             if (!uniqueKeys.Add(unique)) return;
 
             multiItems.Add(new AdsTestItem
             {
                 useIntId = false,
-                adType = adType,
+                adTypeV1 = adTypeV1,
                 where = where,
                 currentLevel = 1,
-                buttonLabel = source + " - " + adType + ": " + where
+                buttonLabel = source + " - " + adTypeV1 + ": " + where
             });
         }
 
-        private void AddSingleItemIfValid(AdUnitType adType, string where, string adUnitId, string source)
+        private void AddSingleItemIfValid(AdUnitTypeV1 adTypeV1, string where, string adUnitId, string source)
         {
             if (string.IsNullOrEmpty(adUnitId))
                 return;
 
-            if (adType == AdUnitType.Banner)
+            if (adTypeV1 == AdUnitTypeV1.Banner)
             {
                 AddBannerItems(where, source + " - Banner (Single)", uniqueKeys: null, forceSingleList: true);
                 return;
@@ -427,10 +428,10 @@ namespace GameUpSDK
             _singleItems.Add(new AdsTestItem
             {
                 useIntId = false,
-                adType = adType,
+                adTypeV1 = adTypeV1,
                 where = where,
                 currentLevel = 1,
-                buttonLabel = source + " - " + adType + " (Single)"
+                buttonLabel = source + " - " + adTypeV1 + " (Single)"
             });
         }
 
@@ -450,7 +451,7 @@ namespace GameUpSDK
                 target.Add(new AdsTestItem
                 {
                     useIntId = false,
-                    adType = AdUnitType.Banner,
+                    adTypeV1 = AdUnitTypeV1.Banner,
                     where = where,
                     currentLevel = 1,
                     useCollapsibleBanner = false,
@@ -466,7 +467,7 @@ namespace GameUpSDK
                 target.Add(new AdsTestItem
                 {
                     useIntId = false,
-                    adType = AdUnitType.Banner,
+                    adTypeV1 = AdUnitTypeV1.Banner,
                     where = where,
                     currentLevel = 1,
                     useCollapsibleBanner = true,
@@ -482,7 +483,7 @@ namespace GameUpSDK
                 target.Add(new AdsTestItem
                 {
                     useIntId = false,
-                    adType = AdUnitType.Banner,
+                    adTypeV1 = AdUnitTypeV1.Banner,
                     where = where,
                     currentLevel = 1,
                     useCollapsibleBanner = true,
@@ -522,20 +523,20 @@ namespace GameUpSDK
             return string.IsNullOrEmpty(legacyFieldName) ? null : ReadPrivateField<string>(target, legacyFieldName);
         }
 
-        private static List<AdUnitIdEntry> ReadPlatformAdUnitEntries(object target, string androidFieldName, string iosFieldName, string legacyFieldName = null)
+        private static List<AdUnitIdEntryV1> ReadPlatformAdUnitEntries(object target, string androidFieldName, string iosFieldName, string legacyFieldName = null)
         {
             bool useIOS = IsIOSBuildTarget();
-            var preferred = ReadPrivateField<List<AdUnitIdEntry>>(target, useIOS ? iosFieldName : androidFieldName);
+            var preferred = ReadPrivateField<List<AdUnitIdEntryV1>>(target, useIOS ? iosFieldName : androidFieldName);
             if (preferred != null && preferred.Count > 0)
                 return preferred;
 
-            var fallback = ReadPrivateField<List<AdUnitIdEntry>>(target, useIOS ? androidFieldName : iosFieldName);
+            var fallback = ReadPrivateField<List<AdUnitIdEntryV1>>(target, useIOS ? androidFieldName : iosFieldName);
             if (fallback != null && fallback.Count > 0)
                 return fallback;
 
             return string.IsNullOrEmpty(legacyFieldName)
                 ? preferred ?? fallback
-                : ReadPrivateField<List<AdUnitIdEntry>>(target, legacyFieldName);
+                : ReadPrivateField<List<AdUnitIdEntryV1>>(target, legacyFieldName);
         }
 
         private static bool IsIOSBuildTarget()
@@ -557,7 +558,7 @@ namespace GameUpSDK
             to.buttonLabel = from.buttonLabel;
             to.useIntId = from.useIntId;
             to.intId = from.intId;
-            to.adType = from.adType;
+            to.adTypeV1 = from.adTypeV1;
             to.where = from.where;
             to.currentLevel = from.currentLevel;
         }

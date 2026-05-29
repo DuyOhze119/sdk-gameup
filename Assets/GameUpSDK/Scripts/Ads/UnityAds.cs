@@ -106,9 +106,9 @@ namespace GameUpSDK
 
         private void CreateAdUnits()
         {
-            var bannerId = GetSingleUnitId(AdUnitType.Banner);
-            var interstitialId = GetSingleUnitId(AdUnitType.Interstitial);
-            var rewardedId = GetSingleUnitId(AdUnitType.RewardedVideo);
+            var bannerId = GetSingleUnitId(AdUnitTypeV1.Banner);
+            var interstitialId = GetSingleUnitId(AdUnitTypeV1.Interstitial);
+            var rewardedId = GetSingleUnitId(AdUnitTypeV1.RewardedVideo);
             if (!string.IsNullOrEmpty(bannerId))
                 _bannerAd = new LevelPlayBannerAd(bannerId);
             if (!string.IsNullOrEmpty(interstitialId))
@@ -138,16 +138,16 @@ namespace GameUpSDK
 #endif
         }
 
-        private string GetSingleUnitId(AdUnitType type)
+        private string GetSingleUnitId(AdUnitTypeV1 typeV1)
         {
             bool isAndroid = GetRuntimeAdPlatform() == RuntimeAdPlatform.Android;
-            switch (type)
+            switch (typeV1)
             {
-                case AdUnitType.Banner:
+                case AdUnitTypeV1.Banner:
                     return isAndroid ? bannerAdUnitIdAndroid : bannerAdUnitIdIOS;
-                case AdUnitType.Interstitial:
+                case AdUnitTypeV1.Interstitial:
                     return isAndroid ? interstitialAdUnitIdAndroid : interstitialAdUnitIdIOS;
-                case AdUnitType.RewardedVideo:
+                case AdUnitTypeV1.RewardedVideo:
                     return isAndroid ? rewardedVideoAdUnitIdAndroid : rewardedVideoAdUnitIdIOS;
                 default:
                     return null;

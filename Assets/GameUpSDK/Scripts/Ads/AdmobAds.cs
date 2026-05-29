@@ -25,10 +25,10 @@ namespace GameUpSDK
 
         [Tooltip("Danh sách mapping Android: (AdType, NameId=where, Id=ad unit id). Chỉ dùng khi useMultiAdUnitIds=true.")]
         [FormerlySerializedAs("adUnitIds")]
-        [SerializeField] private System.Collections.Generic.List<AdUnitIdEntry> adUnitIdsAndroid = new System.Collections.Generic.List<AdUnitIdEntry>();
+        [SerializeField] private System.Collections.Generic.List<AdUnitIdEntryV1> adUnitIdsAndroid = new System.Collections.Generic.List<AdUnitIdEntryV1>();
 
         [Tooltip("Danh sách mapping iOS: (AdType, NameId=where, Id=ad unit id). Chỉ dùng khi useMultiAdUnitIds=true.")]
-        [SerializeField] private System.Collections.Generic.List<AdUnitIdEntry> adUnitIdsIOS = new System.Collections.Generic.List<AdUnitIdEntry>();
+        [SerializeField] private System.Collections.Generic.List<AdUnitIdEntryV1> adUnitIdsIOS = new System.Collections.Generic.List<AdUnitIdEntryV1>();
 
         [Header("Single IDs (legacy / fallback)")]
         [FormerlySerializedAs("bannerAdUnitId")]
@@ -101,10 +101,10 @@ namespace GameUpSDK
             return string.IsNullOrEmpty(value) ? "null" : value;
         }
 
-        private void LogAdTrace(string phase, AdUnitType type, string unitId, string where = null, string extra = null)
+        private void LogAdTrace(string phase, AdUnitTypeV1 typeV1, string unitId, string where = null, string extra = null)
         {
             var message = "[GameUp] AdmobAds " + phase +
-                          " | type=" + type +
+                          " | type=" + typeV1 +
                           " | where=" + Safe(where) +
                           " | unitId=" + Safe(unitId);
             if (!string.IsNullOrEmpty(extra))
@@ -130,19 +130,19 @@ namespace GameUpSDK
 
         private string ResolveBannerUnitIdForRequest(string where)
         {
-            var requestedUnitId = ResolveUnitId(AdUnitType.Banner, where);
+            var requestedUnitId = ResolveUnitId(AdUnitTypeV1.Banner, where);
             if (!string.IsNullOrEmpty(requestedUnitId))
                 return requestedUnitId;
 
             if (!useMultiAdUnitIds)
-                return GetSingleUnitId(AdUnitType.Banner);
+                return GetSingleUnitId(AdUnitTypeV1.Banner);
 
             string fallbackUnitId = null;
             var activeAdUnitIds = GetActiveAdUnitIds();
             for (int i = 0; i < activeAdUnitIds.Count; i++)
             {
                 var e = activeAdUnitIds[i];
-                if (e == null || e.AdType != AdUnitType.Banner || !e.IsValid()) continue;
+                if (e == null || e.AdTypeV1 != AdUnitTypeV1.Banner || !e.IsValid()) continue;
                 if (string.Equals(e.NameId, "main", StringComparison.OrdinalIgnoreCase))
                     return e.Id;
                 if (fallbackUnitId == null)
@@ -214,7 +214,7 @@ namespace GameUpSDK
                 {
                     LogAdTrace(
                         "show",
-                        AdUnitType.Banner,
+                        AdUnitTypeV1.Banner,
                         _bannerUnitIdActive,
                         where,
                         "collapsibleRequest=" + (_bannerCollapsiblePlacementActive != CollapsibleBannerPlacement.None) +
@@ -226,7 +226,7 @@ namespace GameUpSDK
 
                 if (!string.IsNullOrEmpty(unitId) && !_bannerLoading)
                 {
-                    LogAdTrace("show_deferred", AdUnitType.Banner, unitId, where, "reason=not_loaded_retry_request");
+                    LogAdTrace("show_deferred", AdUnitTypeV1.Banner, unitId, where, "reason=not_loaded_retry_request");
                     RequestBannerInternal(unitId, placement, where);
                 }
                 else
@@ -333,18 +333,18 @@ namespace GameUpSDK
             MainThreadDispatcher.Enqueue(() =>
             {
                 var collapsibleKeyword = ToCollapsibleKeyword(placement);
-                LogAdTrace("request", AdUnitType.Banner, unitId, where, "collapsible=" + Safe(collapsibleKeyword));
+                LogAdTrace("request", AdUnitTypeV1.Banner, unitId, where, "collapsible=" + Safe(collapsibleKeyword));
                 if (_bannerRequestInProgress)
                 {
                     if (_bannerUnitIdActive == unitId && _bannerCollapsiblePlacementActive == placement)
                     {
-                        LogAdTrace("request_skip", AdUnitType.Banner, unitId, where, extra: "reason=request_in_progress_same_request");
+                        LogAdTrace("request_skip", AdUnitTypeV1.Banner, unitId, where, extra: "reason=request_in_progress_same_request");
                         return;
                     }
 
                     _pendingBannerUnitId = unitId;
                     _pendingBannerCollapsiblePlacement = placement;
-                    LogAdTrace("request_deferred", AdUnitType.Banner, unitId, where, extra: "reason=request_in_progress_pending_switch,collapsible=" + Safe(collapsibleKeyword));
+                    LogAdTrace("request_deferred", AdUnitTypeV1.Banner, unitId, where, extra: "reason=request_in_progress_pending_switch,collapsible=" + Safe(collapsibleKeyword));
                     return;
                 }
 
@@ -382,7 +382,7 @@ namespace GameUpSDK
                                 _bannerIsCollapsible = _bannerCollapsiblePlacementActive != CollapsibleBannerPlacement.None;
                             LogAdTrace(
                                 "load_success",
-                                AdUnitType.Banner,
+                                AdUnitTypeV1.Banner,
                                 _bannerUnitIdActive,
                                 _bannerPlacementForShow,
                                 "requestedCollapsible=" + Safe(ToCollapsibleKeyword(_bannerCollapsiblePlacementActive)) +
@@ -391,7 +391,7 @@ namespace GameUpSDK
                             {
                                 LogAdTrace(
                                     "show",
-                                    AdUnitType.Banner,
+                                    AdUnitTypeV1.Banner,
                                     _bannerUnitIdActive,
                                     _bannerPlacementForShow,
                                     "from=auto_on_loaded,isCollapsible=" + _bannerIsCollapsible);
@@ -475,7 +475,7 @@ namespace GameUpSDK
             if (!_initialized) return;
             if (!useMultiAdUnitIds)
             {
-                var singleId = GetSingleUnitId(AdUnitType.Interstitial);
+                var singleId = GetSingleUnitId(AdUnitTypeV1.Interstitial);
                 if (string.IsNullOrEmpty(singleId)) return;
                 RequestInterstitialInternal(singleId, where: null);
                 return;
@@ -483,7 +483,7 @@ namespace GameUpSDK
 
             foreach (var e in GetActiveAdUnitIds())
             {
-                if (e == null || e.AdType != AdUnitType.Interstitial || !e.IsValid()) continue;
+                if (e == null || e.AdTypeV1 != AdUnitTypeV1.Interstitial || !e.IsValid()) continue;
                 RequestInterstitialInternal(e.Id, e.NameId);
             }
 #endif
@@ -495,7 +495,7 @@ namespace GameUpSDK
             if (!_initialized) return;
             if (!useMultiAdUnitIds)
             {
-                var singleId = GetSingleUnitId(AdUnitType.RewardedVideo);
+                var singleId = GetSingleUnitId(AdUnitTypeV1.RewardedVideo);
                 if (string.IsNullOrEmpty(singleId)) return;
                 RequestRewardedInternal(singleId, where: null);
                 return;
@@ -503,7 +503,7 @@ namespace GameUpSDK
 
             foreach (var e in GetActiveAdUnitIds())
             {
-                if (e == null || e.AdType != AdUnitType.RewardedVideo || !e.IsValid()) continue;
+                if (e == null || e.AdTypeV1 != AdUnitTypeV1.RewardedVideo || !e.IsValid()) continue;
                 RequestRewardedInternal(e.Id, e.NameId);
             }
 #endif
@@ -515,7 +515,7 @@ namespace GameUpSDK
             if (!_initialized) return;
             if (!useMultiAdUnitIds)
             {
-                var singleId = GetSingleUnitId(AdUnitType.AppOpen);
+                var singleId = GetSingleUnitId(AdUnitTypeV1.AppOpen);
                 if (string.IsNullOrEmpty(singleId)) return;
                 RequestAppOpenInternal(singleId, where: null);
                 return;
@@ -523,7 +523,7 @@ namespace GameUpSDK
 
             foreach (var e in GetActiveAdUnitIds())
             {
-                if (e == null || e.AdType != AdUnitType.AppOpen || !e.IsValid()) continue;
+                if (e == null || e.AdTypeV1 != AdUnitTypeV1.AppOpen || !e.IsValid()) continue;
                 RequestAppOpenInternal(e.Id, e.NameId);
             }
 #endif
@@ -546,7 +546,7 @@ namespace GameUpSDK
 
             if (!useMultiAdUnitIds)
             {
-                var singleId = GetSingleUnitId(AdUnitType.NativeAd);
+                var singleId = GetSingleUnitId(AdUnitTypeV1.NativeAd);
                 if (string.IsNullOrEmpty(singleId)) return;
                 RequestNativeInternal(singleId, null);
                 return;
@@ -555,7 +555,7 @@ namespace GameUpSDK
             foreach (var e in GetActiveAdUnitIds())
             {
                 // Thay thế "Native" bằng enum AdUnitType tương ứng của hệ thống bạn
-                if (e == null || e.AdType.ToString() != "Native" || !e.IsValid()) continue; 
+                if (e == null || e.AdTypeV1.ToString() != "Native" || !e.IsValid()) continue; 
                 RequestNativeInternal(e.Id, e.NameId);
             }
 #endif
@@ -608,7 +608,7 @@ namespace GameUpSDK
             var retryDelay = (float)Math.Pow(2, Math.Min(LoadRetryExponentCap, _retryInterstitialAttempt));
             CancelInvoke(nameof(RequestInterstitial));
             Invoke(nameof(RequestInterstitial), retryDelay);
-            LogAdTrace("load_retry_scheduled", AdUnitType.Interstitial, null, null, "delaySeconds=" + retryDelay + ",attempt=" + _retryInterstitialAttempt);
+            LogAdTrace("load_retry_scheduled", AdUnitTypeV1.Interstitial, null, null, "delaySeconds=" + retryDelay + ",attempt=" + _retryInterstitialAttempt);
         }
 
         private void ScheduleRewardedLoadRetry()
@@ -617,14 +617,14 @@ namespace GameUpSDK
             var retryDelay = (float)Math.Pow(2, Math.Min(LoadRetryExponentCap, _retryRewardedAttempt));
             CancelInvoke(nameof(RequestRewardedVideo));
             Invoke(nameof(RequestRewardedVideo), retryDelay);
-            LogAdTrace("load_retry_scheduled", AdUnitType.RewardedVideo, null, null, "delaySeconds=" + retryDelay + ",attempt=" + _retryRewardedAttempt);
+            LogAdTrace("load_retry_scheduled", AdUnitTypeV1.RewardedVideo, null, null, "delaySeconds=" + retryDelay + ",attempt=" + _retryRewardedAttempt);
         }
 
         private void RequestInterstitialAfterNotReady(string where)
         {
             if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
             {
-                var unitId = ResolveUnitId(AdUnitType.Interstitial, where);
+                var unitId = ResolveUnitId(AdUnitTypeV1.Interstitial, where);
                 if (!string.IsNullOrEmpty(unitId))
                     RequestInterstitialInternal(unitId, where);
                 return;
@@ -637,7 +637,7 @@ namespace GameUpSDK
         {
             if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
             {
-                var unitId = ResolveUnitId(AdUnitType.RewardedVideo, where);
+                var unitId = ResolveUnitId(AdUnitTypeV1.RewardedVideo, where);
                 if (!string.IsNullOrEmpty(unitId))
                     RequestRewardedInternal(unitId, where);
                 return;
@@ -648,7 +648,7 @@ namespace GameUpSDK
 
         private void RequestInterstitialInternal(string unitId, string where)
         {
-            LogAdTrace("request", AdUnitType.Interstitial, unitId, where);
+            LogAdTrace("request", AdUnitTypeV1.Interstitial, unitId, where);
             var request = new AdRequest();
             InterstitialAd.Load(unitId, request, (ad, error) =>
             {
@@ -679,7 +679,7 @@ namespace GameUpSDK
                         RegisterInterstitialEvents(ad, where: null);
                     }
 
-                    LogAdTrace("load_success", AdUnitType.Interstitial, ad.GetAdUnitID(), where);
+                    LogAdTrace("load_success", AdUnitTypeV1.Interstitial, ad.GetAdUnitID(), where);
                     OnInterstitialLoaded?.Invoke();
                 });
             });
@@ -687,7 +687,7 @@ namespace GameUpSDK
 
         private void RequestRewardedInternal(string unitId, string where)
         {
-            LogAdTrace("request", AdUnitType.RewardedVideo, unitId, where);
+            LogAdTrace("request", AdUnitTypeV1.RewardedVideo, unitId, where);
             var request = new AdRequest();
             RewardedAd.Load(unitId, request, (ad, error) =>
             {
@@ -716,7 +716,7 @@ namespace GameUpSDK
                         _rewardedAd = ad;
                     }
 
-                    LogAdTrace("load_success", AdUnitType.RewardedVideo, ad.GetAdUnitID(), where);
+                    LogAdTrace("load_success", AdUnitTypeV1.RewardedVideo, ad.GetAdUnitID(), where);
                     OnRewardedLoaded?.Invoke();
                     ad.OnAdPaid += adValue =>
                     {
@@ -742,7 +742,7 @@ namespace GameUpSDK
 
         private void RequestAppOpenInternal(string unitId, string where)
         {
-            LogAdTrace("request", AdUnitType.AppOpen, unitId, where);
+            LogAdTrace("request", AdUnitTypeV1.AppOpen, unitId, where);
             if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
             {
                 if (_appOpenByWhere.TryGetValue(where, out var old) && old != null) old.Destroy();
@@ -784,7 +784,7 @@ namespace GameUpSDK
                         _appOpenExpireTime = expire;
                         RegisterAppOpenEvents(ad, where: null);
                     }
-                    LogAdTrace("load_success", AdUnitType.AppOpen, ad.GetAdUnitID(), where, "expireAt=" + expire.ToString("O"));
+                    LogAdTrace("load_success", AdUnitTypeV1.AppOpen, ad.GetAdUnitID(), where, "expireAt=" + expire.ToString("O"));
                 });
             });
         }
@@ -804,7 +804,7 @@ namespace GameUpSDK
                     {
                         if (_interstitialByWhere.TryGetValue(where, out var cur) && cur != null) cur.Destroy();
                         _interstitialByWhere.Remove(where);
-                        var unitId = ResolveUnitId(AdUnitType.Interstitial, where);
+                        var unitId = ResolveUnitId(AdUnitTypeV1.Interstitial, where);
                         if (!string.IsNullOrEmpty(unitId))
                             RequestInterstitialInternal(unitId, where);
                     }
@@ -824,7 +824,7 @@ namespace GameUpSDK
                     {
                         if (_interstitialByWhere.TryGetValue(where, out var cur) && cur != null) cur.Destroy();
                         _interstitialByWhere.Remove(where);
-                        var unitId = ResolveUnitId(AdUnitType.Interstitial, where);
+                        var unitId = ResolveUnitId(AdUnitTypeV1.Interstitial, where);
                         if (!string.IsNullOrEmpty(unitId))
                             RequestInterstitialInternal(unitId, where);
                     }
@@ -873,7 +873,7 @@ namespace GameUpSDK
                         if (_appOpenByWhere.TryGetValue(where, out var cur) && cur != null) cur.Destroy();
                         _appOpenByWhere.Remove(where);
                         _appOpenExpireByWhere.Remove(where);
-                        var unitId = ResolveUnitId(AdUnitType.AppOpen, where);
+                        var unitId = ResolveUnitId(AdUnitTypeV1.AppOpen, where);
                         if (!string.IsNullOrEmpty(unitId))
                             RequestAppOpenInternal(unitId, where);
                     }
@@ -894,7 +894,7 @@ namespace GameUpSDK
                         if (_appOpenByWhere.TryGetValue(where, out var cur) && cur != null) cur.Destroy();
                         _appOpenByWhere.Remove(where);
                         _appOpenExpireByWhere.Remove(where);
-                        var unitId = ResolveUnitId(AdUnitType.AppOpen, where);
+                        var unitId = ResolveUnitId(AdUnitTypeV1.AppOpen, where);
                         if (!string.IsNullOrEmpty(unitId))
                             RequestAppOpenInternal(unitId, where);
                     }
@@ -967,7 +967,7 @@ namespace GameUpSDK
         public bool IsNativeAdAvailable()
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            return _nativeAd != null;
+            return FullScreenNativeAdManager.Instance.IsAdReady();
 #else
             return false;
 #endif
@@ -1014,14 +1014,14 @@ namespace GameUpSDK
             {
                 if (string.IsNullOrEmpty(where) || !_interstitialByWhere.TryGetValue(where, out var multiAd) || multiAd == null || !multiAd.CanShowAd())
                 {
-                    LogAdTrace("show_fail", AdUnitType.Interstitial, ResolveUnitId(AdUnitType.Interstitial, where), where, "reason=not_ready");
+                    LogAdTrace("show_fail", AdUnitTypeV1.Interstitial, ResolveUnitId(AdUnitTypeV1.Interstitial, where), where, "reason=not_ready");
                     onFail?.Invoke();
                     RequestInterstitialAfterNotReady(where);
                     return;
                 }
 
                 _interstitialByWhere.Remove(where);
-                LogAdTrace("show", AdUnitType.Interstitial, multiAd.GetAdUnitID(), where);
+                LogAdTrace("show", AdUnitTypeV1.Interstitial, multiAd.GetAdUnitID(), where);
                 multiAd.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() => onSuccess?.Invoke());
                 multiAd.OnAdFullScreenContentFailed += _ => MainThreadDispatcher.Enqueue(() => onFail?.Invoke());
                 multiAd.Show();
@@ -1030,7 +1030,7 @@ namespace GameUpSDK
 
             if (_interstitialAd == null || !_interstitialAd.CanShowAd())
             {
-                LogAdTrace("show_fail", AdUnitType.Interstitial, GetSingleUnitId(AdUnitType.Interstitial), where, "reason=not_ready");
+                LogAdTrace("show_fail", AdUnitTypeV1.Interstitial, GetSingleUnitId(AdUnitTypeV1.Interstitial), where, "reason=not_ready");
                 onFail?.Invoke();
                 RequestInterstitialAfterNotReady(where);
                 return;
@@ -1038,7 +1038,7 @@ namespace GameUpSDK
 
             var ad = _interstitialAd;
             _interstitialAd = null;
-            LogAdTrace("show", AdUnitType.Interstitial, ad.GetAdUnitID(), where);
+            LogAdTrace("show", AdUnitTypeV1.Interstitial, ad.GetAdUnitID(), where);
             ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() => onSuccess?.Invoke());
             ad.OnAdFullScreenContentFailed += _ => MainThreadDispatcher.Enqueue(() => onFail?.Invoke());
             ad.Show();
@@ -1054,14 +1054,14 @@ namespace GameUpSDK
             {
                 if (string.IsNullOrEmpty(where) || !_rewardedByWhere.TryGetValue(where, out var multiAd) || multiAd == null || !multiAd.CanShowAd())
                 {
-                    LogAdTrace("show_fail", AdUnitType.RewardedVideo, ResolveUnitId(AdUnitType.RewardedVideo, where), where, "reason=not_ready");
+                    LogAdTrace("show_fail", AdUnitTypeV1.RewardedVideo, ResolveUnitId(AdUnitTypeV1.RewardedVideo, where), where, "reason=not_ready");
                     onFail?.Invoke();
                     RequestRewardedAfterNotReady(where);
                     return;
                 }
 
                 _rewardedByWhere.Remove(where);
-                LogAdTrace("show", AdUnitType.RewardedVideo, multiAd.GetAdUnitID(), where);
+                LogAdTrace("show", AdUnitTypeV1.RewardedVideo, multiAd.GetAdUnitID(), where);
                 AdsRules.BeginInterstitialCappingPause();
                 var rewardGrantedMulti = false;
                 multiAd.OnAdFullScreenContentClosed += () =>
@@ -1070,7 +1070,7 @@ namespace GameUpSDK
                     {
                         AdsRules.EndInterstitialCappingPause();
                         if (!rewardGrantedMulti) onFail?.Invoke();
-                        var unitId = ResolveUnitId(AdUnitType.RewardedVideo, where);
+                        var unitId = ResolveUnitId(AdUnitTypeV1.RewardedVideo, where);
                         if (!string.IsNullOrEmpty(unitId)) RequestRewardedInternal(unitId, where);
                     });
                 };
@@ -1080,7 +1080,7 @@ namespace GameUpSDK
                     {
                         AdsRules.EndInterstitialCappingPause();
                         onFail?.Invoke();
-                        var unitId = ResolveUnitId(AdUnitType.RewardedVideo, where);
+                        var unitId = ResolveUnitId(AdUnitTypeV1.RewardedVideo, where);
                         if (!string.IsNullOrEmpty(unitId)) RequestRewardedInternal(unitId, where);
                     });
                 };
@@ -1094,7 +1094,7 @@ namespace GameUpSDK
 
             if (_rewardedAd == null || !_rewardedAd.CanShowAd())
             {
-                LogAdTrace("show_fail", AdUnitType.RewardedVideo, GetSingleUnitId(AdUnitType.RewardedVideo), where, "reason=not_ready");
+                LogAdTrace("show_fail", AdUnitTypeV1.RewardedVideo, GetSingleUnitId(AdUnitTypeV1.RewardedVideo), where, "reason=not_ready");
                 onFail?.Invoke();
                 RequestRewardedAfterNotReady(where);
                 return;
@@ -1104,7 +1104,7 @@ namespace GameUpSDK
             var rewardGranted = false;
             var ad = _rewardedAd;
             _rewardedAd = null;
-            LogAdTrace("show", AdUnitType.RewardedVideo, ad.GetAdUnitID(), where);
+            LogAdTrace("show", AdUnitTypeV1.RewardedVideo, ad.GetAdUnitID(), where);
             ad.OnAdFullScreenContentClosed += () =>
             {
                 MainThreadDispatcher.Enqueue(() =>
@@ -1145,24 +1145,24 @@ namespace GameUpSDK
                     DateTime.Now >= exp ||
                     !multiAd.CanShowAd())
                 {
-                    LogAdTrace("show_fail", AdUnitType.AppOpen, ResolveUnitId(AdUnitType.AppOpen, where), where, "reason=not_ready_or_expired");
+                    LogAdTrace("show_fail", AdUnitTypeV1.AppOpen, ResolveUnitId(AdUnitTypeV1.AppOpen, where), where, "reason=not_ready_or_expired");
                     onFail?.Invoke();
                     return;
                 }
 
                 _appOpenByWhere.Remove(where);
                 _appOpenExpireByWhere.Remove(where);
-                LogAdTrace("show", AdUnitType.AppOpen, multiAd.GetAdUnitID(), where);
+                LogAdTrace("show", AdUnitTypeV1.AppOpen, multiAd.GetAdUnitID(), where);
                 multiAd.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
                 {
                     onSuccess?.Invoke();
-                    var unitId = ResolveUnitId(AdUnitType.AppOpen, where);
+                    var unitId = ResolveUnitId(AdUnitTypeV1.AppOpen, where);
                     if (!string.IsNullOrEmpty(unitId)) RequestAppOpenInternal(unitId, where);
                 });
                 multiAd.OnAdFullScreenContentFailed += _ => MainThreadDispatcher.Enqueue(() =>
                 {
                     onFail?.Invoke();
-                    var unitId = ResolveUnitId(AdUnitType.AppOpen, where);
+                    var unitId = ResolveUnitId(AdUnitTypeV1.AppOpen, where);
                     if (!string.IsNullOrEmpty(unitId)) RequestAppOpenInternal(unitId, where);
                 });
                 multiAd.Show();
@@ -1171,14 +1171,14 @@ namespace GameUpSDK
 
             if (_appOpenAd == null || !_appOpenAd.CanShowAd() || DateTime.Now >= _appOpenExpireTime)
             {
-                LogAdTrace("show_fail", AdUnitType.AppOpen, GetSingleUnitId(AdUnitType.AppOpen), where, "reason=not_ready_or_expired");
+                LogAdTrace("show_fail", AdUnitTypeV1.AppOpen, GetSingleUnitId(AdUnitTypeV1.AppOpen), where, "reason=not_ready_or_expired");
                 onFail?.Invoke();
                 return;
             }
 
             var ad = _appOpenAd;
             _appOpenAd = null;
-            LogAdTrace("show", AdUnitType.AppOpen, ad.GetAdUnitID(), where);
+            LogAdTrace("show", AdUnitTypeV1.AppOpen, ad.GetAdUnitID(), where);
             ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
             {
                 onSuccess?.Invoke();
@@ -1235,7 +1235,7 @@ namespace GameUpSDK
 #endif
         }
 
-        private string ResolveUnitId(AdUnitType type, string where)
+        private string ResolveUnitId(AdUnitTypeV1 typeV1, string where)
         {
             var normalizedWhere = string.IsNullOrWhiteSpace(where) ? null : where.Trim();
             if (useMultiAdUnitIds && !string.IsNullOrEmpty(normalizedWhere))
@@ -1245,19 +1245,19 @@ namespace GameUpSDK
                 {
                     var e = activeAdUnitIds[i];
                     if (e == null) continue;
-                    if (e.AdType != type) continue;
+                    if (e.AdTypeV1 != typeV1) continue;
                     if (!e.IsValid()) continue;
                     if (string.Equals(e.NameId?.Trim(), normalizedWhere, StringComparison.OrdinalIgnoreCase))
                         return e.Id;
                 }
             }
 
-            switch (type)
+            switch (typeV1)
             {
-                case AdUnitType.Banner: return GetSingleUnitId(AdUnitType.Banner);
-                case AdUnitType.Interstitial: return GetSingleUnitId(AdUnitType.Interstitial);
-                case AdUnitType.RewardedVideo: return GetSingleUnitId(AdUnitType.RewardedVideo);
-                case AdUnitType.AppOpen: return GetSingleUnitId(AdUnitType.AppOpen);
+                case AdUnitTypeV1.Banner: return GetSingleUnitId(AdUnitTypeV1.Banner);
+                case AdUnitTypeV1.Interstitial: return GetSingleUnitId(AdUnitTypeV1.Interstitial);
+                case AdUnitTypeV1.RewardedVideo: return GetSingleUnitId(AdUnitTypeV1.RewardedVideo);
+                case AdUnitTypeV1.AppOpen: return GetSingleUnitId(AdUnitTypeV1.AppOpen);
                 default: return null;
             }
         }
@@ -1283,27 +1283,27 @@ namespace GameUpSDK
 #endif
         }
 
-        private string GetSingleUnitId(AdUnitType type)
+        private string GetSingleUnitId(AdUnitTypeV1 typeV1)
         {
             bool isAndroid = GetRuntimeAdPlatform() == RuntimeAdPlatform.Android;
-            switch (type)
+            switch (typeV1)
             {
-                case AdUnitType.Banner:
+                case AdUnitTypeV1.Banner:
                     return isAndroid ? bannerAdUnitIdAndroid : bannerAdUnitIdIOS;
-                case AdUnitType.Interstitial:
+                case AdUnitTypeV1.Interstitial:
                     return isAndroid ? interstitialAdUnitIdAndroid : interstitialAdUnitIdIOS;
-                case AdUnitType.RewardedVideo:
+                case AdUnitTypeV1.RewardedVideo:
                     return isAndroid ? rewardedAdUnitIdAndroid : rewardedAdUnitIdIOS;
-                case AdUnitType.AppOpen:
+                case AdUnitTypeV1.AppOpen:
                     return isAndroid ? appOpenAdUnitIdAndroid : appOpenAdUnitIdIOS;
-                case AdUnitType.NativeAd:
+                case AdUnitTypeV1.NativeAd:
                     return isAndroid ? nativeAdUnitIdAndroid : nativeAdUnitIdIOS;
                 default:
                     return null;
             }
         }
 
-        private System.Collections.Generic.List<AdUnitIdEntry> GetActiveAdUnitIds()
+        private System.Collections.Generic.List<AdUnitIdEntryV1> GetActiveAdUnitIds()
         {
             bool isAndroid = GetRuntimeAdPlatform() == RuntimeAdPlatform.Android;
             var preferred = isAndroid ? adUnitIdsAndroid : adUnitIdsIOS;
@@ -1312,12 +1312,12 @@ namespace GameUpSDK
                 return preferred;
             if (fallback != null && fallback.Count > 0)
                 return fallback;
-            return preferred ?? new System.Collections.Generic.List<AdUnitIdEntry>();
+            return preferred ?? new System.Collections.Generic.List<AdUnitIdEntryV1>();
         }
 
-        bool IAdUnitIdResolver.TryResolve(int intId, out AdUnitType adType, out string nameId)
+        bool IAdUnitIdResolver.TryResolve(int intId, out AdUnitTypeV1 adTypeV1, out string nameId)
         {
-            adType = AdUnitType.Interstitial;
+            adTypeV1 = AdUnitTypeV1.Interstitial;
             nameId = null;
 
             var activeAdUnitIds = GetActiveAdUnitIds();
@@ -1330,7 +1330,7 @@ namespace GameUpSDK
                 if (e == null) continue;
                 if (e.intId != intId) continue;
                 if (!e.IsValid()) continue;
-                adType = e.AdType;
+                adTypeV1 = e.AdTypeV1;
                 nameId = e.NameId;
                 return !string.IsNullOrEmpty(nameId);
             }
@@ -1342,7 +1342,7 @@ namespace GameUpSDK
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (!useMultiAdUnitIds) return IsBannerAvailable();
-            var unitId = ResolveUnitId(AdUnitType.Banner, where);
+            var unitId = ResolveUnitId(AdUnitTypeV1.Banner, where);
             return !string.IsNullOrEmpty(unitId); // banner can be created on demand
 #else
             return false;
@@ -1353,7 +1353,7 @@ namespace GameUpSDK
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (!useMultiAdUnitIds) return IsCollapsibleBannerAvailable();
-            return !string.IsNullOrEmpty(ResolveUnitId(AdUnitType.Banner, where));
+            return !string.IsNullOrEmpty(ResolveUnitId(AdUnitTypeV1.Banner, where));
 #else
             return false;
 #endif
@@ -1403,10 +1403,7 @@ namespace GameUpSDK
         public bool IsNativeAdAvailable(string where)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            if (!useMultiAdUnitIds) return IsNativeAdAvailable();
-            return !string.IsNullOrEmpty(where) &&
-                   _nativeOverlayAdsByWhere.TryGetValue(where, out var ad) &&
-                   ad != null;
+            return FullScreenNativeAdManager.Instance.IsAdReady();
 #else
             return false;
 #endif

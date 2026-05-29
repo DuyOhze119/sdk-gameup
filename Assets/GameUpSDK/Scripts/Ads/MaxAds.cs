@@ -26,12 +26,12 @@ namespace GameUpSDK
         private bool useMultiAdUnitIds;
 
         [Tooltip("Danh sách mapping Android: (AdType, NameId=where, Id=ad unit id).")] [SerializeField]
-        private System.Collections.Generic.List<AdUnitIdEntry> adUnitIdsAndroid =
-            new System.Collections.Generic.List<AdUnitIdEntry>();
+        private System.Collections.Generic.List<AdUnitIdEntryV1> adUnitIdsAndroid =
+            new System.Collections.Generic.List<AdUnitIdEntryV1>();
 
         [Tooltip("Danh sách mapping iOS: (AdType, NameId=where, Id=ad unit id).")] [SerializeField]
-        private System.Collections.Generic.List<AdUnitIdEntry> adUnitIdsIOS =
-            new System.Collections.Generic.List<AdUnitIdEntry>();
+        private System.Collections.Generic.List<AdUnitIdEntryV1> adUnitIdsIOS =
+            new System.Collections.Generic.List<AdUnitIdEntryV1>();
 
         [Header("Single IDs (Fallback)")] [SerializeField]
         private string bannerAdUnitIdAndroid;
@@ -61,9 +61,9 @@ namespace GameUpSDK
 
         private static string Safe(string value) => string.IsNullOrEmpty(value) ? "null" : value;
 
-        private void LogAdTrace(string phase, AdUnitType type, string unitId, string where = null, string extra = null)
+        private void LogAdTrace(string phase, AdUnitTypeV1 typeV1, string unitId, string where = null, string extra = null)
         {
-            var message = $"[GameUp] MaxAds {phase} | type={type} | where={Safe(where)} | unitId={Safe(unitId)}";
+            var message = $"[GameUp] MaxAds {phase} | type={typeV1} | where={Safe(where)} | unitId={Safe(unitId)}";
             if (!string.IsNullOrEmpty(extra)) message += " | " + extra;
             Debug.Log(message);
         }
@@ -191,7 +191,7 @@ namespace GameUpSDK
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (!_initialized) return;
-            string unitId = ResolveUnitId(AdUnitType.Banner, null);
+            string unitId = ResolveUnitId(AdUnitTypeV1.Banner, null);
             if (string.IsNullOrEmpty(unitId)) return;
 
             MaxSdk.CreateBanner(unitId, MaxSdkBase.BannerPosition.BottomCenter);
@@ -204,7 +204,7 @@ namespace GameUpSDK
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (!_initialized) return;
-            string unitId = ResolveUnitId(AdUnitType.Banner, where);
+            string unitId = ResolveUnitId(AdUnitTypeV1.Banner, where);
             if (string.IsNullOrEmpty(unitId)) return;
 
             var pos = placement == CollapsibleBannerPlacement.Top
@@ -218,7 +218,7 @@ namespace GameUpSDK
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (!_initialized) return;
-            ExecuteForAllUnits(AdUnitType.Interstitial, (id) => MaxSdk.LoadInterstitial(id));
+            ExecuteForAllUnits(AdUnitTypeV1.Interstitial, (id) => MaxSdk.LoadInterstitial(id));
 #endif
         }
 
@@ -226,7 +226,7 @@ namespace GameUpSDK
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (!_initialized) return;
-            ExecuteForAllUnits(AdUnitType.RewardedVideo, (id) => MaxSdk.LoadRewardedAd(id));
+            ExecuteForAllUnits(AdUnitTypeV1.RewardedVideo, (id) => MaxSdk.LoadRewardedAd(id));
 #endif
         }
 
@@ -234,7 +234,7 @@ namespace GameUpSDK
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             if (!_initialized) return;
-            ExecuteForAllUnits(AdUnitType.AppOpen, (id) => MaxSdk.LoadAppOpenAd(id));
+            ExecuteForAllUnits(AdUnitTypeV1.AppOpen, (id) => MaxSdk.LoadAppOpenAd(id));
 #endif
         }
 
@@ -247,7 +247,7 @@ namespace GameUpSDK
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             _bannerPlacementForShow = string.IsNullOrEmpty(where) ? "main" : where;
-            string unitId = ResolveUnitId(AdUnitType.Banner, where);
+            string unitId = ResolveUnitId(AdUnitTypeV1.Banner, where);
             if (!string.IsNullOrEmpty(unitId)) MaxSdk.ShowBanner(unitId);
 #endif
         }
@@ -261,7 +261,7 @@ namespace GameUpSDK
         public void HideBanner(string where)
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            string unitId = ResolveUnitId(AdUnitType.Banner, where);
+            string unitId = ResolveUnitId(AdUnitTypeV1.Banner, where);
             if (!string.IsNullOrEmpty(unitId)) MaxSdk.HideBanner(unitId);
 #endif
         }
@@ -269,7 +269,7 @@ namespace GameUpSDK
         public void ShowInterstitial(string where, Action onSuccess, Action onFail)
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            string unitId = ResolveUnitId(AdUnitType.Interstitial, where);
+            string unitId = ResolveUnitId(AdUnitTypeV1.Interstitial, where);
             if (MaxSdk.IsInterstitialReady(unitId))
             {
                 MaxSdkCallbacks.Interstitial.OnAdHiddenEvent += HandleHidden;
@@ -296,7 +296,7 @@ namespace GameUpSDK
         public void ShowRewardedVideo(string where, Action onSuccess, Action onFail)
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            string unitId = ResolveUnitId(AdUnitType.RewardedVideo, where);
+            string unitId = ResolveUnitId(AdUnitTypeV1.RewardedVideo, where);
             bool rewardedEarned = false;
 
             if (MaxSdk.IsRewardedAdReady(unitId))
@@ -350,7 +350,7 @@ namespace GameUpSDK
         public void ShowAppOpenAds(string where, Action onSuccess, Action onFail)
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            string unitId = ResolveUnitId(AdUnitType.AppOpen, where);
+            string unitId = ResolveUnitId(AdUnitTypeV1.AppOpen, where);
             if (MaxSdk.IsAppOpenAdReady(unitId))
             {
                 MaxSdkCallbacks.AppOpen.OnAdHiddenEvent += HandleHidden;
@@ -389,7 +389,7 @@ namespace GameUpSDK
         public bool IsInterstitialAvailable()
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            return MaxSdk.IsInterstitialReady(ResolveUnitId(AdUnitType.Interstitial, null));
+            return MaxSdk.IsInterstitialReady(ResolveUnitId(AdUnitTypeV1.Interstitial, null));
 #endif
             return false;
         }
@@ -397,7 +397,7 @@ namespace GameUpSDK
         public bool IsRewardedVideoAvailable()
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            return MaxSdk.IsRewardedAdReady(ResolveUnitId(AdUnitType.RewardedVideo, null));
+            return MaxSdk.IsRewardedAdReady(ResolveUnitId(AdUnitTypeV1.RewardedVideo, null));
 #endif
             return false;
         }
@@ -405,7 +405,7 @@ namespace GameUpSDK
         public bool IsAppOpenAdsAvailable()
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            return MaxSdk.IsAppOpenAdReady(ResolveUnitId(AdUnitType.AppOpen, null));
+            return MaxSdk.IsAppOpenAdReady(ResolveUnitId(AdUnitTypeV1.AppOpen, null));
 #endif
             return false;
         }
@@ -415,15 +415,15 @@ namespace GameUpSDK
             return false;
         }
 
-        public bool IsBannerAvailable(string where) => !string.IsNullOrEmpty(ResolveUnitId(AdUnitType.Banner, where));
+        public bool IsBannerAvailable(string where) => !string.IsNullOrEmpty(ResolveUnitId(AdUnitTypeV1.Banner, where));
 
         public bool IsCollapsibleBannerAvailable(string where) =>
-            !string.IsNullOrEmpty(ResolveUnitId(AdUnitType.Banner, where));
+            !string.IsNullOrEmpty(ResolveUnitId(AdUnitTypeV1.Banner, where));
 
         public bool IsInterstitialAvailable(string where)
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            return MaxSdk.IsInterstitialReady(ResolveUnitId(AdUnitType.Interstitial, where));
+            return MaxSdk.IsInterstitialReady(ResolveUnitId(AdUnitTypeV1.Interstitial, where));
 #endif
             return false;
         }
@@ -431,7 +431,7 @@ namespace GameUpSDK
         public bool IsRewardedVideoAvailable(string where)
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            return MaxSdk.IsRewardedAdReady(ResolveUnitId(AdUnitType.RewardedVideo, where));
+            return MaxSdk.IsRewardedAdReady(ResolveUnitId(AdUnitTypeV1.RewardedVideo, where));
 #endif
             return false;
         }
@@ -439,7 +439,7 @@ namespace GameUpSDK
         public bool IsAppOpenAdsAvailable(string where)
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
-            return MaxSdk.IsAppOpenAdReady(ResolveUnitId(AdUnitType.AppOpen, where));
+            return MaxSdk.IsAppOpenAdReady(ResolveUnitId(AdUnitTypeV1.AppOpen, where));
 #endif
             return false;
         }
@@ -450,22 +450,22 @@ namespace GameUpSDK
         }
 
         // ---- RESOLVERS / HELPERS ----
-        private void ExecuteForAllUnits(AdUnitType type, Action<string> action)
+        private void ExecuteForAllUnits(AdUnitTypeV1 typeV1, Action<string> action)
         {
             if (!useMultiAdUnitIds)
             {
-                string singleId = GetSingleUnitId(type);
+                string singleId = GetSingleUnitId(typeV1);
                 if (!string.IsNullOrEmpty(singleId)) action(singleId);
                 return;
             }
 
             foreach (var e in GetActiveAdUnitIds())
             {
-                if (e != null && e.AdType == type && e.IsValid()) action(e.Id);
+                if (e != null && e.AdTypeV1 == typeV1 && e.IsValid()) action(e.Id);
             }
         }
 
-        private string ResolveUnitId(AdUnitType type, string where)
+        private string ResolveUnitId(AdUnitTypeV1 typeV1, string where)
         {
             var normalizedWhere = string.IsNullOrWhiteSpace(where) ? null : where.Trim();
             if (useMultiAdUnitIds && !string.IsNullOrEmpty(normalizedWhere))
@@ -474,24 +474,24 @@ namespace GameUpSDK
                 for (int i = 0; i < activeAdUnitIds.Count; i++)
                 {
                     var e = activeAdUnitIds[i];
-                    if (e != null && e.AdType == type && e.IsValid() && string.Equals(e.NameId?.Trim(), normalizedWhere,
+                    if (e != null && e.AdTypeV1 == typeV1 && e.IsValid() && string.Equals(e.NameId?.Trim(), normalizedWhere,
                             StringComparison.OrdinalIgnoreCase))
                         return e.Id;
                 }
             }
 
-            return GetSingleUnitId(type);
+            return GetSingleUnitId(typeV1);
         }
 
-        private string GetSingleUnitId(AdUnitType type)
+        private string GetSingleUnitId(AdUnitTypeV1 typeV1)
         {
             bool isAndroid = GetRuntimeAdPlatform() == RuntimeAdPlatform.Android;
-            return type switch
+            return typeV1 switch
             {
-                AdUnitType.Banner => isAndroid ? bannerAdUnitIdAndroid : bannerAdUnitIdIOS,
-                AdUnitType.Interstitial => isAndroid ? interstitialAdUnitIdAndroid : interstitialAdUnitIdIOS,
-                AdUnitType.RewardedVideo => isAndroid ? rewardedAdUnitIdAndroid : rewardedAdUnitIdIOS,
-                AdUnitType.AppOpen => isAndroid ? appOpenAdUnitIdAndroid : appOpenAdUnitIdIOS,
+                AdUnitTypeV1.Banner => isAndroid ? bannerAdUnitIdAndroid : bannerAdUnitIdIOS,
+                AdUnitTypeV1.Interstitial => isAndroid ? interstitialAdUnitIdAndroid : interstitialAdUnitIdIOS,
+                AdUnitTypeV1.RewardedVideo => isAndroid ? rewardedAdUnitIdAndroid : rewardedAdUnitIdIOS,
+                AdUnitTypeV1.AppOpen => isAndroid ? appOpenAdUnitIdAndroid : appOpenAdUnitIdIOS,
                 _ => null
             };
         }
@@ -515,16 +515,16 @@ namespace GameUpSDK
 #endif
         }
 
-        private System.Collections.Generic.List<AdUnitIdEntry> GetActiveAdUnitIds()
+        private System.Collections.Generic.List<AdUnitIdEntryV1> GetActiveAdUnitIds()
         {
             bool isAndroid = GetRuntimeAdPlatform() == RuntimeAdPlatform.Android;
             var preferred = isAndroid ? adUnitIdsAndroid : adUnitIdsIOS;
-            return preferred ?? new System.Collections.Generic.List<AdUnitIdEntry>();
+            return preferred ?? new System.Collections.Generic.List<AdUnitIdEntryV1>();
         }
 
-        public bool TryResolve(int intId, out AdUnitType adType, out string nameId)
+        public bool TryResolve(int intId, out AdUnitTypeV1 adTypeV1, out string nameId)
         {
-            adType = AdUnitType.Interstitial;
+            adTypeV1 = AdUnitTypeV1.Interstitial;
             nameId = null;
             var activeAdUnitIds = GetActiveAdUnitIds();
             if (!useMultiAdUnitIds || activeAdUnitIds == null) return false;
@@ -534,7 +534,7 @@ namespace GameUpSDK
                 var e = activeAdUnitIds[i];
                 if (e != null && e.intId == intId && e.IsValid())
                 {
-                    adType = e.AdType;
+                    adTypeV1 = e.AdTypeV1;
                     nameId = e.NameId;
                     return true;
                 }

@@ -1,4 +1,5 @@
 using System;
+using UnityEngine.Serialization;
 
 namespace GameUpSDK
 {
@@ -9,7 +10,7 @@ namespace GameUpSDK
         Bottom
     }
 
-    public enum AdUnitType
+    public enum AdUnitTypeV1
     {
         Banner,
         Interstitial,
@@ -25,14 +26,14 @@ namespace GameUpSDK
     /// - id: network ad unit id / placement id
     /// </summary>
     [Serializable]
-    public class AdUnitIdEntry
+    public class AdUnitIdEntryV1
     {
-        public AdUnitType adType;
+        [FormerlySerializedAs("adType")] public AdUnitTypeV1 adTypeV1;
         public int intId;
         public string nameId;
         public string id;
 
-        public AdUnitType AdType => adType;
+        public AdUnitTypeV1 AdTypeV1 => adTypeV1;
         public string NameId => nameId;
         public string Id => id;
 
@@ -62,7 +63,7 @@ namespace GameUpSDK
     /// </summary>
     public interface IAdUnitIdResolver
     {
-        bool TryResolve(int intId, out AdUnitType adType, out string nameId);
+        bool TryResolve(int intId, out AdUnitTypeV1 adTypeV1, out string nameId);
     }
 
     /// <summary>

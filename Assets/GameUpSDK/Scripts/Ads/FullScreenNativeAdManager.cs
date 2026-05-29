@@ -8,6 +8,20 @@ namespace GameUpSDK
         private AndroidJavaObject currentActivity;
         private bool _initialized;
         private string _adUnitId;
+        
+#if UNITY_IOS && !UNITY_EDITOR
+    [DllImport("__Internal")]
+    private static extern void _iosLoadNativeAd(string adUnitId);
+
+    [DllImport("__Internal")]
+    private static extern bool _iosIsNativeAdReady();
+
+    [DllImport("__Internal")]
+    private static extern void _iosShowNativeAd();
+
+    [DllImport("__Internal")]
+    private static extern void _iosHideNativeAd();
+#endif
 
         /// <summary>
         /// Hàm gọi tải trước quảng cáo (Nên gọi sớm, ví dụ khi vừa vào sảnh hoặc bắt đầu Level mới)
@@ -30,6 +44,10 @@ namespace GameUpSDK
             bridgeClass.CallStatic("loadAd", currentActivity, _adUnitId);
         }
 #endif
+            
+#if UNITY_IOS && !UNITY_EDITOR
+            _iosLoadNativeAd(_adUnitId);
+#endif
         }
 
         /// <summary>
@@ -42,6 +60,9 @@ namespace GameUpSDK
         {
             return bridgeClass.CallStatic<bool>("isAdLoaded");
         }
+#endif
+#if UNITY_IOS && !UNITY_EDITOR
+            return _iosIsNativeAdReady();
 #endif
             return false;
         }
@@ -56,6 +77,8 @@ namespace GameUpSDK
 #if UNITY_ANDROID && !UNITY_EDITOR
             Debug.Log("Unity: Quảng cáo đã sẵn sàng, hiển thị ngay.");
             bridgeClass.CallStatic("showAd", currentActivity);
+#elif UNITY_IOS
+            _iosShowNativeAd();
 #endif
             }
             else
@@ -74,7 +97,10 @@ namespace GameUpSDK
             // Sau khi tắt quảng cáo cũ, tự động tải trước quảng cáo mới cho lượt sau
             RequestAd(_adUnitId);
         }
+#elif UNITY_IOS
+        _iosHideNativeAd();
 #endif
+            RequestAd(_adUnitId);
         }
     }
 }

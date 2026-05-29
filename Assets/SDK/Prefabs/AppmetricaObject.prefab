@@ -44,6 +44,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 138b1b37bf184b239d0d0027315c0540, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  apiKey: abc
+  apiKey: 
   enableLogs: 0
-  enableEventLogging: 0
+  enableEventLogging: 1

@@ -537,17 +537,17 @@ namespace GameUpSDK
 
             switch (type)
             {
-                case AdUnitType.Banner:
+                case AdUnitTypeV1.Banner:
                     ShowBanner(where, onRqFail);
                     onSuccess?.Invoke();
                     break;
-                case AdUnitType.Interstitial:
+                case AdUnitTypeV1.Interstitial:
                     ShowInterstitial(where, currentLevel <= 0 ? int.MaxValue : currentLevel, onSuccess, onFail, onRqFail);
                     break;
-                case AdUnitType.RewardedVideo:
+                case AdUnitTypeV1.RewardedVideo:
                     ShowRewardedVideo(where, currentLevel, onSuccess, onFail, onRqFail);
                     break;
-                case AdUnitType.AppOpen:
+                case AdUnitTypeV1.AppOpen:
                     ShowAppOpenAds(where, onSuccess, onFail, onRqFail);
                     break;
                 default:
