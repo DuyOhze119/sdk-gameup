@@ -535,73 +535,7 @@ namespace GameUpSDK
         private void RequestNativeInternal(string unitId, string where)
         {
             Debug.Log($"[GameUp] AdmobAds request | type=Native | where={Safe(where)} | unitId={Safe(unitId)}");
-
-            if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
-            {
-                if (_nativeOverlayAdsByWhere.TryGetValue(where, out var old) && old != null) old.Destroy();
-                _nativeOverlayAdsByWhere.Remove(where);
-            }
-            else
-            {
-                if (_nativeAd != null)
-                {
-                    _nativeAd.Destroy();
-                    _nativeAd = null;
-                }
-            }
-
-            var request = new AdRequest();
-            
-            // Cấu hình Native Overlay - Mặc định hiện ở Botton (Có thể đổi tuỳ UI dự án)
-
-            var options = new NativeAdOptions
-            {
-                AdChoicesPlacement = AdChoicesPlacement.TopRightCorner,
-                MediaAspectRatio = MediaAspectRatio.Any,
-            };
-
-            NativeOverlayAd.Load(unitId, request, options, (ad, error) =>
-            {
-                MainThreadDispatcher.Enqueue(() =>
-                {
-                    if (error != null || ad == null)
-                    {
-                        var message = error?.GetMessage() ?? "unknown";
-                        var code = error != null ? error.GetCode().ToString() : "unknown";
-                        Debug.LogWarning($"[GameUp] AdmobAds load_fail | type=Native | where={Safe(where)} | unitId={Safe(unitId)} | code={code} | message={message}");
-                        return;
-                    }
-
-                    if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
-                    {
-                        _nativeOverlayAdsByWhere[where] = ad;
-                    }
-                    else
-                    {
-                        _nativeAd = ad;
-                    }
-
-                    ad.OnAdPaid += adValue =>
-                    {
-                        MainThreadDispatcher.Enqueue(() =>
-                        {
-                            if (adValue == null) return;
-                            double value = adValue.Value * 0.000001f;
-                            var data = new AdImpressionData
-                            {
-                                AdNetwork = "Admob",
-                                AdUnit = unitId,
-                                InstanceName = unitId,
-                                AdFormat = "NativeOverlay",
-                                Revenue = value
-                            };
-                            AdsEvent.RaiseImpressionDataReady(data);
-                        });
-                    };
-
-                    Debug.Log($"[GameUp] AdmobAds load_success | type=Native | where={Safe(where)} | unitId={unitId}");
-                });
-            });
+            FullScreenNativeAdManager.Instance.RequestAd(unitId);
         }
 #endif
 
@@ -1266,29 +1200,7 @@ namespace GameUpSDK
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             MainThreadDispatcher.Enqueue(() =>
             {
-                if (useMultiAdUnitIds)
-                {
-                    if (string.IsNullOrEmpty(where) || !_nativeOverlayAdsByWhere.TryGetValue(where, out var multiAd) || multiAd == null)
-                    {
-                        Debug.LogWarning($"[GameUp] AdmobAds show_fail | type=Native | where={Safe(where)} | reason=not_ready");
-                        RequestNativeAd(); 
-                        return;
-                    }
-
-                    Debug.Log($"[GameUp] AdmobAds show | type=Native | where={Safe(where)}");
-                    RenderAd(multiAd);
-                    multiAd.Show();
-                    return;
-                }
-
-                if (_nativeAd == null)
-                {
-                    Debug.LogWarning($"[GameUp] AdmobAds show_fail | type=Native | where=null | reason=not_ready");
-                    RequestNativeAd();
-                    return;
-                }
-                RenderAd(_nativeAd);
-                _nativeAd.Show();
+                FullScreenNativeAdManager.Instance.ShowFullScreenAd();
             });
 #endif
         }
@@ -1298,17 +1210,7 @@ namespace GameUpSDK
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IPHONE)
             MainThreadDispatcher.Enqueue(() =>
             {
-                if (useMultiAdUnitIds && !string.IsNullOrEmpty(where))
-                {
-                    if (_nativeOverlayAdsByWhere.TryGetValue(where, out var multiAd) && multiAd != null)
-                    {
-                        multiAd.Hide();
-                    }
-                }
-                else
-                {
-                    _nativeAd?.Hide();
-                }
+                FullScreenNativeAdManager.Instance.ForceCloseAd();
             });
 #endif
         }
