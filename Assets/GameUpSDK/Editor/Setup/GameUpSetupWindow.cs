@@ -12,7 +12,6 @@ namespace GameUpSDK.Editor.Setup
         private List<SetupTabBase> _allTabs;
         private List<SetupTabBase> _visibleTabs;
         private int _activeTabIndex;
-        private AdsManager.PrimaryMediation _lastPrimaryMediation;
         private string _loadErrors;
         private string _saveErrors;
         private Vector2 _scrollPosition;
@@ -47,7 +46,6 @@ namespace GameUpSDK.Editor.Setup
 
         private void RefreshVisibleTabs()
         {
-            _lastPrimaryMediation = GameUpSetupPaths.GetPrimaryMediation();
             _visibleTabs = _allTabs.Where(t => t.IsVisible).ToList();
             if (_activeTabIndex >= _visibleTabs.Count) _activeTabIndex = 0;
         }
@@ -86,9 +84,7 @@ namespace GameUpSDK.Editor.Setup
                 EditorGUILayout.EndScrollView();
                 return;
             }
-
-            if (GameUpSetupPaths.GetPrimaryMediation() != _lastPrimaryMediation) RefreshVisibleTabs();
-
+            
             string[] tabNames = _visibleTabs.Select(t => t.Title).ToArray();
             _activeTabIndex = GUILayout.Toolbar(_activeTabIndex, tabNames);
             EditorGUILayout.Space(8);

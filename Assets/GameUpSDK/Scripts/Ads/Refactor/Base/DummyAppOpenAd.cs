@@ -8,7 +8,11 @@ namespace GameUpSDK.Ads
         {
             
         }
-        
+
+        public override void Load(string where = null)
+        {
+        }
+
         public DummyAppOpenAd(AdUnitConfig config, AdUnitType adType, string networkName) : base(config, adType,
             networkName)
         {

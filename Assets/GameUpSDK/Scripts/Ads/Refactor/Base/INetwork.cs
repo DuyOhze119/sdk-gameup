@@ -17,6 +17,7 @@ namespace GameUpSDK.Ads
         IRewardedAd RewardedAd { get; }
         IAppOpenAd AppOpenAd { get; }
         IBannerAd BannerAd { get; }
+        INativeFullScreenAd NativeFullScreenAd { get; }
         
         bool IsInitialized { get; }
         void Initialize();
@@ -46,12 +47,18 @@ namespace GameUpSDK.Ads
 
     public interface IBannerAd : IAdFormat
     {
-        void Show(string where, CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom);
+        void Show(string where);
         void Hide(string where);
     }
 
     public interface IAppOpenAd : IAdFormat
     {
         void Show(string where, Action onSuccess, Action onFail);
+    }
+
+    public interface INativeFullScreenAd : IAdFormat
+    {
+        void Show(string where, Action onSuccess, Action onFail);
+        void Hide();
     }
 }

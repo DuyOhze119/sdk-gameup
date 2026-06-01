@@ -12,6 +12,7 @@ namespace GameUpSDK.Ads
         [SerializeField] private AdUnitConfig interstitialConfig;
         [SerializeField] private AdUnitConfig bannerConfig;
         [SerializeField] private AdUnitConfig appOpenAdConfig;
+        [SerializeField] private AdUnitConfig nativeAdConfig;
 
         public MediationProvider MediationProvider { get; set; } = MediationProvider.Max;
         public bool IsInitialized { get; private set; }
@@ -21,6 +22,8 @@ namespace GameUpSDK.Ads
         public IInterstitialAd InterstitialAd { get; private set; }
         public IBannerAd BannerAd { get; private set; }
         public IAppOpenAd AppOpenAd { get; private set; }
+        
+        public INativeFullScreenAd NativeFullScreenAd { get; private set; }
 
         public void Initialize()
         {
@@ -39,17 +42,18 @@ namespace GameUpSDK.Ads
                         MaxSdk.ShowMediationDebugger();
                     }
 
-                    // Khởi tạo các module
+                    AppOpenAd = new MaxAppOpenAd(appOpenAdConfig);
                     RewardedAd = new MaxRewardedAd(rewardedConfig);
                     InterstitialAd = new MaxInterstitialAd(interstitialConfig);
                     BannerAd = new MaxBannerAd(bannerConfig);
-                    AppOpenAd = new MaxAppOpenAd(appOpenAdConfig);
+                    NativeFullScreenAd = new DummyNativeFullscreenAd();
 
                     // Preload
                     AppOpenAd.Load();
                     RewardedAd.Load();
                     InterstitialAd.Load();
                     BannerAd.Load();
+                    NativeFullScreenAd.Load();
                 });
             };
 

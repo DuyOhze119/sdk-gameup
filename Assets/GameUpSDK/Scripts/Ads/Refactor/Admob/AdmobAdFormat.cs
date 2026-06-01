@@ -3,7 +3,6 @@ using System.Collections.Generic;
 #if ADMOB_DEPENDENCIES_INSTALLED
 using GoogleMobileAds.Api;
 #endif
-using UnityEngine;
 
 namespace GameUpSDK.Ads
 {
@@ -246,27 +245,84 @@ namespace GameUpSDK.Ads
     public class AdmobBannerAd : BaseAdFormat, IBannerAd
     {
 #if ADMOB_DEPENDENCIES_INSTALLED
-        private Dictionary<string, BannerView> _banners = new Dictionary<string, BannerView>();
+        private readonly Dictionary<string, BannerView> _banners = new Dictionary<string, BannerView>();
 #endif
+        private readonly Dictionary<string, bool> _isLoaded = new Dictionary<string, bool>();
+        
+
         public AdmobBannerAd(AdUnitConfig config) : base(config, AdUnitType.Banner, "Admob")
         {
+            
         }
 
         public override bool IsAvailable(string where = null)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
             string key = GetKey(where);
-            return _banners.TryGetValue(key, out var banner) && banner != null;
+            var available = _isLoaded.TryGetValue(key, out var isLoaded) && isLoaded;
+            UnityEngine.Debug.Log($"[GameUp] Banner available: {available} - where: {where}");
+            return available;
 #endif
             return false;
         }
 
         protected override void RequestAdInternal(string unitId, string where)
         {
-            HandleLoadSuccess(unitId, where);
+#if ADMOB_DEPENDENCIES_INSTALLED
+            string key = GetKey(where);
+
+            // Lấy thẳng Config Entry từ Setup Window
+            var entry = _config.GetEntry(_adType, where);
+
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (_banners.TryGetValue(key, out var oldBanner) && oldBanner != null) oldBanner.Destroy();
+                _isLoaded[key] = false;
+
+                var pos = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top
+                    ? AdPosition.Top
+                    : AdPosition.Bottom;
+                var size = GetAdMobBannerSize(entry.BannerSize);
+
+                var banner = new BannerView(unitId, size, pos);
+                _banners[key] = banner;
+
+                banner.OnBannerAdLoaded += () =>
+                {
+                    MainThreadDispatcher.Enqueue(() =>
+                    {
+                        _isLoaded[key] = true;
+                        HandleLoadSuccess(unitId, where);
+                        banner.Hide();
+                    });
+                };
+
+                banner.OnBannerAdLoadFailed += (err) =>
+                {
+                    MainThreadDispatcher.Enqueue(() =>
+                    {
+                        _isLoaded[key] = false;
+                        HandleLoadFailed(unitId, where, err?.GetMessage());
+                    });
+                };
+
+                banner.OnAdPaid += (adValue) =>
+                {
+                    if (adValue != null) TrackRevenue(unitId, key, "Banner", adValue.Value * 0.000001f);
+                };
+
+                var request = new AdRequest();
+                if (entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top)
+                    request.Extras.Add("collapsible", "top");
+                else if (entry.CollapsiblePlacement == CollapsibleBannerPlacement.Bottom)
+                    request.Extras.Add("collapsible", "bottom");
+
+                banner.LoadAd(request);
+            });
+#endif
         }
 
-        public void Show(string where, CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom)
+        public void Show(string where)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
             MainThreadDispatcher.Enqueue(() =>
@@ -279,22 +335,13 @@ namespace GameUpSDK.Ads
                     return;
                 }
 
-                if (_banners.TryGetValue(key, out var oldBanner) && oldBanner != null) oldBanner.Destroy();
-                var pos = placement == CollapsibleBannerPlacement.Top ? AdPosition.Top : AdPosition.Bottom;
-                var size = AdSize.GetCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(AdSize.FullWidth);
-                var banner = new BannerView(unitId, size, pos);
-                var request = new AdRequest();
-                if (placement == CollapsibleBannerPlacement.Top) request.Extras.Add("collapsible", "top");
-                else if (placement == CollapsibleBannerPlacement.Bottom) request.Extras.Add("collapsible", "bottom");
-
-                banner.OnAdPaid += (adValue) =>
+                if (_isLoaded.TryGetValue(key, out bool loaded) && loaded)
                 {
-                    if (adValue != null) TrackRevenue(unitId, key, "Banner", adValue.Value * 0.000001f);
-                };
-                banner.LoadAd(request);
-                NotifyAdDisplayed(where);
-                banner.Show();
-                _banners[key] = banner;
+                    NotifyAdDisplayed(where);
+                    _banners[key].Show();
+                    UnityEngine.Debug.Log($"[GameUp] Banner available: {loaded}");
+                }
+                else Load(where);
             });
 #endif
         }
@@ -302,8 +349,77 @@ namespace GameUpSDK.Ads
         public void Hide(string where)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            if (_banners.TryGetValue(GetKey(where), out var banner) && banner != null) banner.Hide();
+            string key = GetKey(where);
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (_banners.TryGetValue(key, out var banner) && banner != null) banner.Hide();
+            });
 #endif
+        }
+
+        private AdSize GetAdMobBannerSize(BannerSize size)
+        {
+            switch (size)
+            {
+                case BannerSize.Banner: return AdSize.Banner;
+                case BannerSize.Adaptive:
+                    return AdSize.GetCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(AdSize.FullWidth);
+                case BannerSize.MediumRectangle: return AdSize.MediumRectangle;
+                case BannerSize.Leaderboard: return AdSize.Leaderboard;
+                case BannerSize.Large:
+                default: return new AdSize(320, 100);
+            }
+        }
+    }
+
+    public class AdmobNativeFullscreenAd : BaseAdFormat, INativeFullScreenAd
+    {
+        private string _bannerId;
+        private string _where;
+        public AdmobNativeFullscreenAd(AdUnitConfig config) : base(config, AdUnitType.NativeAd, "Admob")
+        {
+            FullScreenNativeAdManager.Instance.OnAdClosedEvent += OnNativeAdClosed;
+            FullScreenNativeAdManager.Instance.OnAdLoadedEvent += OnNativeAdLoaded;
+            FullScreenNativeAdManager.Instance.OnAdLoadFailedEvent += OnNativeAdLoadFailed;
+        }
+
+        public override bool IsAvailable(string where = null)
+        {
+            return FullScreenNativeAdManager.Instance.IsAdReady();
+        }
+
+        protected override void RequestAdInternal(string unitId, string where)
+        {
+            _where = where;
+            _bannerId = unitId;
+            FullScreenNativeAdManager.Instance.RequestAd(unitId);
+        }
+
+        public void Show(string where, Action onSuccess, Action onFail)
+        {
+            _where = where;
+            FullScreenNativeAdManager.Instance.ShowFullScreenAd();
+        }
+
+        public void Hide()
+        {
+            FullScreenNativeAdManager.Instance.ForceCloseAd();
+        }
+
+        private void OnNativeAdClosed()
+        {
+            NotifyAdClosed(_where);
+            Load(_where);
+        }
+        
+        private void OnNativeAdLoaded()
+        {
+            HandleLoadSuccess(_bannerId, _where);
+        }
+        
+        private void OnNativeAdLoadFailed(string error)
+        {
+            HandleLoadFailed(_bannerId, _where, error);
         }
     }
 }

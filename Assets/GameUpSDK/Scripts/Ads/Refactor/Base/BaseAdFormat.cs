@@ -38,7 +38,7 @@ namespace GameUpSDK.Ads
             _networkName = networkName;
         }
 
-        protected string GetKey(string where) => string.IsNullOrEmpty(where) ? "default" : where;
+        protected string GetKey(string where) => _config.ResolveUnitId(_adType, where);
 
         public virtual void Load(string where = null)
         {

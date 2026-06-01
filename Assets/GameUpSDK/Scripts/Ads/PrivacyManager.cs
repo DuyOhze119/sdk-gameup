@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using GameUpSDK.Ads;
 using UnityEngine;
 using GameUpSDK.Singletons;
 #if ADMOB_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IOS)
@@ -62,7 +63,7 @@ namespace GameUpSDK
             // Giả sử AdsManager của bạn là Singleton
             if (AdsManager.Instance != null)
             {
-                AdsManager.Instance.SetAfterCheckGDPR(_consentGranted);
+                AdsManager.Instance.SetConsent(_consentGranted);
             }
 
             _onCompleted?.Invoke(_consentGranted);

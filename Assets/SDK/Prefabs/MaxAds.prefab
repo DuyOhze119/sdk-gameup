@@ -70,3 +70,9 @@ MonoBehaviour:
     defaultIdIOS: 
     multiIdsAndroid: []
     multiIdsIOS: []
+  nativeAdConfig:
+    useMultiAdUnitIds: 0
+    defaultIdAndroid: 
+    defaultIdIOS: 
+    multiIdsAndroid: []
+    multiIdsIOS: []

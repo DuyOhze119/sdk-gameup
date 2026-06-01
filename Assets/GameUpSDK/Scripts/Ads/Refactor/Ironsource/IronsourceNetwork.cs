@@ -8,15 +8,18 @@ namespace GameUpSDK.Ads
 
         [Header("Ad Unit Configs (Placements)")]
         public AdUnitConfig interstitialConfig;
+
         public AdUnitConfig rewardedConfig;
         public AdUnitConfig bannerConfig;
-        
+
         public MediationProvider MediationProvider { get; set; } = MediationProvider.IronSource;
         public bool IsInitialized { get; private set; }
         public IInterstitialAd InterstitialAd { get; private set; }
         public IRewardedAd RewardedAd { get; private set; }
         public IAppOpenAd AppOpenAd { get; private set; }
         public IBannerAd BannerAd { get; private set; }
+
+        public INativeFullScreenAd NativeFullScreenAd { get; private set; }
 
         public void Initialize()
         {
@@ -34,19 +37,22 @@ namespace GameUpSDK.Ads
                     RewardedAd = new IronSourceRewardedAd(rewardedConfig);
                     BannerAd = new IronSourceBannerAd(bannerConfig);
                     AppOpenAd = new DummyAppOpenAd();
+                    NativeFullScreenAd = new DummyNativeFullscreenAd();
                     // LevelPlay không có AppOpenAd, gán null hoặc tạo 1 class Dummy trả về false
-                    
+
                     Unity.Services.LevelPlay.LevelPlay.OnImpressionDataReady += OnImpression;
 
+                    AppOpenAd.Load();
                     InterstitialAd.Load();
                     RewardedAd.Load();
                     BannerAd.Load();
+                    NativeFullScreenAd.Load();
                 });
             };
             Unity.Services.LevelPlay.LevelPlay.Init(levelPlayAppKey);
 #endif
         }
-
+        
         public void SetConsent(bool isConsent)
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED

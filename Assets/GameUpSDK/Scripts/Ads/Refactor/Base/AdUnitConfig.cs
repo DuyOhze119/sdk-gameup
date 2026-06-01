@@ -7,36 +7,48 @@ namespace GameUpSDK.Ads
     [Serializable]
     public class AdUnitConfig
     {
-        [Tooltip("Bật để dùng Multi-IDs theo where")]
         public bool useMultiAdUnitIds;
         
         [Header("Default Single IDs")]
         public string defaultIdAndroid;
         public string defaultIdIOS;
         
+        // Bổ sung cấu hình mặc định khi không dùng Multi Ids
+        public BannerSize defaultBannerSize = BannerSize.Adaptive;
+        public CollapsibleBannerPlacement defaultCollapsible = CollapsibleBannerPlacement.None;
+        
         [Header("Multi IDs")]
         public List<AdUnitIdEntry> multiIdsAndroid = new List<AdUnitIdEntry>();
         public List<AdUnitIdEntry> multiIdsIOS = new List<AdUnitIdEntry>();
 
-        public string ResolveUnitId(AdUnitType type, string where)
+        public AdUnitIdEntry GetEntry(AdUnitType type, string where)
         {
             bool isAndroid = GetRuntimeAdPlatform() == RuntimeAdPlatform.Android;
-            var defaultId = isAndroid ? defaultIdAndroid : defaultIdIOS;
-            
-            if (!useMultiAdUnitIds || string.IsNullOrWhiteSpace(where)) 
-                return defaultId;
-
             var multiIds = isAndroid ? multiIdsAndroid : multiIdsIOS;
-            foreach (var entry in multiIds)
+            
+            if (useMultiAdUnitIds && !string.IsNullOrWhiteSpace(where)) 
             {
-                if (entry != null && entry.AdType == type && entry.IsValid() &&
-                    string.Equals(entry.NameId?.Trim(), where.Trim(), StringComparison.OrdinalIgnoreCase))
+                foreach (var entry in multiIds)
                 {
-                    return entry.Id;
+                    if (entry != null && entry.AdType == type && entry.IsValid() &&
+                        string.Equals(entry.NameId?.Trim(), where.Trim(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        return entry;
+                    }
                 }
             }
-            return defaultId; // Fallback
+            
+            // Fallback (Hoặc dành cho chế độ Default ID)
+            return new AdUnitIdEntry {
+                Id = isAndroid ? defaultIdAndroid : defaultIdIOS,
+                AdType = type,
+                NameId = where,
+                BannerSize = defaultBannerSize,
+                CollapsiblePlacement = defaultCollapsible
+            };
         }
+
+        public string ResolveUnitId(AdUnitType type, string where) => GetEntry(type, where).Id;
 
         private enum RuntimeAdPlatform { Android, IOS }
         private RuntimeAdPlatform GetRuntimeAdPlatform()

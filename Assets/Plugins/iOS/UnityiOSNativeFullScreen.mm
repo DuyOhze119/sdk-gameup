@@ -5,11 +5,21 @@
 // Hàm lấy ViewController hiện tại của Unity
 extern UIViewController* UnityGetGLViewController();
 
+// 1. Định nghĩa các kiểu Callback (Con trỏ hàm) từ C#
+typedef void (*NativeAdLoadedCallback)();
+typedef void (*NativeAdFailedCallback)(const char* error);
+typedef void (*NativeAdClosedCallback)();
+
 @interface UnityiOSNativeFullScreen : NSObject <GADNativeAdLoaderDelegate>
 @property(nonatomic, strong) GADAdLoader *adLoader;
 @property(nonatomic, strong) GADNativeAd *loadedAd;
 @property(nonatomic, strong) UIView *mainContainer;
 @property(nonatomic, assign) BOOL isAdLoading;
+
+// 2. Lưu trữ các Callback
+@property(nonatomic, assign) NativeAdLoadedCallback onLoadedCallback;
+@property(nonatomic, assign) NativeAdFailedCallback onFailedCallback;
+@property(nonatomic, assign) NativeAdClosedCallback onClosedCallback;
 
 + (instancetype)sharedInstance;
 - (void)loadAd:(NSString *)adUnitId;
@@ -29,7 +39,6 @@ extern UIViewController* UnityGetGLViewController();
     return sharedInstance;
 }
 
-// 1. Tải trước quảng cáo
 - (void)loadAd:(NSString *)adUnitId {
     if (self.loadedAd != nil || self.isAdLoading) return;
 
@@ -44,7 +53,6 @@ extern UIViewController* UnityGetGLViewController();
     [self.adLoader loadRequest:[GADRequest request]];
 }
 
-// 2. Kiểm tra sẵn sàng
 - (BOOL)isAdReady {
     return self.loadedAd != nil;
 }
@@ -84,10 +92,9 @@ extern UIViewController* UnityGetGLViewController();
 
     adView.nativeAd = self.loadedAd;
 
-    // --- NÚT ĐÓNG ĐẾM NGƯỢC HÌNH TRÒN (Tương đương 90x90 Pixel trên Android) ---
+    // --- NÚT ĐÓNG ĐẾM NGƯỢC ---
     UIButton *closeButton = [UIButton buttonWithType:UIButtonTypeCustom];
     closeButton.frame = CGRectMake(screenBounds.size.width - 65, 50, 45, 45); 
-    
     closeButton.layer.cornerRadius = 22.5; 
     closeButton.layer.masksToBounds = YES;
     closeButton.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.5];
@@ -98,7 +105,6 @@ extern UIViewController* UnityGetGLViewController();
     [closeButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     closeButton.titleLabel.font = [UIFont systemFontOfSize:14]; 
     closeButton.userInteractionEnabled = NO; 
-    
     closeButton.tag = 999; 
     [self.mainContainer addSubview:closeButton];
 
@@ -132,14 +138,19 @@ extern UIViewController* UnityGetGLViewController();
     dispatch_resume(timer);
 }
 
-// 4. Ẩn quảng cáo và dọn dẹp
+// Ẩn quảng cáo và dọn dẹp
 - (void)hideAd {
     if (self.mainContainer) {
         [self.mainContainer removeFromSuperview];
         self.mainContainer = nil;
     }
     if (self.loadedAd) {
-        self.loadedAd = nil; // Giải phóng để load lượt tiếp theo
+        self.loadedAd = nil; 
+    }
+    
+    // GỌI CALLBACK ĐÓNG VỀ C#
+    if (self.onClosedCallback) {
+        self.onClosedCallback();
     }
 }
 
@@ -147,19 +158,35 @@ extern UIViewController* UnityGetGLViewController();
 - (void)adLoader:(GADAdLoader *)adLoader didReceiveNativeAd:(GADNativeAd *)nativeAd {
     self.loadedAd = nativeAd;
     self.isAdLoading = NO;
+    
+    // GỌI CALLBACK THÀNH CÔNG VỀ C#
+    if (self.onLoadedCallback) {
+        self.onLoadedCallback();
+    }
 }
 
 - (void)adLoader:(GADAdLoader *)adLoader didFailToReceiveAdWithError:(NSError *)error {
     self.isAdLoading = NO;
     self.loadedAd = nil;
+    
+    // GỌI CALLBACK LỖI VỀ C# (Gửi chuỗi lỗi qua)
+    if (self.onFailedCallback) {
+        self.onFailedCallback(error.localizedDescription.UTF8String);
+    }
 }
 @end
 
-// C-Style Linker để C# trong Unity có thể DllImport được
+// 3. C-Style Linker cập nhật (Thêm tham số Callback vào Load)
 extern "C" {
-    void _iosLoadNativeAd(const char* adUnitId) {
+    void _iosLoadNativeAd(const char* adUnitId, NativeAdLoadedCallback onLoaded, NativeAdFailedCallback onFailed, NativeAdClosedCallback onClosed) {
         NSString *unitIdStr = [NSString stringWithUTF8String:adUnitId];
-        [[UnityiOSNativeFullScreen sharedInstance] loadAd:unitIdStr];
+        
+        UnityiOSNativeFullScreen *instance = [UnityiOSNativeFullScreen sharedInstance];
+        instance.onLoadedCallback = onLoaded;
+        instance.onFailedCallback = onFailed;
+        instance.onClosedCallback = onClosed;
+        
+        [instance loadAd:unitIdStr];
     }
 
     bool _iosIsNativeAdReady() {

@@ -8,11 +8,16 @@ namespace GameUpSDK.Editor.Setup
 {
     public enum AdMobIdEditorPlatform { Android, IOS }
 
-    public class AdUnitConfigData
+public class AdUnitConfigData
     {
         public bool useMultiIds;
         public string defaultIdAndroid;
         public string defaultIdIOS;
+        
+        // Thêm 2 field
+        public BannerSize defaultBannerSize;
+        public CollapsibleBannerPlacement defaultCollapsible;
+        
         public List<AdUnitIdEntry> multiIdsAndroid = new List<AdUnitIdEntry>();
         public List<AdUnitIdEntry> multiIdsIOS = new List<AdUnitIdEntry>();
 
@@ -22,6 +27,12 @@ namespace GameUpSDK.Editor.Setup
             useMultiIds = configProp.FindPropertyRelative("useMultiAdUnitIds")?.boolValue ?? false;
             defaultIdAndroid = configProp.FindPropertyRelative("defaultIdAndroid")?.stringValue ?? "";
             defaultIdIOS = configProp.FindPropertyRelative("defaultIdIOS")?.stringValue ?? "";
+            
+            var bsProp = configProp.FindPropertyRelative("defaultBannerSize");
+            if (bsProp != null) defaultBannerSize = (BannerSize)bsProp.enumValueIndex;
+            var colProp = configProp.FindPropertyRelative("defaultCollapsible");
+            if (colProp != null) defaultCollapsible = (CollapsibleBannerPlacement)colProp.enumValueIndex;
+
             SetupTabBase.AssignAdUnitIdListDirect(configProp.FindPropertyRelative("multiIdsAndroid"), multiIdsAndroid);
             SetupTabBase.AssignAdUnitIdListDirect(configProp.FindPropertyRelative("multiIdsIOS"), multiIdsIOS);
         }
@@ -32,6 +43,12 @@ namespace GameUpSDK.Editor.Setup
             if (configProp.FindPropertyRelative("useMultiAdUnitIds") != null) configProp.FindPropertyRelative("useMultiAdUnitIds").boolValue = useMultiIds;
             if (configProp.FindPropertyRelative("defaultIdAndroid") != null) configProp.FindPropertyRelative("defaultIdAndroid").stringValue = defaultIdAndroid;
             if (configProp.FindPropertyRelative("defaultIdIOS") != null) configProp.FindPropertyRelative("defaultIdIOS").stringValue = defaultIdIOS;
+            
+            var bsProp = configProp.FindPropertyRelative("defaultBannerSize");
+            if (bsProp != null) bsProp.enumValueIndex = (int)defaultBannerSize;
+            var colProp = configProp.FindPropertyRelative("defaultCollapsible");
+            if (colProp != null) colProp.enumValueIndex = (int)defaultCollapsible;
+
             SetupTabBase.SetAdUnitIdListDirect(configProp.FindPropertyRelative("multiIdsAndroid"), multiIdsAndroid);
             SetupTabBase.SetAdUnitIdListDirect(configProp.FindPropertyRelative("multiIdsIOS"), multiIdsIOS);
         }
@@ -149,7 +166,7 @@ namespace GameUpSDK.Editor.Setup
         }
 
         // --- UI DRAWERS ---
-        protected void DrawStringListUI(string label, List<string> list)
+protected void DrawStringListUI(string label, List<string> list)
         {
             EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
             EditorGUI.indentLevel++;
@@ -164,7 +181,8 @@ namespace GameUpSDK.Editor.Setup
             EditorGUILayout.Space();
         }
 
-        protected void DrawConfigDataUI(string label, AdUnitConfigData configData, AdMobIdEditorPlatform platform)
+        // Đã thêm tham số defaultAdType
+protected void DrawConfigDataUI(string label, AdUnitConfigData configData, AdMobIdEditorPlatform platform, AdUnitType defaultAdType)
         {
             EditorGUILayout.BeginVertical("box");
             EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
@@ -173,22 +191,28 @@ namespace GameUpSDK.Editor.Setup
             if (configData.useMultiIds)
             {
                 var list = platform == AdMobIdEditorPlatform.Android ? configData.multiIdsAndroid : configData.multiIdsIOS;
-                DrawAdUnitIdListUI(ref list);
+                DrawAdUnitIdListUI(ref list, defaultAdType);
                 if (platform == AdMobIdEditorPlatform.Android) configData.multiIdsAndroid = list;
                 else configData.multiIdsIOS = list;
             }
             else
             {
-                if (platform == AdMobIdEditorPlatform.Android)
-                    configData.defaultIdAndroid = EditorGUILayout.TextField("Android Default ID", configData.defaultIdAndroid);
-                else
-                    configData.defaultIdIOS = EditorGUILayout.TextField("iOS Default ID", configData.defaultIdIOS);
+                if (platform == AdMobIdEditorPlatform.Android) configData.defaultIdAndroid = EditorGUILayout.TextField("Android Default ID", configData.defaultIdAndroid);
+                else configData.defaultIdIOS = EditorGUILayout.TextField("iOS Default ID", configData.defaultIdIOS);
+
+                // Cấu hình Banner Mặc Định (Chỉ hiện ở Tab Banner)
+                if (defaultAdType == AdUnitType.Banner)
+                {
+                    EditorGUILayout.Space();
+                    configData.defaultBannerSize = (BannerSize)EditorGUILayout.EnumPopup("Banner Size", configData.defaultBannerSize);
+                    configData.defaultCollapsible = (CollapsibleBannerPlacement)EditorGUILayout.EnumPopup("Collapsible", configData.defaultCollapsible);
+                }
             }
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space();
         }
 
-        private void DrawAdUnitIdListUI(ref List<AdUnitIdEntry> list)
+        private void DrawAdUnitIdListUI(ref List<AdUnitIdEntry> list, AdUnitType defaultAdType)
         {
             if (list == null) list = new List<AdUnitIdEntry>();
             NormalizeIntIds(list);
@@ -196,7 +220,6 @@ namespace GameUpSDK.Editor.Setup
             
             EditorGUILayout.BeginHorizontal();
             GUILayout.Label("#", EditorStyles.miniLabel, GUILayout.Width(28f));
-            GUILayout.Label("Ad Type", EditorStyles.miniLabel, GUILayout.Width(108f));
             GUILayout.Label("Where (Placement)", EditorStyles.miniLabel, GUILayout.Width(200f));
             GUILayout.Label("Ad Unit ID", EditorStyles.miniLabel, GUILayout.MinWidth(160f));
             GUILayout.Label("", GUILayout.Width(24));
@@ -204,16 +227,31 @@ namespace GameUpSDK.Editor.Setup
 
             for (int i = 0; i < list.Count; i++)
             {
-                var e = list[i] ?? (list[i] = new AdUnitIdEntry());
+                var e = list[i] ?? (list[i] = new AdUnitIdEntry { AdType = defaultAdType });
+                e.AdType = defaultAdType; 
+
                 EditorGUILayout.BeginHorizontal();
                 EditorGUILayout.LabelField(e.intId.ToString(), GUILayout.Width(28f));
-                e.AdType = (AdUnitType)EditorGUILayout.EnumPopup(e.AdType, GUILayout.Width(108f));
                 e.NameId = EditorGUILayout.TextField(e.NameId ?? "", GUILayout.Width(200f));
                 e.Id = EditorGUILayout.TextField(e.Id ?? "", GUILayout.MinWidth(160f));
                 if (GUILayout.Button("-", GUILayout.Width(24))) { list.RemoveAt(i); i--; }
                 EditorGUILayout.EndHorizontal();
+
+                // UI Nâng cao: Hiện setting riêng của từng banner thụt vào bên trong
+                if (e.AdType == AdUnitType.Banner)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    GUILayout.Space(32f); 
+                    GUILayout.Label("↳ Size:", EditorStyles.miniLabel, GUILayout.Width(45));
+                    e.BannerSize = (BannerSize)EditorGUILayout.EnumPopup(e.BannerSize, GUILayout.Width(100));
+                    GUILayout.Label("Collapsible:", EditorStyles.miniLabel, GUILayout.Width(70));
+                    e.CollapsiblePlacement = (CollapsibleBannerPlacement)EditorGUILayout.EnumPopup(e.CollapsiblePlacement, GUILayout.Width(100));
+                    EditorGUILayout.EndHorizontal();
+                    EditorGUILayout.Space(4);
+                }
             }
-            if (GUILayout.Button("+ Add Multi-ID")) list.Add(new AdUnitIdEntry());
+            
+            if (GUILayout.Button($"+ Add {defaultAdType} Placement")) { list.Add(new AdUnitIdEntry { AdType = defaultAdType }); }
             EditorGUILayout.EndVertical();
         }
 

@@ -12,6 +12,7 @@ namespace GameUpSDK.Ads
         public AdUnitConfig rewardedConfig;
         public AdUnitConfig appOpenConfig;
         public AdUnitConfig bannerConfig;
+        public AdUnitConfig nativeAdConfig;
 
         public bool IsInitialized { get; private set; }
 
@@ -20,6 +21,8 @@ namespace GameUpSDK.Ads
         public IRewardedAd RewardedAd { get; private set; }
         public IAppOpenAd AppOpenAd { get; private set; }
         public IBannerAd BannerAd { get; private set; }
+        
+        public INativeFullScreenAd NativeFullScreenAd { get; private set; }
 
         public void Initialize()
         {
@@ -40,15 +43,18 @@ namespace GameUpSDK.Ads
                     RewardedAd = new AdmobRewardedAd(rewardedConfig);
                     AppOpenAd = new AdmobAppOpenAd(appOpenConfig);
                     BannerAd = new AdmobBannerAd(bannerConfig);
+                    NativeFullScreenAd = new AdmobNativeFullscreenAd(nativeAdConfig);
 
                     InterstitialAd.Load();
                     RewardedAd.Load();
                     AppOpenAd.Load();
                     BannerAd.Load();
+                    NativeFullScreenAd.Load();
                 });
             });
 #endif
         }
+        
         public void SetConsent(bool isConsent) { }
     }
 }

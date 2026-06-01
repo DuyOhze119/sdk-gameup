@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using GameUpSDK.Ads;
 using UnityEditor;
 using UnityEngine;
 
@@ -56,20 +57,5 @@ namespace GameUpSDK.Editor.Setup
         public const string PathLevelPlayMediationSettings = "Assets/LevelPlay/Resources/LevelPlayMediationSettings.asset";
         public const string PathGameAnalyticsSettings = "Assets/Resources/GameAnalytics/Settings.asset";
         public const string PathFacebookSettings = "Assets/FacebookSDK/SDK/Resources/FacebookSettings.asset";
-
-        public static AdsManager.PrimaryMediation GetPrimaryMediation()
-        {
-            try
-            {
-                string symbols = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Android);
-                if (!string.IsNullOrEmpty(symbols))
-                {
-                    if (symbols.Contains("GAMEUP_PRIMARY_MEDIATION_MAX")) return AdsManager.PrimaryMediation.Max;
-                    if (symbols.Contains(GUDefinetion.PrimaryMediationAdMob)) return AdsManager.PrimaryMediation.AdMob;
-                }
-            }
-            catch { }
-            return AdsManager.PrimaryMediation.LevelPlay;
-        }
     }
 }

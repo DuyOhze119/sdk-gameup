@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GameUpSDK.Ads
@@ -12,7 +13,8 @@ namespace GameUpSDK.Ads
         public override bool IsAvailable(string where = null)
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED
-            return MaxSdk.IsInterstitialReady(_config.ResolveUnitId(_adType, where));
+            return !string.IsNullOrEmpty(_config.ResolveUnitId(_adType, where)) &&
+                   MaxSdk.IsInterstitialReady(_config.ResolveUnitId(_adType, where));
 #endif
             return false;
         }
@@ -99,7 +101,8 @@ namespace GameUpSDK.Ads
         public override bool IsAvailable(string where = null)
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED
-            return MaxSdk.IsRewardedAdReady(_config.ResolveUnitId(_adType, where));
+            return !string.IsNullOrEmpty(_config.ResolveUnitId(_adType, where)) &&
+                   MaxSdk.IsRewardedAdReady(_config.ResolveUnitId(_adType, where));
 #endif
             return false;
         }
@@ -201,7 +204,8 @@ namespace GameUpSDK.Ads
         public override bool IsAvailable(string where = null)
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED
-            return MaxSdk.IsAppOpenAdReady(_config.ResolveUnitId(_adType, where));
+            return !string.IsNullOrEmpty(_config.ResolveUnitId(_adType, where)) &&
+                   MaxSdk.IsAppOpenAdReady(_config.ResolveUnitId(_adType, where));
 #endif
             return false;
         }
@@ -271,6 +275,8 @@ namespace GameUpSDK.Ads
 
     public class MaxBannerAd : BaseAdFormat, IBannerAd
     {
+        private readonly Dictionary<string, bool> _isLoaded = new Dictionary<string, bool>();
+
         public MaxBannerAd(AdUnitConfig config) : base(config, AdUnitType.Banner, "MAX")
         {
         }
@@ -282,25 +288,85 @@ namespace GameUpSDK.Ads
 
         protected override void RequestAdInternal(string unitId, string where)
         {
-            HandleLoadSuccess(unitId, where);
+#if MAXSDK_DEPENDENCIES_INSTALLED
+            string key = GetKey(where);
+            
+            // Đọc trực tiếp cấu hình Size và Placement từ Editor Setup Window
+            var entry = _config.GetEntry(_adType, where);
+
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                _isLoaded[key] = false;
+                
+                // Map config sang định dạng của AppLovin MAX
+                var pos = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top 
+                            ? MaxSdkBase.BannerPosition.TopCenter 
+                            : MaxSdkBase.BannerPosition.BottomCenter;
+                
+                MaxSdk.CreateBanner(unitId, pos);
+                
+                if (entry.BannerSize == BannerSize.Adaptive) 
+                {
+                    MaxSdk.SetBannerExtraParameter(unitId, "adaptive_banner", "true");
+                }
+
+                Action<string, MaxSdkBase.AdInfo> onLoaded = null;
+                Action<string, MaxSdkBase.ErrorInfo> onFailed = null;
+
+                onLoaded = (id, info) => 
+                { 
+                    if (id == unitId) 
+                    { 
+                        _isLoaded[key] = true;
+                        MaxSdkCallbacks.Banner.OnAdLoadedEvent -= onLoaded;
+                        MaxSdkCallbacks.Banner.OnAdLoadFailedEvent -= onFailed;
+                        
+                        HandleLoadSuccess(unitId, where);
+                        
+                        // AUTO-SHOW: Tự động bung ra nếu UI game đã gọi Show() lúc nó đang tải
+                    } 
+                };
+                
+                onFailed = (id, err) => 
+                { 
+                    if (id == unitId) 
+                    { 
+                        _isLoaded[key] = false;
+                        MaxSdkCallbacks.Banner.OnAdLoadedEvent -= onLoaded;
+                        MaxSdkCallbacks.Banner.OnAdLoadFailedEvent -= onFailed;
+                        
+                        HandleLoadFailed(unitId, where, err.Message);
+                        
+                    } 
+                };
+
+                MaxSdkCallbacks.Banner.OnAdLoadedEvent += onLoaded;
+                MaxSdkCallbacks.Banner.OnAdLoadFailedEvent += onFailed;
+                
+                MaxSdk.LoadBanner(unitId); 
+            });
+#endif
         }
 
-        public void Show(string where, CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom)
+        public void Show(string where)
         {
 #if MAXSDK_DEPENDENCIES_INSTALLED
-
-            string unitId = _config.ResolveUnitId(_adType, where);
-            if (string.IsNullOrEmpty(unitId)) return;
-            var pos = placement == CollapsibleBannerPlacement.Top
-                ? MaxSdk.BannerPosition.TopCenter
-                : MaxSdk.BannerPosition.BottomCenter;
-            MaxSdk.CreateBanner(unitId, pos);
-            if (placement == CollapsibleBannerPlacement.None)
-                MaxSdk.SetBannerExtraParameter(unitId, "adaptive_banner", "true");
-            NotifyAdDisplayed(where);
-            MaxSdk.ShowBanner(unitId);
-
-            MaxSdk.ShowBanner(unitId);
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                string key = GetKey(where);
+                string unitId = _config.ResolveUnitId(_adType, where);
+                if (string.IsNullOrEmpty(unitId)) { NotifyAdDisplayFailed(where, "empty_id"); return; }
+                
+                if (_isLoaded.TryGetValue(key, out bool loaded) && loaded)
+                {
+                    NotifyAdDisplayed(where);
+                    MaxSdk.ShowBanner(unitId);
+                }
+                else 
+                {
+                    Load(where);
+                }
+            });
 #endif
         }
 

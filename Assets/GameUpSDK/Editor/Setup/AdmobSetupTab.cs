@@ -20,6 +20,7 @@ namespace GameUpSDK.Editor.Setup
         private AdUnitConfigData _rewardedConfig = new AdUnitConfigData();
         private AdUnitConfigData _appOpenConfig = new AdUnitConfigData();
         private AdUnitConfigData _bannerConfig = new AdUnitConfigData();
+        private AdUnitConfigData _nativeAdConfig = new AdUnitConfigData();
 
         public override void Load()
         {
@@ -38,6 +39,7 @@ namespace GameUpSDK.Editor.Setup
                     _rewardedConfig.Load(so.FindProperty("rewardedConfig"));
                     _appOpenConfig.Load(so.FindProperty("appOpenConfig"));
                     _bannerConfig.Load(so.FindProperty("bannerConfig"));
+                    _nativeAdConfig.Load(so.FindProperty("nativeAdConfig"));
                 }
             }
 
@@ -57,10 +59,11 @@ namespace GameUpSDK.Editor.Setup
             EditorGUILayout.Space();
 
             DrawStringListUI("Test Devices", _testDevices);
-            DrawConfigDataUI("Banner Configuration", _bannerConfig, _platform);
-            DrawConfigDataUI("Interstitial Configuration", _interstitialConfig, _platform);
-            DrawConfigDataUI("Rewarded Configuration", _rewardedConfig, _platform);
-            DrawConfigDataUI("App Open Configuration", _appOpenConfig, _platform);
+            DrawConfigDataUI("Banner Configuration", _bannerConfig, _platform, AdUnitType.Banner);
+            DrawConfigDataUI("Interstitial Configuration", _interstitialConfig, _platform, AdUnitType.Interstitial);
+            DrawConfigDataUI("Rewarded Configuration", _rewardedConfig, _platform, AdUnitType.RewardedVideo);
+            DrawConfigDataUI("App Open Configuration", _appOpenConfig, _platform, AdUnitType.AppOpen);
+            DrawConfigDataUI("NativeAd Configuration", _nativeAdConfig, _platform, AdUnitType.NativeAd);
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Google Mobile Ads App IDs", EditorStyles.boldLabel);
@@ -75,6 +78,7 @@ namespace GameUpSDK.Editor.Setup
             _rewardedConfig.Save(so.FindProperty("rewardedConfig"));
             _appOpenConfig.Save(so.FindProperty("appOpenConfig"));
             _bannerConfig.Save(so.FindProperty("bannerConfig"));
+            _nativeAdConfig.Save(so.FindProperty("nativeAdConfig"));
         }
 
         public override void Save()
@@ -157,10 +161,10 @@ namespace GameUpSDK.Editor.Setup
             _showMediationDebugger = EditorGUILayout.Toggle("Show Mediation Debugger", _showMediationDebugger);
             EditorGUILayout.Space();
 
-            DrawConfigDataUI("Banner Configuration", _bannerConfig, _platform);
-            DrawConfigDataUI("Interstitial Configuration", _interstitialConfig, _platform);
-            DrawConfigDataUI("Rewarded Configuration", _rewardedConfig, _platform);
-            DrawConfigDataUI("App Open Configuration", _appOpenConfig, _platform);
+            DrawConfigDataUI("Banner Configuration", _bannerConfig, _platform, AdUnitType.Banner);
+            DrawConfigDataUI("Interstitial Configuration", _interstitialConfig, _platform, AdUnitType.Interstitial);
+            DrawConfigDataUI("Rewarded Configuration", _rewardedConfig, _platform, AdUnitType.RewardedVideo);
+            DrawConfigDataUI("App Open Configuration", _appOpenConfig, _platform, AdUnitType.AppOpen);
         }
 
         private void ApplyToSerializedObject(SerializedObject so)
@@ -240,9 +244,9 @@ namespace GameUpSDK.Editor.Setup
             _levelPlayAppKey = EditorGUILayout.TextField("LevelPlay App Key", _levelPlayAppKey);
             EditorGUILayout.Space();
 
-            DrawConfigDataUI("Banner Configuration", _bannerConfig, _platform);
-            DrawConfigDataUI("Interstitial Configuration", _interstitialConfig, _platform);
-            DrawConfigDataUI("Rewarded Configuration", _rewardedConfig, _platform);
+            DrawConfigDataUI("Banner Configuration", _bannerConfig, _platform, AdUnitType.Banner);
+            DrawConfigDataUI("Interstitial Configuration", _interstitialConfig, _platform, AdUnitType.Interstitial);
+            DrawConfigDataUI("Rewarded Configuration", _rewardedConfig, _platform, AdUnitType.RewardedVideo);
         }
 
         private void ApplyToSerializedObject(SerializedObject so)

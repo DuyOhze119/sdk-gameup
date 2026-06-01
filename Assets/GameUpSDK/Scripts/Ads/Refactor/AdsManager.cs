@@ -5,6 +5,27 @@ using GameUpSDK.Singletons;
 
 namespace GameUpSDK.Ads
 {
+    public enum BannerSize
+    {
+        /// <summary>320 × 50 – kích thước nhỏ nhất, phổ biến nhất.</summary>
+        Banner,
+
+        /// <summary>320 × 90 – lớn hơn BANNER, fill rate tốt. Mặc định.</summary>
+        Large,
+
+        /// <summary>
+        /// Chiều rộng toàn màn hình, chiều cao tự điều chỉnh theo màn hình.
+        /// Fill rate cao nhất – được IronSource/LevelPlay khuyến nghị.
+        /// </summary>
+        Adaptive,
+
+        /// <summary>300 × 250 – Medium Rectangle (MREC), thường dùng trong content.</summary>
+        MediumRectangle,
+
+        /// <summary>728 × 90 – chỉ phù hợp trên iPad / tablet.</summary>
+        Leaderboard,
+    }
+
     [DefaultExecutionOrder(-50)]
     public class AdsManager : MonoSingletonSdk<AdsManager>
     {
@@ -63,12 +84,15 @@ namespace GameUpSDK.Ads
                 if (provider == MediationProvider.None) continue;
                 if (_networkDict.TryGetValue(provider, out var network))
                 {
-                    if (!network.IsInitialized) network.Initialize();
+                    if (!network.IsInitialized)
+                    {
+                        network.Initialize();
+                    }
                 }
             }
         }
 
-        private void SetConsent(bool isConsent)
+        public void SetConsent(bool isConsent)
         {
             foreach (var network in _networkDict.Values) network.SetConsent(isConsent);
         }
@@ -88,6 +112,8 @@ namespace GameUpSDK.Ads
                                                    network.InterstitialAd.IsAvailable(where),
                         AdUnitType.AppOpen => network.AppOpenAd != null && network.AppOpenAd.IsAvailable(where),
                         AdUnitType.Banner => network.BannerAd != null && network.BannerAd.IsAvailable(where),
+                        AdUnitType.NativeAd => network.NativeFullScreenAd != null &&
+                                               network.NativeFullScreenAd.IsAvailable(where),
                         _ => false
                     };
                     if (isAvailable) return network;
@@ -163,26 +189,14 @@ namespace GameUpSDK.Ads
 
         public bool IsBannerAvailable(string where = null) => GetAvailableProvider(AdUnitType.Banner, where) != null;
 
-        public void ShowBanner(string where)
+        public void LoadBanner(string where)
         {
-            if (!AdsRules.IsBannerEnabled()) return;
-            _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeBanner, where);
-
             var network = GetAvailableProvider(AdUnitType.Banner, where);
-            if (network == null)
-            {
-                _tracker.LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where, "network_null");
-                return;
-            }
-
-            _tracker.LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeBanner, where);
-            network.BannerAd.Show(where, CollapsibleBannerPlacement.None);
+            network?.BannerAd.Load(where);
         }
 
-        public void ShowCollapsibleBanner(string where,
-            CollapsibleBannerPlacement placement = CollapsibleBannerPlacement.Bottom)
+        public void ShowBanner(string where)
         {
-            if (!AdsRules.IsBannerEnabled()) return;
             _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeBanner, where);
 
             var network = GetAvailableProvider(AdUnitType.Banner, where);
@@ -193,12 +207,55 @@ namespace GameUpSDK.Ads
             }
 
             _tracker.LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeBanner, where);
-            network.BannerAd.Show(where, placement);
+            network.BannerAd.Show(where);
+        }
+
+        public void ShowCollapsibleBanner(string where)
+        {
+            _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeBanner, where);
+
+            var network = GetAvailableProvider(AdUnitType.Banner, where);
+            if (network == null)
+            {
+                _tracker.LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where, "network_null");
+                return;
+            }
+
+            _tracker.LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeBanner, where);
+            network.BannerAd.Show(where);
         }
 
         public void HideBanner(string where)
         {
             foreach (var network in _networkDict.Values) network.BannerAd?.Hide(where);
+        }
+
+        public bool IsNativeAdAvailable(string where = null) =>
+            GetAvailableProvider(AdUnitType.NativeAd, where) != null;
+
+
+        public void ShowNativeAd(string where, Action onSuccess, Action onFail)
+        {
+            _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeNativeAd, where);
+            var network = GetAvailableProvider(AdUnitType.NativeAd, where);
+
+            if (network == null)
+            {
+                _tracker.LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeNativeAd, where, "network_null");
+                onFail?.Invoke();
+                return;
+            }
+
+            _tracker.LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeNativeAd, where);
+            network.NativeFullScreenAd.Show(where, onSuccess, onFail);
+        }
+
+        public void HideNativeAd(string where = null)
+        {
+            foreach (var network in _networkDict)
+            {
+                network.Value.NativeFullScreenAd.Hide();
+            }
         }
     }
 }
