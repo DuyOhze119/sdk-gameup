@@ -43,6 +43,8 @@ namespace GameUpSDK.Ads
 
         private AdsTracker _tracker;
 
+        private readonly List<IAdCondition> _showConditions = new List<IAdCondition>();
+
         protected void Awake()
         {
             DontDestroyOnLoad(gameObject);
@@ -87,6 +89,7 @@ namespace GameUpSDK.Ads
                     if (!network.IsInitialized)
                     {
                         network.Initialize();
+                        WireUpCappingEvents(network);
                     }
                 }
             }
@@ -95,6 +98,56 @@ namespace GameUpSDK.Ads
         public void SetConsent(bool isConsent)
         {
             foreach (var network in _networkDict.Values) network.SetConsent(isConsent);
+        }
+
+        private void WireUpCappingEvents(IAdNetwork network)
+        {
+            Action<string> pauseAct = (where) => AdCappingManager.Instance.PauseAllCapping();
+            Action<string> resumeAct = (where) => AdCappingManager.Instance.ResumeAllCapping();
+
+            if (network.InterstitialAd != null)
+            {
+                network.InterstitialAd.OnAdDisplayed += pauseAct;
+                network.InterstitialAd.OnAdClosed += resumeAct;
+                network.InterstitialAd.OnAdClosed += AdCappingManager.Instance.ResetCapping;
+            }
+
+            if (network.RewardedAd != null)
+            {
+                network.RewardedAd.OnAdDisplayed += pauseAct;
+                network.RewardedAd.OnAdClosed += resumeAct;
+            }
+
+            if (network.AppOpenAd != null)
+            {
+                network.AppOpenAd.OnAdDisplayed += pauseAct;
+                network.AppOpenAd.OnAdClosed += resumeAct;
+            }
+
+            if (network.NativeFullScreenAd != null)
+            {
+                network.NativeFullScreenAd.OnAdDisplayed += pauseAct;
+                network.NativeFullScreenAd.OnAdClosed += resumeAct;
+            }
+        }
+
+        public void AddCondition(IAdCondition condition)
+        {
+            if (!_showConditions.Contains(condition)) _showConditions.Add(condition);
+        }
+
+        private bool EvaluateConditions(AdUnitType adType, string where, out string blockReason)
+        {
+            foreach (var condition in _showConditions)
+            {
+                if (!condition.CanShow(adType, where, out blockReason))
+                {
+                    return false;
+                }
+            }
+
+            blockReason = string.Empty;
+            return true;
         }
 
         private IAdNetwork GetAvailableProvider(AdUnitType adType, string where)
@@ -154,6 +207,12 @@ namespace GameUpSDK.Ads
         public void ShowInterstitial(string where, int currentLevel, Action onSuccess = null,
             Action onFail = null)
         {
+            if (!EvaluateConditions(AdUnitType.Interstitial, where, out var blockReason))
+            {
+                Debug.Log($"[GameUpSDK] Interstitial bị chặn bởi rules: {blockReason}");
+                onFail?.Invoke(); return;
+            }
+            
             _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeInterstitial, where);
             var network = GetAvailableProvider(AdUnitType.Interstitial, where);
 

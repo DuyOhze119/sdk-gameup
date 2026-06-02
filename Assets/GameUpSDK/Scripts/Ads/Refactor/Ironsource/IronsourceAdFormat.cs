@@ -127,7 +127,6 @@ namespace GameUpSDK.Ads
             if (IsAvailable(where))
             {
                 NotifyAdDisplayed(where);
-                AdsRules.BeginInterstitialCappingPause();
                 var ad = _ads[key];
                 bool earned = false;
 
@@ -143,7 +142,6 @@ namespace GameUpSDK.Ads
                     NotifyAdClosed(where);
                     MainThreadDispatcher.Enqueue(() =>
                     {
-                        AdsRules.EndInterstitialCappingPause();
                         if (earned) onSuccess?.Invoke();
                         else onFail?.Invoke();
                         Load(where);
@@ -158,7 +156,6 @@ namespace GameUpSDK.Ads
                     NotifyAdDisplayFailed(where, err.ErrorMessage);
                     MainThreadDispatcher.Enqueue(() =>
                     {
-                        AdsRules.EndInterstitialCappingPause();
                         onFail?.Invoke();
                         Load(where);
                     });

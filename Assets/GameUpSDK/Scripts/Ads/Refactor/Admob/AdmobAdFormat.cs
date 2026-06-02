@@ -128,21 +128,18 @@ namespace GameUpSDK.Ads
             if (IsAvailable(where))
             {
                 NotifyAdDisplayed(where);
-                AdsRules.BeginInterstitialCappingPause();
                 var ad = _ads[key];
                 _ads.Remove(key);
                 bool earned = false;
 
                 ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
                 {
-                    AdsRules.EndInterstitialCappingPause();
                     NotifyAdClosed(where);
                     if (!earned) onFail?.Invoke();
                     Load(where);
                 });
                 ad.OnAdFullScreenContentFailed += (err) => MainThreadDispatcher.Enqueue(() =>
                 {
-                    AdsRules.EndInterstitialCappingPause();
                     NotifyAdDisplayFailed(where, err.GetMessage());
                     onFail?.Invoke();
                     Load(where);

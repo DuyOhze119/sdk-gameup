@@ -155,7 +155,6 @@ namespace GameUpSDK.Ads
             if (IsAvailable(where))
             {
                 NotifyAdDisplayed(where);
-                AdsRules.BeginInterstitialCappingPause();
                 bool earned = false;
                 Action<string, MaxSdkBase.Reward, MaxSdkBase.AdInfo> onReward = null;
                 Action<string, MaxSdkBase.AdInfo> onHidden = null;
@@ -175,7 +174,6 @@ namespace GameUpSDK.Ads
                     NotifyAdClosed(where);
                     MainThreadDispatcher.Enqueue(() =>
                     {
-                        AdsRules.EndInterstitialCappingPause();
                         if (earned) onSuccess?.Invoke();
                         else onFail?.Invoke();
                         Load(where);
