@@ -48,6 +48,36 @@ namespace GameUpSDK.Ads
             };
         }
 
+        public List<string> GetAllPlacements()
+        {
+            var placements = new List<string>();
+            
+            if (!useMultiAdUnitIds)
+            {
+                placements.Add("default");
+                return placements;
+            }
+
+            bool isAndroid = GetRuntimeAdPlatform() == RuntimeAdPlatform.Android;
+            var multiIds = isAndroid ? multiIdsAndroid : multiIdsIOS;
+
+            foreach (var entry in multiIds)
+            {
+                if (entry != null&& entry.IsValid() && !string.IsNullOrWhiteSpace(entry.NameId))
+                {
+                    string cleanName = entry.NameId.Trim();
+                    if (!placements.Contains(cleanName))
+                    {
+                        placements.Add(cleanName);
+                    }
+                }
+            }
+
+            if (placements.Count == 0) placements.Add("default"); 
+
+            return placements;
+        }
+        
         public string ResolveUnitId(AdUnitType type, string where) => GetEntry(type, where).Id;
 
         private enum RuntimeAdPlatform { Android, IOS }

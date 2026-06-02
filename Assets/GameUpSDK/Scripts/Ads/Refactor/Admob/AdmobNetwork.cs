@@ -31,11 +31,19 @@ namespace GameUpSDK.Ads
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
             if (IsInitialized) return;
+            var timeInit = Time.realtimeSinceStartup;
+            Debug.LogError($"Initializing Admob Network: {Time.realtimeSinceStartup}");
             GoogleMobileAds.Api.RequestConfiguration config = new GoogleMobileAds.Api.RequestConfiguration { TestDeviceIds = testDevices };
             GoogleMobileAds.Api.MobileAds.SetRequestConfiguration(config);
             
             GoogleMobileAds.Api.MobileAds.Initialize(initStatus =>
             {
+                Debug.LogError($"Initialized Admob Network: {Time.realtimeSinceStartup} - Total time initialized: {Time.realtimeSinceStartup - timeInit}");
+                foreach (var adapter in initStatus.getAdapterStatusMap())
+                {
+                    Debug.Log($"Adapter status: {adapter.Key} - {adapter.Value.InitializationState} - {adapter.Value.Latency} - {adapter.Value.Description}");
+                }
+                
                 GoogleMobileAds.Common.MobileAdsEventExecutor.ExecuteInUpdate(() =>
                 {
                     IsInitialized = true;
@@ -47,11 +55,11 @@ namespace GameUpSDK.Ads
                     BannerAd = new AdmobBannerAd(bannerConfig);
                     NativeFullScreenAd = new AdmobNativeFullscreenAd(nativeAdConfig);
 
-                    InterstitialAd.Load();
-                    RewardedAd.Load();
-                    AppOpenAd.Load();
-                    BannerAd.Load();
-                    NativeFullScreenAd.Load();
+                    InterstitialAd.LoadAll();
+                    RewardedAd.LoadAll();
+                    AppOpenAd.LoadAll();
+                    BannerAd.LoadAll();
+                    NativeFullScreenAd.LoadAll();
                     
                     OnInitialized?.Invoke(this);
                 });

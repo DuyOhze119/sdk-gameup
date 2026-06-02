@@ -59,6 +59,15 @@ namespace GameUpSDK.Ads
             RequestAdInternal(unitId, where);
         }
 
+        public void LoadAll()
+        {
+            var placements = _config.GetAllPlacements();
+            foreach (var placement in placements)
+            {
+                Load(placement);
+            }
+        }
+
         public abstract bool IsAvailable(string where = null);
 
         protected abstract void RequestAdInternal(string unitId, string where);

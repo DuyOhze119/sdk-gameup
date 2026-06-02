@@ -49,13 +49,12 @@ namespace GameUpSDK.Ads
                     InterstitialAd = new MaxInterstitialAd(interstitialConfig);
                     BannerAd = new MaxBannerAd(bannerConfig);
                     NativeFullScreenAd = new DummyNativeFullscreenAd();
-
-                    // Preload
-                    AppOpenAd.Load();
-                    RewardedAd.Load();
-                    InterstitialAd.Load();
-                    BannerAd.Load();
-                    NativeFullScreenAd.Load();
+                    
+                    InterstitialAd.LoadAll();
+                    RewardedAd.LoadAll();
+                    AppOpenAd.LoadAll();
+                    BannerAd.LoadAll();
+                    NativeFullScreenAd.LoadAll();
                     
                     OnInitialized?.Invoke(this);
                 });

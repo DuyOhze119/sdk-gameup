@@ -44,11 +44,11 @@ namespace GameUpSDK.Ads
 
                     Unity.Services.LevelPlay.LevelPlay.OnImpressionDataReady += OnImpression;
 
-                    AppOpenAd.Load();
-                    InterstitialAd.Load();
-                    RewardedAd.Load();
-                    BannerAd.Load();
-                    NativeFullScreenAd.Load();
+                    InterstitialAd.LoadAll();
+                    RewardedAd.LoadAll();
+                    AppOpenAd.LoadAll();
+                    BannerAd.LoadAll();
+                    NativeFullScreenAd.LoadAll();
                     
                     OnInitialized?.Invoke(this);
                 });

@@ -33,6 +33,7 @@ namespace GameUpSDK.Ads
         event Action<string, string> OnAdDisplayFailed;
         event Action<string> OnAdClosed;
         void Load(string where = null);
+        void LoadAll();
         bool IsAvailable(string where = null);
     }
 
