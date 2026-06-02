@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GameUpSDK.Ads
@@ -50,6 +51,57 @@ namespace GameUpSDK.Ads
                     reason = $"level_too_low_({currentLevel}<{_minLevelRequired})";
                     return false;
                 }
+            }
+
+            reason = string.Empty;
+            return true;
+        }
+    }
+
+    public class RemoveAdCondition : IAdCondition
+    {
+        private readonly List<AdUnitType> _adUnitTypes;
+        private readonly System.Func<bool> _getRemoveAdFunc;
+
+        public RemoveAdCondition(List<AdUnitType> removeAdUnits, System.Func<bool> getRemoveAdFunc)
+        {
+            _getRemoveAdFunc = getRemoveAdFunc;
+            _adUnitTypes = removeAdUnits;
+        }
+
+        public bool CanShow(AdUnitType adType, string where, out string reason)
+        {
+            if (_adUnitTypes.Contains(adType) && _getRemoveAdFunc.Invoke())
+            {
+                reason = $"can remove_ad_{adType}";
+                return false;
+            }
+
+            reason = string.Empty;
+            return true;
+        }
+    }
+
+    public class IgnoreAfterShowAnyAd : IAdCondition
+    {
+        private readonly float _ignoreTime;
+        private readonly System.Func<float> _getTimeAfterShowAdFunc;
+        private readonly List<AdUnitType> _adUnitTypes;
+
+        public IgnoreAfterShowAnyAd(List<AdUnitType> ignoreAdUnits, float ignoreTime,
+            System.Func<float> getTimeAfterShowAdFunc)
+        {
+            _ignoreTime = ignoreTime;
+            _adUnitTypes = ignoreAdUnits;
+            _getTimeAfterShowAdFunc = getTimeAfterShowAdFunc;
+        }
+
+        public bool CanShow(AdUnitType adType, string where, out string reason)
+        {
+            if (_adUnitTypes.Contains(adType) && _getTimeAfterShowAdFunc.Invoke() <= _ignoreTime)
+            {
+                reason = $"ignore show ad after ad: {adType}";
+                return false;
             }
 
             reason = string.Empty;

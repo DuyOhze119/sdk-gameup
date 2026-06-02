@@ -46,6 +46,8 @@ namespace GameUpSDK.Ads
 
         private readonly List<IAdCondition> _showConditions = new List<IAdCondition>();
 
+        private float _timePointAfterShowAd;
+
         protected void Awake()
         {
             DontDestroyOnLoad(gameObject);
@@ -119,24 +121,28 @@ namespace GameUpSDK.Ads
                 network.InterstitialAd.OnAdDisplayed += pauseAct;
                 network.InterstitialAd.OnAdClosed += resumeAct;
                 network.InterstitialAd.OnAdClosed += adCloseAct;
+                network.InterstitialAd.OnAdLoaded += HandleAdClosed;
             }
 
             if (network.RewardedAd != null)
             {
                 network.RewardedAd.OnAdDisplayed += pauseAct;
                 network.RewardedAd.OnAdClosed += resumeAct;
+                network.RewardedAd.OnAdLoaded += HandleAdClosed;
             }
 
             if (network.AppOpenAd != null)
             {
                 network.AppOpenAd.OnAdDisplayed += pauseAct;
                 network.AppOpenAd.OnAdClosed += resumeAct;
+                network.AppOpenAd.OnAdLoaded += HandleAdClosed;
             }
 
             if (network.NativeFullScreenAd != null)
             {
                 network.NativeFullScreenAd.OnAdDisplayed += pauseAct;
                 network.NativeFullScreenAd.OnAdClosed += resumeAct;
+                network.NativeFullScreenAd.OnAdLoaded += HandleAdClosed;
             }
         }
 
@@ -218,7 +224,7 @@ namespace GameUpSDK.Ads
         {
             if (!EvaluateConditions(AdUnitType.Interstitial, where, out var blockReason))
             {
-                Debug.Log($"[GameUpSDK] Interstitial bị chặn bởi rules: {blockReason}");
+                Debug.Log($"[GameUpSDK] Interstitial block rules: {blockReason}");
                 onFail?.Invoke(); return;
             }
             
@@ -244,6 +250,12 @@ namespace GameUpSDK.Ads
 
         public void ShowAppOpenAds(string where, Action onSuccess = null, Action onFail = null)
         {
+            if (!EvaluateConditions(AdUnitType.AppOpen, where, out var blockReason))
+            {
+                Debug.Log($"[GameUpSDK] AppOpenAd block rules: {blockReason}");
+                onFail?.Invoke(); return;
+            }
+            
             _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeAppOpen, where);
             var network = GetAvailableProvider(AdUnitType.AppOpen, where);
 
@@ -263,6 +275,12 @@ namespace GameUpSDK.Ads
 
         public void ShowBanner(string where)
         {
+            if (!EvaluateConditions(AdUnitType.Banner, where, out var blockReason))
+            {
+                Debug.Log($"[GameUpSDK] Banner block rules: {blockReason}"); 
+                return;
+            }
+            
             _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeBanner, where);
 
             var network = GetAvailableProvider(AdUnitType.Banner, where);
@@ -279,6 +297,12 @@ namespace GameUpSDK.Ads
 
         public void ShowCollapsibleBanner(string where)
         {
+            if (!EvaluateConditions(AdUnitType.Banner, where, out var blockReason))
+            {
+                Debug.Log($"[GameUpSDK] Banner block rules: {blockReason}");
+                return;
+            }
+            
             _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeBanner, where);
 
             var network = GetAvailableProvider(AdUnitType.Banner, where);
@@ -304,6 +328,12 @@ namespace GameUpSDK.Ads
 
         public void ShowNativeAd(string where, Action onSuccess, Action onFail)
         {
+            if (!EvaluateConditions(AdUnitType.NativeAd, where, out var blockReason))
+            {
+                Debug.Log($"[GameUpSDK] NativeAd block rules: {blockReason}");
+                onFail?.Invoke(); return;
+            }
+            
             _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeNativeAd, where);
             var network = GetAvailableProvider(AdUnitType.NativeAd, where);
 
@@ -368,6 +398,16 @@ namespace GameUpSDK.Ads
                 default:
                     throw new ArgumentOutOfRangeException(nameof(adType), adType, null);
             }
+        }
+
+        private void HandleAdClosed(string where)
+        {
+            _timePointAfterShowAd = Time.realtimeSinceStartup;
+        }
+
+        public float GetTimeCountAfterShowAd()
+        {
+            return Time.realtimeSinceStartup - _timePointAfterShowAd;
         }
     }
 }
