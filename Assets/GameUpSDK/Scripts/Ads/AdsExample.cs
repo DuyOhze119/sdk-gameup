@@ -13,7 +13,7 @@ namespace GameUpSDK
         private void Start()
         {
             AdCappingManager.Instance.SetCappingLimit("default", 15, 0);
-            AdsManager.Instance.AddCondition(new CappingTimeCondition("default"));
+            AdsManager.Instance.AddCondition(new CappingTimeCondition(AdUnitType.Interstitial, "default"));
         }
 
         private void OnGUI()

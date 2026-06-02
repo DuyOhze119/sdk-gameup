@@ -5,15 +5,17 @@ namespace GameUpSDK.Ads
     public class CappingTimeCondition : IAdCondition
     {
         private readonly string _cappingGroup;
+        private readonly AdUnitType _adUnitType;
 
-        public CappingTimeCondition(string cappingGroup = "default")
+        public CappingTimeCondition(AdUnitType adUnitType = AdUnitType.Interstitial, string cappingGroup = "default")
         {
             _cappingGroup = cappingGroup;
+            _adUnitType = adUnitType;
         }
 
         public bool CanShow(AdUnitType adType, string where, out string reason)
         {
-            if (adType == AdUnitType.Interstitial)
+            if (adType == _adUnitType)
             {
                 if (!AdCappingManager.Instance.IsCappingReady(_cappingGroup))
                 {
