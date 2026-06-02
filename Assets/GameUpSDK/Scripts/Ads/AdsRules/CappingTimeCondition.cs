@@ -98,6 +98,7 @@ namespace GameUpSDK.Ads
 
         public bool CanShow(AdUnitType adType, string where, out string reason)
         {
+            Debug.Log($"ignore_after_show_any_ad: {adType}, {where}, {_getTimeAfterShowAdFunc?.Invoke()}");
             if (_adUnitTypes.Contains(adType) && _getTimeAfterShowAdFunc.Invoke() <= _ignoreTime)
             {
                 reason = $"ignore show ad after ad: {adType} - {_ignoreTime} - current count: {_getTimeAfterShowAdFunc.Invoke()}";
