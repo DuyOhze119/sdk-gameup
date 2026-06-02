@@ -39,9 +39,14 @@ namespace GameUpSDK.Ads
             GoogleMobileAds.Api.MobileAds.Initialize(initStatus =>
             {
                 Debug.LogError($"Initialized Admob Network: {Time.realtimeSinceStartup} - Total time initialized: {Time.realtimeSinceStartup - timeInit}");
-                foreach (var adapter in initStatus.getAdapterStatusMap())
+                var adapterStatusMap = initStatus.getAdapterStatusMap();
+                foreach (var adapter in adapterStatusMap)
                 {
-                    Debug.Log($"Adapter status: {adapter.Key} - {adapter.Value.InitializationState} - {adapter.Value.Latency} - {adapter.Value.Description}");
+                    string name = adapter.Key;
+                    var status = adapter.Value;
+                    
+                    // In ra log: Tên mạng - Trạng thái - Thời gian trễ - Mô tả lỗi (nếu có)
+                    Debug.Log($"[AdMob Init] adapter: {name} | status: {status.InitializationState} | Độ trễ: {status.Latency}ms | Phản hồi: {status.Description}");
                 }
                 
                 GoogleMobileAds.Common.MobileAdsEventExecutor.ExecuteInUpdate(() =>
