@@ -92,50 +92,27 @@ typedef void (*NativeAdClosedCallback)();
 
     adView.nativeAd = self.loadedAd;
 
-    // --- NÚT ĐÓNG ĐẾM NGƯỢC ---
+    // --- NÚT ĐÓNG HÌNH TRÒN (Hiển thị ngay lập tức) ---
     UIButton *closeButton = [UIButton buttonWithType:UIButtonTypeCustom];
     closeButton.frame = CGRectMake(screenBounds.size.width - 65, 50, 45, 45); 
+    
     closeButton.layer.cornerRadius = 22.5; 
     closeButton.layer.masksToBounds = YES;
     closeButton.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.5];
     closeButton.layer.borderWidth = 1.5; 
     closeButton.layer.borderColor = [UIColor whiteColor].CGColor;
     
-    [closeButton setTitle:@"3" forState:UIControlStateNormal];
+    // Đặt chữ X, chỉnh font và mở khóa cho phép bấm ngay
+    [closeButton setTitle:@"X" forState:UIControlStateNormal];
     [closeButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    closeButton.titleLabel.font = [UIFont systemFontOfSize:14]; 
-    closeButton.userInteractionEnabled = NO; 
-    closeButton.tag = 999; 
+    closeButton.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium]; 
+    closeButton.userInteractionEnabled = YES; 
+    
+    // Gắn sự kiện click gọi hàm hideAd
+    [closeButton addTarget:self action:@selector(hideAd) forControlEvents:UIControlEventTouchUpInside];
+    
     [self.mainContainer addSubview:closeButton];
-
-    __block int secondsLeft = 3; 
-    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
-    dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
-    dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, 1.0 * NSEC_PER_SEC), 1.0 * NSEC_PER_SEC, 0.1 * NSEC_PER_SEC);
     
-    __block dispatch_source_t blockTimer = timer; 
-    
-    dispatch_source_set_event_handler(timer, ^{
-        secondsLeft--;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            UIButton *btn = (UIButton *)[self.mainContainer viewWithTag:999];
-            if (btn) {
-                if (secondsLeft > 0) {
-                    [btn setTitle:[NSString stringWithFormat:@"%d", secondsLeft] forState:UIControlStateNormal];
-                } else {
-                    dispatch_source_cancel(blockTimer);
-                    [btn setTitle:@"X" forState:UIControlStateNormal];
-                    btn.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
-                    btn.userInteractionEnabled = YES;
-                    [btn addTarget:self action:@selector(hideAd) forControlEvents:UIControlEventTouchUpInside];
-                }
-            } else {
-                dispatch_source_cancel(blockTimer);
-            }
-        });
-    });
-    
-    dispatch_resume(timer);
 }
 
 // Ẩn quảng cáo và dọn dẹp

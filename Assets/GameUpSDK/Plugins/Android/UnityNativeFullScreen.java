@@ -125,50 +125,35 @@ public class UnityNativeFullScreen {
         mainContainer.addView(adView);
         adView.setNativeAd(nativeAd);
 
-        android.graphics.drawable.GradientDrawable circleBackground = new android.graphics.drawable.GradientDrawable();
-        circleBackground.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        circleBackground.setColor(Color.parseColor("#88000000")); 
-        circleBackground.setStroke(3, Color.WHITE); 
-
-        final Button btnClose = new Button(activity);
-        btnClose.setBackground(circleBackground);
-        btnClose.setTextColor(Color.WHITE);
-        btnClose.setTextSize(14); 
-        btnClose.setGravity(Gravity.CENTER);
-        btnClose.setPadding(0, 0, 0, 0); 
+        // 6. Nút Đóng dạng vòng tròn (Hiển thị ngay lập tức)
+                android.graphics.drawable.GradientDrawable circleBackground = new android.graphics.drawable.GradientDrawable();
+                circleBackground.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+                circleBackground.setColor(Color.parseColor("#88000000")); 
+                circleBackground.setStroke(3, Color.WHITE); 
         
-        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(90, 90);
-        closeParams.gravity = Gravity.TOP | Gravity.END;
-        closeParams.setMargins(0, 60, 40, 0); 
-        btnClose.setLayoutParams(closeParams);
-
-        final int[] secondsLeft = {3};
-        btnClose.setText(String.valueOf(secondsLeft[0]));
-        btnClose.setEnabled(false);
-
-        final android.os.Handler handler = new android.os.Handler();
-        final Runnable countdownRunnable = new Runnable() {
-            @Override
-            public void run() {
-                secondsLeft[0]--;
-                if (secondsLeft[0] > 0) {
-                    btnClose.setText(String.valueOf(secondsLeft[0]));
-                    handler.postDelayed(this, 1000);
-                } else {
-                    btnClose.setText("X");
-                    btnClose.setTextSize(16); 
-                    btnClose.setEnabled(true);
-                    btnClose.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            hideAd(activity);
-                        }
-                    });
-                }
-            }
-        };
-        handler.postDelayed(countdownRunnable, 1000);
-        mainContainer.addView(btnClose);
+                final Button btnClose = new Button(activity);
+                btnClose.setBackground(circleBackground);
+                btnClose.setTextColor(Color.WHITE);
+                btnClose.setTextSize(16); // Size 16 để chữ X vừa vặn
+                btnClose.setGravity(Gravity.CENTER);
+                btnClose.setPadding(0, 0, 0, 0); 
+                
+                FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(90, 90);
+                closeParams.gravity = Gravity.TOP | Gravity.END;
+                closeParams.setMargins(0, 60, 40, 0); 
+                btnClose.setLayoutParams(closeParams);
+        
+                // Hiển thị chữ X luôn và cho phép click ngay
+                btnClose.setText("X");
+                btnClose.setEnabled(true);
+                btnClose.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        hideAd(activity);
+                    }
+                });
+        
+                mainContainer.addView(btnClose);
     }
 
     public static void hideAd(Activity activity) {
