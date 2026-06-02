@@ -139,6 +139,7 @@ namespace GameUpSDK.Ads
                 _tracker.LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeRewardedVideo, where,
                     "no_ads_available");
                 onFail?.Invoke();
+                LoadAd(AdUnitType.RewardedVideo, where);
                 return;
             }
 
@@ -158,8 +159,10 @@ namespace GameUpSDK.Ads
 
             if (network == null)
             {
-                _tracker.LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeInterstitial, where, "network_null");
+                _tracker.LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeInterstitial, where,
+                    "no_ads_available");
                 onFail?.Invoke();
+                LoadAd(AdUnitType.Interstitial, where);
                 return;
             }
 
@@ -178,8 +181,9 @@ namespace GameUpSDK.Ads
 
             if (network == null)
             {
-                _tracker.LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeAppOpen, where, "network_null");
+                _tracker.LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeAppOpen, where, "no_ads_available");
                 onFail?.Invoke();
+                LoadAd(AdUnitType.AppOpen, where);
                 return;
             }
 
@@ -189,12 +193,6 @@ namespace GameUpSDK.Ads
 
         public bool IsBannerAvailable(string where = null) => GetAvailableProvider(AdUnitType.Banner, where) != null;
 
-        public void LoadBanner(string where)
-        {
-            var network = GetAvailableProvider(AdUnitType.Banner, where);
-            network?.BannerAd.Load(where);
-        }
-
         public void ShowBanner(string where)
         {
             _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeBanner, where);
@@ -202,7 +200,8 @@ namespace GameUpSDK.Ads
             var network = GetAvailableProvider(AdUnitType.Banner, where);
             if (network == null)
             {
-                _tracker.LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where, "network_null");
+                _tracker.LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where, "no_ads_available");
+                LoadAd(AdUnitType.Banner, where);
                 return;
             }
 
@@ -217,7 +216,8 @@ namespace GameUpSDK.Ads
             var network = GetAvailableProvider(AdUnitType.Banner, where);
             if (network == null)
             {
-                _tracker.LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where, "network_null");
+                _tracker.LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where, "no_ads_available");
+                LoadAd(AdUnitType.Banner, where);
                 return;
             }
 
@@ -255,6 +255,50 @@ namespace GameUpSDK.Ads
             foreach (var network in _networkDict)
             {
                 network.Value.NativeFullScreenAd.Hide();
+            }
+        }
+
+        public void LoadAd(AdUnitType adType, string where = null)
+        {
+            switch (adType)
+            {
+                case AdUnitType.Banner:
+                    foreach (var network in _networkDict)
+                    {
+                        network.Value.BannerAd?.Load(where);
+                    }
+
+                    break;
+                case AdUnitType.Interstitial:
+                    foreach (var network in _networkDict)
+                    {
+                        network.Value.InterstitialAd?.Load(where);
+                    }
+
+                    break;
+                case AdUnitType.RewardedVideo:
+                    foreach (var network in _networkDict)
+                    {
+                        network.Value.RewardedAd?.Load(where);
+                    }
+
+                    break;
+                case AdUnitType.AppOpen:
+                    foreach (var network in _networkDict)
+                    {
+                        network.Value.AppOpenAd?.Load(where);
+                    }
+
+                    break;
+                case AdUnitType.NativeAd:
+                    foreach (var network in _networkDict)
+                    {
+                        network.Value.NativeFullScreenAd?.Load(where);
+                    }
+
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(adType), adType, null);
             }
         }
     }

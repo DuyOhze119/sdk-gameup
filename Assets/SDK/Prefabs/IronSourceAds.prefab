@@ -49,17 +49,23 @@ MonoBehaviour:
     useMultiAdUnitIds: 0
     defaultIdAndroid: 
     defaultIdIOS: 
+    defaultBannerSize: 2
+    defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []
   rewardedConfig:
     useMultiAdUnitIds: 0
     defaultIdAndroid: 
     defaultIdIOS: 
+    defaultBannerSize: 2
+    defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []
   bannerConfig:
     useMultiAdUnitIds: 0
     defaultIdAndroid: 
     defaultIdIOS: 
+    defaultBannerSize: 2
+    defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []

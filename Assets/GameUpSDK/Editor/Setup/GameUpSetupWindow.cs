@@ -4,6 +4,8 @@ using UnityEditor;
 using UnityEngine;
 using UnityEditor.SceneManagement;
 using System.IO;
+using System.Text;
+using GameUpSDK.Ads;
 
 namespace GameUpSDK.Editor.Setup
 {
@@ -111,6 +113,18 @@ namespace GameUpSDK.Editor.Setup
                 CreateSDKInCurrentScene();
             }
 
+            // =========================================================
+            // NÚT MỚI: TẠO FILE CONSTANTS (AdPlacement.cs)
+            // =========================================================
+            EditorGUILayout.Space(4);
+            GUI.backgroundColor = new Color(0.8f, 1f, 0.8f);
+            if (GUILayout.Button("Tạo Class AdPlacement (Constants)", GUILayout.Height(28)))
+            {
+                SaveAllData();
+                GenerateAdPlacementConstants();
+            }
+            GUI.backgroundColor = Color.white;
+            EditorGUILayout.Space(8);
             EditorGUILayout.EndScrollView();
         }
 
@@ -264,6 +278,130 @@ namespace GameUpSDK.Editor.Setup
                 EditorGUIUtility.PingObject(instance);
                 EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
             }
+        }
+        
+        // =========================================================================
+        // LOGIC TẠO FILE CONSTANTS CHỨA TÊN PLACEMENT (WHERE)
+        // =========================================================================
+        
+        private void GenerateAdPlacementConstants()
+        {
+            HashSet<string> placements = new HashSet<string>();
+            
+            // Các placement hệ thống mặc định (nếu muốn)
+            placements.Add("default");
+            placements.Add("main");
+
+            // Quét các Prefab chứa logic Ads
+            ExtractPlacementsFromPrefab(GameUpSetupPaths.PathAdMob, placements);
+            ExtractPlacementsFromPrefab(GameUpSetupPaths.PathMax, placements);
+            ExtractPlacementsFromPrefab(GameUpSetupPaths.PathIronSource, placements);
+
+            // Sinh mã nguồn C#
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("// ========================================================");
+            sb.AppendLine("// AUTO-GENERATED FILE BY GAMEUP SDK. DO NOT MODIFY DIRECTLY.");
+            sb.AppendLine("// ========================================================");
+            sb.AppendLine("");
+            sb.AppendLine("namespace GameUpSDK.Ads");
+            sb.AppendLine("{");
+            sb.AppendLine("    public static class AdPlacement");
+            sb.AppendLine("    {");
+
+            foreach (var p in placements)
+            {
+                string varName = SanitizeToVariableName(p);
+                sb.AppendLine($"        public const string {varName} = \"{p}\";");
+            }
+
+            sb.AppendLine("    }");
+            sb.AppendLine("}");
+
+            // Tạo thư mục Scripts nếu chưa có
+            string dir = "Assets/SDK/Scripts";
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            
+            // Ghi file
+            string path = dir + "/AdPlacement.cs";
+            File.WriteAllText(path, sb.ToString());
+            
+            AssetDatabase.Refresh();
+            Debug.Log($"[GameUpSDK] Đã tạo thành công file Constants tại: {path}");
+            
+            // Highlight file cho bạn dễ thấy
+            var asset = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
+            if (asset != null) EditorGUIUtility.PingObject(asset);
+        }
+
+        private void ExtractPlacementsFromPrefab(string prefabPath, HashSet<string> placements)
+        {
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) == null) return;
+            var go = PrefabUtility.LoadPrefabContents(prefabPath);
+            if (go == null) return;
+
+            try
+            {
+                var network = go.GetComponent<IAdNetwork>();
+                if (network != null)
+                {
+                    var so = new SerializedObject((MonoBehaviour)network);
+                    string[] configs = { "bannerConfig", "interstitialConfig", "rewardedConfig", "appOpenConfig", "nativeConfig" };
+                    
+                    foreach (var c in configs)
+                    {
+                        var configProp = so.FindProperty(c);
+                        if (configProp != null)
+                        {
+                            ExtractFromList(configProp.FindPropertyRelative("multiIdsAndroid"), placements);
+                            ExtractFromList(configProp.FindPropertyRelative("multiIdsIOS"), placements);
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(go);
+            }
+        }
+
+        private void ExtractFromList(SerializedProperty listProp, HashSet<string> placements)
+        {
+            if (listProp == null || !listProp.isArray) return;
+            for (int i = 0; i < listProp.arraySize; i++)
+            {
+                var element = listProp.GetArrayElementAtIndex(i);
+                var nameProp = element.FindPropertyRelative("NameId"); // Đây chính là biến string "Where"
+                
+                if (nameProp != null && !string.IsNullOrWhiteSpace(nameProp.stringValue))
+                {
+                    placements.Add(nameProp.stringValue.Trim());
+                }
+            }
+        }
+
+        private string SanitizeToVariableName(string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return "Unknown";
+            
+            // 1. Thay thế các ký tự không phải chữ/số thành dấu cách (để dễ viết hoa)
+            char[] chars = raw.ToCharArray();
+            for (int i = 0; i < chars.Length; i++)
+            {
+                if (!char.IsLetterOrDigit(chars[i])) chars[i] = ' ';
+            }
+            
+            // 2. Chuyển thành PascalCase (VD: "main menu" -> "Main Menu")
+            string cleaned = new string(chars);
+            System.Globalization.TextInfo textInfo = new System.Globalization.CultureInfo("en-US", false).TextInfo;
+            cleaned = textInfo.ToTitleCase(cleaned).Replace(" ", "");
+
+            // 3. Đảm bảo biến hợp lệ trong C# (nếu lỡ bắt đầu bằng số, thì thêm dấu _)
+            if (!char.IsLetter(cleaned[0]) && cleaned[0] != '_')
+            {
+                cleaned = "_" + cleaned;
+            }
+
+            return cleaned;
         }
     }
 }

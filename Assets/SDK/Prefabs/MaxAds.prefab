@@ -50,29 +50,39 @@ MonoBehaviour:
     useMultiAdUnitIds: 0
     defaultIdAndroid: 
     defaultIdIOS: 
+    defaultBannerSize: 2
+    defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []
   interstitialConfig:
     useMultiAdUnitIds: 0
     defaultIdAndroid: 
     defaultIdIOS: 
+    defaultBannerSize: 2
+    defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []
   bannerConfig:
     useMultiAdUnitIds: 0
     defaultIdAndroid: 
     defaultIdIOS: 
+    defaultBannerSize: 2
+    defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []
   appOpenAdConfig:
     useMultiAdUnitIds: 0
     defaultIdAndroid: 
     defaultIdIOS: 
+    defaultBannerSize: 2
+    defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []
   nativeAdConfig:
     useMultiAdUnitIds: 0
     defaultIdAndroid: 
     defaultIdIOS: 
+    defaultBannerSize: 2
+    defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []
