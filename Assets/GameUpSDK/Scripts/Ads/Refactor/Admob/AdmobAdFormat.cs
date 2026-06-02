@@ -259,7 +259,6 @@ namespace GameUpSDK.Ads
 #if ADMOB_DEPENDENCIES_INSTALLED
             string key = GetKey(where);
             var available = _isLoaded.TryGetValue(key, out var isLoaded) && isLoaded;
-            UnityEngine.Debug.Log($"[GameUp] Banner available: {available} - where: {where}");
             return available;
 #endif
             return false;
