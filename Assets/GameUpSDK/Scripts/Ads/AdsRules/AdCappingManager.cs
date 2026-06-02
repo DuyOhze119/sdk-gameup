@@ -18,11 +18,6 @@ namespace GameUpSDK.Ads
         {
             DontDestroyOnLoad(gameObject);
         }
-
-        private void Start()
-        {
-            SetCappingLimit("default", defaultCappingTime);
-        }
         
         private void Update()
         {
@@ -36,9 +31,9 @@ namespace GameUpSDK.Ads
             }
         }
         
-        public void SetCappingLimit(string groupId, float seconds)
+        public void SetCappingLimit(string groupId, float limit, float seconds)
         {
-            _cappingLimits[groupId] = seconds;
+            _cappingLimits[groupId] = limit;
             _currentTimers.TryAdd(groupId, seconds);
         }
 
@@ -46,12 +41,17 @@ namespace GameUpSDK.Ads
         {
             float limit = _cappingLimits.GetValueOrDefault(groupId, defaultCappingTime);
             float current = _currentTimers.GetValueOrDefault(groupId, 0f);
+            Debug.LogError($"current: {current} - limit: {limit}");
             return current >= limit;
         }
 
-        public void ResetCapping(string groupId = "default")
+        public void ResetCapping()
         {
-            if (_currentTimers.ContainsKey(groupId)) _currentTimers[groupId] = 0f;
+            var keys = new List<string>(_currentTimers.Keys);
+            foreach (var key in keys)
+            {
+                _currentTimers[key] = 0;
+            }
         }
 
         public void PauseAllCapping() => _pauseRequests++;

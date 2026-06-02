@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace GameUpSDK.Ads
@@ -12,6 +13,7 @@ namespace GameUpSDK.Ads
         public AdUnitConfig rewardedConfig;
         public AdUnitConfig bannerConfig;
 
+        public Action<IAdNetwork> OnInitialized { get; set; }
         public MediationProvider MediationProvider { get; set; } = MediationProvider.IronSource;
         public bool IsInitialized { get; private set; }
         public IInterstitialAd InterstitialAd { get; private set; }
@@ -47,6 +49,8 @@ namespace GameUpSDK.Ads
                     RewardedAd.Load();
                     BannerAd.Load();
                     NativeFullScreenAd.Load();
+                    
+                    OnInitialized?.Invoke(this);
                 });
             };
             Unity.Services.LevelPlay.LevelPlay.Init(levelPlayAppKey);

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace GameUpSDK.Ads
@@ -14,6 +15,7 @@ namespace GameUpSDK.Ads
         [SerializeField] private AdUnitConfig appOpenAdConfig;
         [SerializeField] private AdUnitConfig nativeAdConfig;
 
+        public Action<IAdNetwork> OnInitialized { get; set; }
         public MediationProvider MediationProvider { get; set; } = MediationProvider.Max;
         public bool IsInitialized { get; private set; }
 
@@ -54,6 +56,8 @@ namespace GameUpSDK.Ads
                     InterstitialAd.Load();
                     BannerAd.Load();
                     NativeFullScreenAd.Load();
+                    
+                    OnInitialized?.Invoke(this);
                 });
             };
 

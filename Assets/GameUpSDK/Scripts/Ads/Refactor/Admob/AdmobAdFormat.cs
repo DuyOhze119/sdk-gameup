@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 #if ADMOB_DEPENDENCIES_INSTALLED
 using GoogleMobileAds.Api;
+using UnityEngine;
 #endif
 
 namespace GameUpSDK.Ads
@@ -58,6 +59,7 @@ namespace GameUpSDK.Ads
                 _ads.Remove(key);
                 ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
                 {
+                    Debug.LogError("Interstitial ad dismissed");
                     NotifyAdClosed(where);
                     onSuccess?.Invoke();
                     Load(where);

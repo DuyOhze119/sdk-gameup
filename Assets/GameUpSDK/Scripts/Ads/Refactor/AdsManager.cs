@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using GameUpSDK.Singletons;
 
@@ -49,13 +50,13 @@ namespace GameUpSDK.Ads
         {
             DontDestroyOnLoad(gameObject);
             _tracker = gameObject.AddComponent<AdsTracker>();
-
             IAdNetwork[] foundNetworks = GetComponentsInChildren<IAdNetwork>(true);
-            foreach (var network in foundNetworks)
+            foreach (var provider in mediationPriority)
             {
-                if (_networkDict.TryAdd(network.MediationProvider, network))
+                var network = foundNetworks.FirstOrDefault(s => s.MediationProvider == provider);
+                if (network != null)
                 {
-                    _tracker.SubscribeToNetwork(network);
+                    _networkDict.Add(provider, network);
                 }
             }
         }
@@ -88,11 +89,18 @@ namespace GameUpSDK.Ads
                 {
                     if (!network.IsInitialized)
                     {
+                        network.OnInitialized += OnInitializedNetwork;
                         network.Initialize();
-                        WireUpCappingEvents(network);
                     }
                 }
             }
+        }
+
+        private void OnInitializedNetwork(IAdNetwork network)
+        {
+            
+            _tracker.SubscribeToNetwork(network);
+            WireUpCappingEvents(network);
         }
 
         public void SetConsent(bool isConsent)
@@ -104,12 +112,13 @@ namespace GameUpSDK.Ads
         {
             Action<string> pauseAct = (where) => AdCappingManager.Instance.PauseAllCapping();
             Action<string> resumeAct = (where) => AdCappingManager.Instance.ResumeAllCapping();
+            Action<string> adCloseAct = (where) => AdCappingManager.Instance.ResetCapping();
 
             if (network.InterstitialAd != null)
             {
                 network.InterstitialAd.OnAdDisplayed += pauseAct;
                 network.InterstitialAd.OnAdClosed += resumeAct;
-                network.InterstitialAd.OnAdClosed += AdCappingManager.Instance.ResetCapping;
+                network.InterstitialAd.OnAdClosed += adCloseAct;
             }
 
             if (network.RewardedAd != null)

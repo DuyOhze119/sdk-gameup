@@ -12,6 +12,7 @@ namespace GameUpSDK.Ads
     
     public interface IAdNetwork
     {
+        Action<IAdNetwork> OnInitialized { get; set; }
         MediationProvider MediationProvider { get; set; }
         IInterstitialAd InterstitialAd { get; }
         IRewardedAd RewardedAd { get; }

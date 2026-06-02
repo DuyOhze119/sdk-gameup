@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -16,6 +17,8 @@ namespace GameUpSDK.Ads
 
         public bool IsInitialized { get; private set; }
 
+        public Action<IAdNetwork> OnInitialized { get; set; }
+        
         public MediationProvider MediationProvider { get; set; } = MediationProvider.Admob;
         public IInterstitialAd InterstitialAd { get; private set; }
         public IRewardedAd RewardedAd { get; private set; }
@@ -28,7 +31,6 @@ namespace GameUpSDK.Ads
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
             if (IsInitialized) return;
-
             GoogleMobileAds.Api.RequestConfiguration config = new GoogleMobileAds.Api.RequestConfiguration { TestDeviceIds = testDevices };
             GoogleMobileAds.Api.MobileAds.SetRequestConfiguration(config);
             
@@ -50,6 +52,8 @@ namespace GameUpSDK.Ads
                     AppOpenAd.Load();
                     BannerAd.Load();
                     NativeFullScreenAd.Load();
+                    
+                    OnInitialized?.Invoke(this);
                 });
             });
 #endif

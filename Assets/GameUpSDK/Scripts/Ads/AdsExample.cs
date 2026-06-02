@@ -10,6 +10,12 @@ namespace GameUpSDK
         private string _statusLog = "Sẵn sàng. Nhấn các nút bên dưới để test quảng cáo.";
         private Vector2 _scrollPosition;
 
+        private void Start()
+        {
+            AdCappingManager.Instance.SetCappingLimit("default", 15, 0);
+            AdsManager.Instance.AddCondition(new CappingTimeCondition("default"));
+        }
+
         private void OnGUI()
         {
             // Thiết lập vùng hiển thị UI bằng GUILayout tại góc trên bên trái màn hình
