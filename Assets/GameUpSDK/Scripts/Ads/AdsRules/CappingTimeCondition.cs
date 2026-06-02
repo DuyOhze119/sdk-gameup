@@ -100,7 +100,7 @@ namespace GameUpSDK.Ads
         {
             if (_adUnitTypes.Contains(adType) && _getTimeAfterShowAdFunc.Invoke() <= _ignoreTime)
             {
-                reason = $"ignore show ad after ad: {adType}";
+                reason = $"ignore show ad after ad: {adType} - {_ignoreTime} - current count: {_getTimeAfterShowAdFunc.Invoke()}";
                 return false;
             }
 
