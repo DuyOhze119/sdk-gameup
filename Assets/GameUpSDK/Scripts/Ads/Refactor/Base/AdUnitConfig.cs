@@ -72,8 +72,8 @@ namespace GameUpSDK.Ads
                     }
                 }
             }
-
-            if (placements.Count == 0) placements.Add("default"); 
+            
+            placements.Add("default"); 
 
             return placements;
         }

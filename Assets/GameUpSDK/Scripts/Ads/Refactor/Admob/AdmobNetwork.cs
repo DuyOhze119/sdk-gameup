@@ -59,12 +59,12 @@ namespace GameUpSDK.Ads
                     AppOpenAd = new AdmobAppOpenAd(appOpenConfig);
                     BannerAd = new AdmobBannerAd(bannerConfig);
                     NativeFullScreenAd = new AdmobNativeFullscreenAd(nativeAdConfig);
+                    AppOpenAd.LoadAll();
+                    NativeFullScreenAd.LoadAll();
+                    BannerAd.LoadAll();
 
                     InterstitialAd.LoadAll();
                     RewardedAd.LoadAll();
-                    AppOpenAd.LoadAll();
-                    BannerAd.LoadAll();
-                    NativeFullScreenAd.LoadAll();
                     
                     OnInitialized?.Invoke(this);
                 });

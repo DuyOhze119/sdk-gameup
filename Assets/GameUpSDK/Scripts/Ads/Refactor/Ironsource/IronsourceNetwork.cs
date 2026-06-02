@@ -43,12 +43,12 @@ namespace GameUpSDK.Ads
                     // LevelPlay không có AppOpenAd, gán null hoặc tạo 1 class Dummy trả về false
 
                     Unity.Services.LevelPlay.LevelPlay.OnImpressionDataReady += OnImpression;
+                    AppOpenAd.LoadAll();
+                    NativeFullScreenAd.LoadAll();
+                    BannerAd.LoadAll();
 
                     InterstitialAd.LoadAll();
                     RewardedAd.LoadAll();
-                    AppOpenAd.LoadAll();
-                    BannerAd.LoadAll();
-                    NativeFullScreenAd.LoadAll();
                     
                     OnInitialized?.Invoke(this);
                 });
