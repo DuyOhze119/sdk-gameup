@@ -80,14 +80,14 @@ MonoBehaviour:
       NameId: home
       Id: abc
       intId: 1
-      BannerSize: 0
+      BannerSize: 2
       CollapsiblePlacement: 0
     - AdType: 0
       NameId: gameplay
       Id: bcdef
       intId: 2
-      BannerSize: 0
-      CollapsiblePlacement: 0
+      BannerSize: 2
+      CollapsiblePlacement: 2
     multiIdsIOS: []
   nativeAdConfig:
     useMultiAdUnitIds: 0
