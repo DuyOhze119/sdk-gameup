@@ -83,8 +83,8 @@ namespace GameUpSDK.Ads
                 onFail?.Invoke();
                 Load(where);
             }
-        }
 #endif
+        }
     }
 
     public class IronSourceRewardedAd : BaseAdFormat, IRewardedAd
@@ -199,20 +199,25 @@ namespace GameUpSDK.Ads
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
             string key = GetKey(where);
-            
+
             // Đọc trực tiếp cấu hình từ Editor Setup Window
             var entry = _config.GetEntry(_adType, where);
 
             MainThreadDispatcher.Enqueue(() =>
             {
                 // Hủy banner cũ nếu có để tạo cái mới chuẩn cấu hình
-                if (_ads.ContainsKey(key)) { _ads[key].DestroyAd(); _ads.Remove(key); }
+                if (_ads.ContainsKey(key))
+                {
+                    _ads[key].DestroyAd();
+                    _ads.Remove(key);
+                }
+
                 _isLoaded[key] = false;
 
                 // Map config sang định dạng của IronSource LevelPlay
-                var pos = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top 
-                            ? LevelPlayBannerPosition.TopCenter 
-                            : LevelPlayBannerPosition.BottomCenter;
+                var pos = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top
+                    ? LevelPlayBannerPosition.TopCenter
+                    : LevelPlayBannerPosition.BottomCenter;
 
                 var bannerConfig = new LevelPlayBannerAd.Config.Builder()
                     .SetSize(GetLevelPlayAdSize(entry.BannerSize))
@@ -222,7 +227,7 @@ namespace GameUpSDK.Ads
 
                 var banner = new LevelPlayBannerAd(unitId, bannerConfig);
 
-                banner.OnAdLoaded += (_) => 
+                banner.OnAdLoaded += (_) =>
                 {
                     MainThreadDispatcher.Enqueue(() =>
                     {
@@ -253,14 +258,18 @@ namespace GameUpSDK.Ads
             {
                 string key = GetKey(where);
                 string unitId = _config.ResolveUnitId(_adType, where);
-                if (string.IsNullOrEmpty(unitId)) { NotifyAdDisplayFailed(where, "empty_id"); return; }
+                if (string.IsNullOrEmpty(unitId))
+                {
+                    NotifyAdDisplayFailed(where, "empty_id");
+                    return;
+                }
 
                 if (_isLoaded.TryGetValue(key, out bool loaded) && loaded)
                 {
                     NotifyAdDisplayed(where);
                     if (_ads.TryGetValue(key, out var ad) && ad != null) ad.ShowAd();
                 }
-                else 
+                else
                 {
                     Load(where);
                 }
@@ -275,6 +284,7 @@ namespace GameUpSDK.Ads
 #endif
         }
 
+#if LEVELPLAY_DEPENDENCIES_INSTALLED
         private static LevelPlayAdSize GetLevelPlayAdSize(BannerSize size)
         {
             switch (size)
@@ -286,5 +296,6 @@ namespace GameUpSDK.Ads
                 default: return LevelPlayAdSize.LARGE;
             }
         }
+#endif
     }
 }
