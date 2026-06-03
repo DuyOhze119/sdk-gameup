@@ -300,6 +300,8 @@ namespace GameUpSDK.Ads
                     MainThreadDispatcher.Enqueue(() =>
                     {
                         _isLoaded[key] = false;
+                        banner.Destroy(); 
+                        _banners.Remove(key);
                         HandleLoadFailed(unitId, where, err?.GetMessage());
                     });
                 };
