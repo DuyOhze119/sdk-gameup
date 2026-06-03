@@ -373,6 +373,7 @@ namespace GameUpSDK.Ads
 #endif
         }
 
+#if ADMOB_DEPENDENCIES_INSTALLED
         private AdSize GetAdMobBannerSize(BannerSize size)
         {
             switch (size)
@@ -386,6 +387,7 @@ namespace GameUpSDK.Ads
                 default: return new AdSize(320, 100);
             }
         }
+#endif
     }
 
     public class AdmobNativeFullscreenAd : BaseAdFormat, INativeFullScreenAd
