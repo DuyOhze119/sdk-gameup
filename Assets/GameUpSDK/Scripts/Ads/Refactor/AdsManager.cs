@@ -46,8 +46,6 @@ namespace GameUpSDK.Ads
 
         private readonly List<IAdCondition> _showConditions = new List<IAdCondition>();
 
-        private float _timePointAfterShowAd;
-
         protected void Awake()
         {
             DontDestroyOnLoad(gameObject);
@@ -113,36 +111,46 @@ namespace GameUpSDK.Ads
         private void WireUpCappingEvents(IAdNetwork network)
         {
             Action<string> pauseAct = (where) => AdCappingManager.Instance.PauseAllCapping();
-            Action<string> resumeAct = (where) => AdCappingManager.Instance.ResumeAllCapping();
-            Action<string> adCloseAct = (where) => AdCappingManager.Instance.ResetCapping();
 
             if (network.InterstitialAd != null)
             {
                 network.InterstitialAd.OnAdDisplayed += pauseAct;
-                network.InterstitialAd.OnAdClosed += resumeAct;
-                network.InterstitialAd.OnAdClosed += adCloseAct;
-                network.InterstitialAd.OnAdLoaded += HandleAdClosed;
+                network.InterstitialAd.OnAdClosed += ( where) =>
+                {
+                    AdCappingManager.Instance.ResumeAllCapping();
+                    AdCappingManager.Instance.ResetCapping();
+                    AdHistoryTracker.MarkAdClosed(AdUnitType.Interstitial);
+                };
             }
 
             if (network.RewardedAd != null)
             {
                 network.RewardedAd.OnAdDisplayed += pauseAct;
-                network.RewardedAd.OnAdClosed += resumeAct;
-                network.RewardedAd.OnAdLoaded += HandleAdClosed;
+                network.RewardedAd.OnAdClosed += ( where) =>
+                {
+                    AdCappingManager.Instance.ResumeAllCapping();
+                    AdHistoryTracker.MarkAdClosed(AdUnitType.RewardedVideo);
+                };
             }
 
             if (network.AppOpenAd != null)
             {
                 network.AppOpenAd.OnAdDisplayed += pauseAct;
-                network.AppOpenAd.OnAdClosed += resumeAct;
-                network.AppOpenAd.OnAdLoaded += HandleAdClosed;
+                network.AppOpenAd.OnAdClosed += ( where) =>
+                {
+                    AdCappingManager.Instance.ResumeAllCapping();
+                    AdHistoryTracker.MarkAdClosed(AdUnitType.AppOpen);
+                };
             }
 
             if (network.NativeFullScreenAd != null)
             {
                 network.NativeFullScreenAd.OnAdDisplayed += pauseAct;
-                network.NativeFullScreenAd.OnAdClosed += resumeAct;
-                network.NativeFullScreenAd.OnAdLoaded += HandleAdClosed;
+                network.NativeFullScreenAd.OnAdClosed += ( where) =>
+                {
+                    AdCappingManager.Instance.ResumeAllCapping();
+                    AdHistoryTracker.MarkAdClosed(AdUnitType.NativeAd);
+                };
             }
         }
 
@@ -398,16 +406,6 @@ namespace GameUpSDK.Ads
                 default:
                     throw new ArgumentOutOfRangeException(nameof(adType), adType, null);
             }
-        }
-
-        private void HandleAdClosed(string where)
-        {
-            _timePointAfterShowAd = Time.realtimeSinceStartup;
-        }
-
-        public float GetTimeCountAfterShowAd()
-        {
-            return Time.realtimeSinceStartup - _timePointAfterShowAd;
         }
     }
 }

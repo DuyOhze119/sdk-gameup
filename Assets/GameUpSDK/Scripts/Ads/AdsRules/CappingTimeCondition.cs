@@ -28,6 +28,11 @@ namespace GameUpSDK.Ads
             reason = string.Empty;
             return true;
         }
+
+        public string GetString()
+        {
+            return $"Condition: Capping Time: {_cappingGroup}";
+        }
     }
 
     public class MinLevelCondition : IAdCondition
@@ -56,6 +61,11 @@ namespace GameUpSDK.Ads
             reason = string.Empty;
             return true;
         }
+
+        public string GetString()
+        {
+            return $"Condition: Min Level: {_minLevelRequired}";
+        }
     }
 
     public class RemoveAdCondition : IAdCondition
@@ -80,33 +90,46 @@ namespace GameUpSDK.Ads
             reason = string.Empty;
             return true;
         }
+
+        public string GetString()
+        {
+            return $"Condition: Remove: {string.Join(", ", _adUnitTypes)}";
+        }
     }
 
-    public class IgnoreAfterShowAnyAd : IAdCondition
+    public class CrossFormatCooldownCondition : IAdCondition
     {
-        private readonly float _ignoreTime;
-        private readonly System.Func<float> _getTimeAfterShowAdFunc;
-        private readonly List<AdUnitType> _adUnitTypes;
+        private readonly AdUnitType _targetAdType; // Loại quảng cáo bị chặn (VD: Interstitial)
+        private readonly AdUnitType _triggerAdType; // Loại quảng cáo làm mốc (VD: RewardedVideo)
+        private readonly float _cooldownSeconds; // Thời gian cần phải chờ (VD: 30 giây)
 
-        public IgnoreAfterShowAnyAd(List<AdUnitType> ignoreAdUnits, float ignoreTime,
-            System.Func<float> getTimeAfterShowAdFunc)
+        public CrossFormatCooldownCondition(AdUnitType targetAdType, AdUnitType triggerAdType, float cooldownSeconds)
         {
-            _ignoreTime = ignoreTime;
-            _adUnitTypes = ignoreAdUnits;
-            _getTimeAfterShowAdFunc = getTimeAfterShowAdFunc;
+            _targetAdType = targetAdType;
+            _triggerAdType = triggerAdType;
+            _cooldownSeconds = cooldownSeconds;
         }
 
         public bool CanShow(AdUnitType adType, string where, out string reason)
         {
-            Debug.Log($"ignore_after_show_any_ad: {adType}, {where}, {_getTimeAfterShowAdFunc?.Invoke()}");
-            if (_adUnitTypes.Contains(adType) && _getTimeAfterShowAdFunc.Invoke() <= _ignoreTime)
+            if (adType == _targetAdType)
             {
-                reason = $"ignore show ad after ad: {adType} - {_ignoreTime} - current count: {_getTimeAfterShowAdFunc.Invoke()}";
-                return false;
+                var timeSinceTriggerClosed = AdHistoryTracker.GetTimeSinceLastClosed(_triggerAdType);
+
+                if (timeSinceTriggerClosed < _cooldownSeconds)
+                {
+                    reason = $"cooldown_from_{_triggerAdType}_({timeSinceTriggerClosed:F1}s < {_cooldownSeconds}s)";
+                    return false; // Chặn hiển thị!
+                }
             }
 
             reason = string.Empty;
             return true;
+        }
+
+        public string GetString()
+        {
+            return $"Cross format cooldown: {_cooldownSeconds}";
         }
     }
 }
