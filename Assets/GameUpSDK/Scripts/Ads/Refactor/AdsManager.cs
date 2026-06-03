@@ -98,9 +98,20 @@ namespace GameUpSDK.Ads
 
         private void OnInitializedNetwork(IAdNetwork network)
         {
-            
             _tracker.SubscribeToNetwork(network);
             WireUpCappingEvents(network);
+            if (network.BannerAd != null)
+            {
+                network.BannerAd.OnAdLoaded += OnBannerLoaded;
+            }
+        }
+
+        private void OnBannerLoaded(string where)
+        {
+            if (!EvaluateConditions(AdUnitType.Banner, where, out var blockReason))
+            {
+                HideBanner(where);
+            }
         }
 
         public void SetConsent(bool isConsent)
@@ -115,7 +126,7 @@ namespace GameUpSDK.Ads
             if (network.InterstitialAd != null)
             {
                 network.InterstitialAd.OnAdDisplayed += pauseAct;
-                network.InterstitialAd.OnAdClosed += ( where) =>
+                network.InterstitialAd.OnAdClosed += (where) =>
                 {
                     AdCappingManager.Instance.ResumeAllCapping();
                     AdCappingManager.Instance.ResetCapping();
@@ -126,7 +137,7 @@ namespace GameUpSDK.Ads
             if (network.RewardedAd != null)
             {
                 network.RewardedAd.OnAdDisplayed += pauseAct;
-                network.RewardedAd.OnAdClosed += ( where) =>
+                network.RewardedAd.OnAdClosed += (where) =>
                 {
                     AdCappingManager.Instance.ResumeAllCapping();
                     AdHistoryTracker.MarkAdClosed(AdUnitType.RewardedVideo);
@@ -136,7 +147,7 @@ namespace GameUpSDK.Ads
             if (network.AppOpenAd != null)
             {
                 network.AppOpenAd.OnAdDisplayed += pauseAct;
-                network.AppOpenAd.OnAdClosed += ( where) =>
+                network.AppOpenAd.OnAdClosed += (where) =>
                 {
                     AdCappingManager.Instance.ResumeAllCapping();
                     AdHistoryTracker.MarkAdClosed(AdUnitType.AppOpen);
@@ -146,7 +157,7 @@ namespace GameUpSDK.Ads
             if (network.NativeFullScreenAd != null)
             {
                 network.NativeFullScreenAd.OnAdDisplayed += pauseAct;
-                network.NativeFullScreenAd.OnAdClosed += ( where) =>
+                network.NativeFullScreenAd.OnAdClosed += (where) =>
                 {
                     AdCappingManager.Instance.ResumeAllCapping();
                     AdHistoryTracker.MarkAdClosed(AdUnitType.NativeAd);
@@ -233,9 +244,10 @@ namespace GameUpSDK.Ads
             if (!EvaluateConditions(AdUnitType.Interstitial, where, out var blockReason))
             {
                 Debug.Log($"[GameUpSDK] Interstitial block rules: {blockReason}");
-                onFail?.Invoke(); return;
+                onFail?.Invoke();
+                return;
             }
-            
+
             _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeInterstitial, where);
             var network = GetAvailableProvider(AdUnitType.Interstitial, where);
 
@@ -261,9 +273,10 @@ namespace GameUpSDK.Ads
             if (!EvaluateConditions(AdUnitType.AppOpen, where, out var blockReason))
             {
                 Debug.Log($"[GameUpSDK] AppOpenAd block rules: {blockReason}");
-                onFail?.Invoke(); return;
+                onFail?.Invoke();
+                return;
             }
-            
+
             _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeAppOpen, where);
             var network = GetAvailableProvider(AdUnitType.AppOpen, where);
 
@@ -285,10 +298,10 @@ namespace GameUpSDK.Ads
         {
             if (!EvaluateConditions(AdUnitType.Banner, where, out var blockReason))
             {
-                Debug.Log($"[GameUpSDK] Banner block rules: {blockReason}"); 
+                Debug.Log($"[GameUpSDK] Banner block rules: {blockReason}");
                 return;
             }
-            
+
             _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeBanner, where);
 
             var network = GetAvailableProvider(AdUnitType.Banner, where);
@@ -310,7 +323,7 @@ namespace GameUpSDK.Ads
                 Debug.Log($"[GameUpSDK] Banner block rules: {blockReason}");
                 return;
             }
-            
+
             _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeBanner, where);
 
             var network = GetAvailableProvider(AdUnitType.Banner, where);
@@ -339,9 +352,10 @@ namespace GameUpSDK.Ads
             if (!EvaluateConditions(AdUnitType.NativeAd, where, out var blockReason))
             {
                 Debug.Log($"[GameUpSDK] NativeAd block rules: {blockReason}");
-                onFail?.Invoke(); return;
+                onFail?.Invoke();
+                return;
             }
-            
+
             _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeNativeAd, where);
             var network = GetAvailableProvider(AdUnitType.NativeAd, where);
 

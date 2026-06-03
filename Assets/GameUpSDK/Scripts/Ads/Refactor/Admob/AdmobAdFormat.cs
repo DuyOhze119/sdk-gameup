@@ -291,7 +291,7 @@ namespace GameUpSDK.Ads
                     {
                         _isLoaded[key] = true;
                         HandleLoadSuccess(unitId, where);
-                        banner.Hide();
+                        //banner.Hide();
                     });
                 };
 

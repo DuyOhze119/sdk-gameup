@@ -132,4 +132,33 @@ namespace GameUpSDK.Ads
             return $"Cross format cooldown: {_cooldownSeconds}";
         }
     }
+
+    public class HideBannerFromRemote : IAdCondition
+    {
+        private readonly System.Func<bool> _getHideBannerFunc;
+
+        public HideBannerFromRemote(System.Func<bool> getHideBannerFunc)
+        {
+            _getHideBannerFunc = getHideBannerFunc;
+        }
+        
+        public bool CanShow(AdUnitType adType, string where, out string reason)
+        {
+            if (adType == AdUnitType.Banner)
+            {
+                if (_getHideBannerFunc.Invoke())
+                {
+                    reason = $"can hide_banner_{where}";
+                    return false;
+                }
+            }
+            reason = string.Empty;
+            return true;
+        }
+
+        public string GetString()
+        {
+            return $"Condition: Hide banner: {_getHideBannerFunc?.Invoke()}";
+        }
+    }
 }
