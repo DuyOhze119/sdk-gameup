@@ -56,5 +56,6 @@ namespace GameUpSDK.Ads
 
         public void PauseAllCapping() => _pauseRequests++;
         public void ResumeAllCapping() { _pauseRequests--; if (_pauseRequests < 0) _pauseRequests = 0; }
+        public bool IsAnyAdShowing => _pauseRequests > 0;
     }
 }
