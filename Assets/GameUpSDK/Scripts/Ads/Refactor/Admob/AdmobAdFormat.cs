@@ -310,10 +310,17 @@ namespace GameUpSDK.Ads
                 };
 
                 var request = new AdRequest();
-                if (entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top)
-                    request.Extras.Add("collapsible", "top");
-                else if (entry.CollapsiblePlacement == CollapsibleBannerPlacement.Bottom)
-                    request.Extras.Add("collapsible", "bottom");
+                switch (entry.CollapsiblePlacement)
+                {
+                    case CollapsibleBannerPlacement.Top:
+                        request.Extras.Add("collapsible", "top");
+                        request.Extras.Add("collapsible_request_id", System.Guid.NewGuid().ToString());
+                        break;
+                    case CollapsibleBannerPlacement.Bottom:
+                        request.Extras.Add("collapsible", "bottom");
+                        request.Extras.Add("collapsible_request_id", System.Guid.NewGuid().ToString());
+                        break;
+                }
 
                 banner.LoadAd(request);
             });
@@ -327,19 +334,28 @@ namespace GameUpSDK.Ads
             {
                 string key = GetKey(where);
                 string unitId = _config.ResolveUnitId(_adType, where);
-                if (string.IsNullOrEmpty(unitId))
-                {
-                    NotifyAdDisplayFailed(where, "empty_id");
-                    return;
-                }
+                var entry = _config.GetEntry(_adType, where);
 
-                if (_isLoaded.TryGetValue(key, out bool loaded) && loaded)
+                if (entry.CollapsiblePlacement != CollapsibleBannerPlacement.None)
                 {
-                    NotifyAdDisplayed(where);
-                    _banners[key].Show();
-                    UnityEngine.Debug.Log($"[GameUp] Banner available: {loaded}");
+                    Load(where);
                 }
-                else Load(where);
+                else
+                {
+                    if (string.IsNullOrEmpty(unitId))
+                    {
+                        NotifyAdDisplayFailed(where, "empty_id");
+                        return;
+                    }
+
+                    if (_isLoaded.TryGetValue(key, out bool loaded) && loaded)
+                    {
+                        NotifyAdDisplayed(where);
+                        _banners[key].Show();
+                        UnityEngine.Debug.Log($"[GameUp] Banner available: {loaded}");
+                    }
+                    else Load(where);
+                }
             });
 #endif
         }
