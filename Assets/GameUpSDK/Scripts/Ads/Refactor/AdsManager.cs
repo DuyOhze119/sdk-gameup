@@ -50,7 +50,7 @@ namespace GameUpSDK.Ads
 
         private readonly List<IAdCondition> _showConditions = new List<IAdCondition>();
 
-        public static readonly Action<string> OnBannerLoadedEvent = delegate { };
+        public static Action<string> OnBannerLoadedEvent = delegate { };
         
         protected void Awake()
         {
