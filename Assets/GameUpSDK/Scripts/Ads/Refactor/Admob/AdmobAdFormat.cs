@@ -625,9 +625,23 @@ namespace GameUpSDK.Ads
         private void ChangeOverlayState(string where, bool isExpanded)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-            _isExpandedDict[key] = isExpanded;
-            RenderAdWithState(where, isExpanded);
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                string key = GetKey(where);
+                _isExpandedDict[key] = isExpanded;
+                
+                if (_ads.TryGetValue(key, out NativeOverlayAd oldAd) && oldAd != null)
+                {
+                    oldAd.Destroy(); 
+                    _ads.Remove(key);
+                }
+
+                StopAutoRefresh(where);
+                var entry = _config.GetEntry(_adType, where);
+                bool isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
+                
+                LoadAndShow(where, key, isCollapsible);
+            });
 #endif
         }
 
@@ -642,29 +656,22 @@ namespace GameUpSDK.Ads
                 {
                     _isExpandedDict[key] = isExpanded;
                     var entry = _config.GetEntry(_adType, where);
-                    AdPosition pos = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top
-                        ? AdPosition.Top
-                        : AdPosition.Bottom;
+                    var pos = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top ? AdPosition.Top : AdPosition.Bottom;
 
-                    bool isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
-
+                    var isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
+                    
                     var targetTemplate = NativeTemplateId.Small;
-                    if (isCollapsible)
+                    if (isCollapsible) 
                     {
                         targetTemplate = isExpanded ? NativeTemplateId.Medium : NativeTemplateId.Small;
                     }
 
-                    NativeTemplateStyle style = new NativeTemplateStyle
+                    var style = new NativeTemplateStyle
                     {
                         TemplateId = targetTemplate,
                         MainBackgroundColor = new Color(0.1f, 0.1f, 0.1f, 1f),
                     };
-
-                    if (targetTemplate == NativeTemplateId.Small)
-                    {
-                        ad.Hide();
-                        await Task.Delay(50);
-                    }
+                    
 
                     ad.RenderTemplate(style, pos);
 
