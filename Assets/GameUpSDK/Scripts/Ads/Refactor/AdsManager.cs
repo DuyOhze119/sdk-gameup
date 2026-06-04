@@ -42,7 +42,7 @@ namespace GameUpSDK.Ads
         public List<MediationProvider> mediationPriority = new List<MediationProvider>
             { MediationProvider.Max, MediationProvider.Admob, MediationProvider.IronSource };
 
-        private HashSet<string> _activeBanners = new HashSet<string>();
+        private readonly HashSet<string> _activeBanners = new HashSet<string>();
         private readonly Dictionary<MediationProvider, IAdNetwork> _networkDict =
             new Dictionary<MediationProvider, IAdNetwork>();
 
@@ -50,6 +50,8 @@ namespace GameUpSDK.Ads
 
         private readonly List<IAdCondition> _showConditions = new List<IAdCondition>();
 
+        public static readonly Action<string> OnBannerLoadedEvent = delegate { };
+        
         protected void Awake()
         {
             DontDestroyOnLoad(gameObject);
@@ -112,10 +114,13 @@ namespace GameUpSDK.Ads
 
         private void OnBannerLoaded(string where)
         {
+            Debug.Log($"OnBannerLoaded: {where}");
             if (!EvaluateConditions(AdUnitType.Banner, where, out var blockReason))
             {
                 HideBanner(where);
             }
+            
+            OnBannerLoadedEvent.Invoke(where);
         }
         
         private void TemporarilyHideBanners()
