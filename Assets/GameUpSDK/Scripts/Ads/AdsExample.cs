@@ -63,13 +63,7 @@ namespace GameUpSDK
                 LogStatus("Yêu cầu hiển thị Banner tiêu chuẩn...");
                 AdsManager.Instance.ShowBanner("main");
             }
-
-            if (GUILayout.Button("Show Collapsible Banner (Bottom)", GUILayout.Height(30)))
-            {
-                LogStatus("Yêu cầu hiển thị Collapsible Banner (Trượt từ dưới lên)...");
-                AdsManager.Instance.ShowCollapsibleBanner("main");
-            }
-
+            
             if (GUILayout.Button("Hide Banner", GUILayout.Height(30)))
             {
                 LogStatus("Đang ẩn Banner vị trí 'main'...");
@@ -163,6 +157,14 @@ namespace GameUpSDK
                 AdsManager.Instance.HideNativeAd("native_menu");
             }
 
+            if (GUILayout.Button("Show Native Banner UI", GUILayout.Height(30)))
+            {
+                RuntimeCollapsibleUI.Create(b =>
+                {
+                    Debug.Log($"Banner: {b}");
+                });
+            }
+            
             GUILayout.Space(30);
             GUILayout.EndScrollView();
             GUILayout.EndArea();

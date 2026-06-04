@@ -15,6 +15,7 @@ namespace GameUpSDK.Ads
         
         // Bổ sung cấu hình mặc định khi không dùng Multi Ids
         public BannerSize defaultBannerSize = BannerSize.Adaptive;
+        public BannerFormatType defaultBannerFormat = BannerFormatType.StandardBanner;
         public CollapsibleBannerPlacement defaultCollapsible = CollapsibleBannerPlacement.None;
         
         [Header("Multi IDs")]

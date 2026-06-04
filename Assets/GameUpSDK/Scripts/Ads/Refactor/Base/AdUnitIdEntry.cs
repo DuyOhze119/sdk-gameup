@@ -25,6 +25,7 @@ namespace GameUpSDK.Ads
         public string NameId; // placement "where"
         public string Id;     // Unit ID thực tế
         public int intId;
+        public BannerFormatType BannerFormat = BannerFormatType.StandardBanner;
         public BannerSize BannerSize = BannerSize.Adaptive;
         public CollapsibleBannerPlacement CollapsiblePlacement = CollapsibleBannerPlacement.None;
 

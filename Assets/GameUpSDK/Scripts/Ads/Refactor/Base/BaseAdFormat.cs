@@ -61,6 +61,7 @@ namespace GameUpSDK.Ads
 
         public void LoadAll()
         {
+            if(_config == null) return;
             var placements = _config.GetAllPlacements();
             foreach (var placement in placements)
             {

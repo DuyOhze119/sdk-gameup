@@ -26,6 +26,12 @@ namespace GameUpSDK.Ads
         /// <summary>728 × 90 – chỉ phù hợp trên iPad / tablet.</summary>
         Leaderboard,
     }
+    
+    public enum BannerFormatType
+    {
+        StandardBanner,
+        NativeOverlay
+    }
 
     [DefaultExecutionOrder(-50)]
     public class AdsManager : MonoSingletonSdk<AdsManager>
@@ -36,9 +42,7 @@ namespace GameUpSDK.Ads
         public List<MediationProvider> mediationPriority = new List<MediationProvider>
             { MediationProvider.Max, MediationProvider.Admob, MediationProvider.IronSource };
 
-        [Header("Banner Settings")] [SerializeField]
-        private BannerSize bannerSize = BannerSize.Large;
-
+        private HashSet<string> _activeBanners = new HashSet<string>();
         private readonly Dictionary<MediationProvider, IAdNetwork> _networkDict =
             new Dictionary<MediationProvider, IAdNetwork>();
 
@@ -113,6 +117,36 @@ namespace GameUpSDK.Ads
                 HideBanner(where);
             }
         }
+        
+        private void TemporarilyHideBanners()
+        {
+            foreach (var provider in mediationPriority)
+            {
+                if (provider == MediationProvider.None) continue;
+                if (_networkDict.TryGetValue(provider, out var network) && network.BannerAd != null)
+                {
+                    foreach (var placement in _activeBanners)
+                    {
+                        network.BannerAd.Hide(placement);
+                    }
+                }
+            }
+        }
+        
+        private void RestoreBanners()
+        {
+            foreach (var provider in mediationPriority)
+            {
+                if (provider == MediationProvider.None) continue;
+                if (_networkDict.TryGetValue(provider, out var network) && network.BannerAd != null)
+                {
+                    foreach (var placement in _activeBanners)
+                    {
+                        network.BannerAd.Show(placement);
+                    }
+                }
+            }
+        }
 
         public void SetConsent(bool isConsent)
         {
@@ -121,7 +155,11 @@ namespace GameUpSDK.Ads
 
         private void WireUpCappingEvents(IAdNetwork network)
         {
-            Action<string> pauseAct = (where) => AdCappingManager.Instance.PauseAllCapping();
+            Action<string> pauseAct = (where) =>
+            {
+                AdCappingManager.Instance.PauseAllCapping();
+                TemporarilyHideBanners();
+            };
 
             if (network.InterstitialAd != null)
             {
@@ -130,6 +168,7 @@ namespace GameUpSDK.Ads
                 {
                     AdCappingManager.Instance.ResumeAllCapping();
                     AdCappingManager.Instance.ResetCapping();
+                    RestoreBanners();
                     AdHistoryTracker.MarkAdClosed(AdUnitType.Interstitial);
                 };
             }
@@ -140,6 +179,7 @@ namespace GameUpSDK.Ads
                 network.RewardedAd.OnAdClosed += (where) =>
                 {
                     AdCappingManager.Instance.ResumeAllCapping();
+                    RestoreBanners();
                     AdHistoryTracker.MarkAdClosed(AdUnitType.RewardedVideo);
                 };
             }
@@ -150,6 +190,7 @@ namespace GameUpSDK.Ads
                 network.AppOpenAd.OnAdClosed += (where) =>
                 {
                     AdCappingManager.Instance.ResumeAllCapping();
+                    RestoreBanners();
                     AdHistoryTracker.MarkAdClosed(AdUnitType.AppOpen);
                 };
             }
@@ -160,6 +201,7 @@ namespace GameUpSDK.Ads
                 network.NativeFullScreenAd.OnAdClosed += (where) =>
                 {
                     AdCappingManager.Instance.ResumeAllCapping();
+                    RestoreBanners();
                     AdHistoryTracker.MarkAdClosed(AdUnitType.NativeAd);
                 };
             }
@@ -184,7 +226,7 @@ namespace GameUpSDK.Ads
             return true;
         }
 
-        private IAdNetwork GetAvailableProvider(AdUnitType adType, string where)
+        public IAdNetwork GetAvailableProvider(AdUnitType adType, string where)
         {
             foreach (var provider in mediationPriority)
             {
@@ -313,33 +355,13 @@ namespace GameUpSDK.Ads
             }
 
             _tracker.LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeBanner, where);
-            network.BannerAd.Show(where);
-        }
-
-        public void ShowCollapsibleBanner(string where)
-        {
-            if (!EvaluateConditions(AdUnitType.Banner, where, out var blockReason))
-            {
-                Debug.Log($"[GameUpSDK] Banner block rules: {blockReason}");
-                return;
-            }
-
-            _tracker.LogAdsEventManager(AdsEvent.AdsRequest, AdsEvent.AdTypeBanner, where);
-
-            var network = GetAvailableProvider(AdUnitType.Banner, where);
-            if (network == null)
-            {
-                _tracker.LogAdsEventManager(AdsEvent.AdsShowFail, AdsEvent.AdTypeBanner, where, "no_ads_available");
-                LoadAd(AdUnitType.Banner, where);
-                return;
-            }
-
-            _tracker.LogAdsEventManager(AdsEvent.AdsAvailable, AdsEvent.AdTypeBanner, where);
+            _activeBanners.Add(where);
             network.BannerAd.Show(where);
         }
 
         public void HideBanner(string where)
         {
+            _activeBanners.Remove(where);
             foreach (var network in _networkDict.Values) network.BannerAd?.Hide(where);
         }
 

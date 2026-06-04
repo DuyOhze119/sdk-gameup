@@ -56,9 +56,10 @@ namespace GameUpSDK.Ads
 
                     InterstitialAd = new AdmobInterstitialAd(interstitialConfig);
                     RewardedAd = new AdmobRewardedAd(rewardedConfig);
+                    BannerAd = new AdmobBannerDispatcher(bannerConfig);
                     AppOpenAd = new AdmobAppOpenAd(appOpenConfig);
-                    BannerAd = new AdmobBannerAd(bannerConfig);
                     NativeFullScreenAd = new AdmobNativeFullscreenAd(nativeAdConfig);
+                    
                     AppOpenAd.LoadAll();
                     NativeFullScreenAd.LoadAll();
                     BannerAd.LoadAll();

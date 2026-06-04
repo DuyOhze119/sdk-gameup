@@ -20,6 +20,7 @@ namespace GameUpSDK.Editor.Setup
 
         // Thêm 2 field
         public BannerSize defaultBannerSize;
+        public BannerFormatType defaultBannerFormat;
         public CollapsibleBannerPlacement defaultCollapsible;
 
         public List<AdUnitIdEntry> multiIdsAndroid = new List<AdUnitIdEntry>();
@@ -31,13 +32,15 @@ namespace GameUpSDK.Editor.Setup
             useMultiIds = configProp.FindPropertyRelative("useMultiAdUnitIds")?.boolValue ?? false;
             defaultIdAndroid = configProp.FindPropertyRelative("defaultIdAndroid")?.stringValue ?? "";
             defaultIdIOS = configProp.FindPropertyRelative("defaultIdIOS")?.stringValue ?? "";
-
-            // SỬA: Đổi .enumValueIndex thành .intValue
-            var bsProp = configProp.FindPropertyRelative("defaultBannerSize");
-            if (bsProp != null) defaultBannerSize = (BannerSize)bsProp.intValue;
-
+            
             var colProp = configProp.FindPropertyRelative("defaultCollapsible");
             if (colProp != null) defaultCollapsible = (CollapsibleBannerPlacement)colProp.intValue;
+            
+            var bsProp = configProp.FindPropertyRelative("defaultBannerSize");
+            if (bsProp != null) defaultBannerSize = (BannerSize)bsProp.intValue;
+            
+            var colBannerFormat = configProp.FindPropertyRelative("defaultBannerFormat");
+            if (colBannerFormat != null) defaultBannerFormat = (BannerFormatType)colBannerFormat.intValue;
 
             SetupTabBase.AssignAdUnitIdListDirect(configProp.FindPropertyRelative("multiIdsAndroid"), multiIdsAndroid);
             SetupTabBase.AssignAdUnitIdListDirect(configProp.FindPropertyRelative("multiIdsIOS"), multiIdsIOS);
@@ -157,6 +160,7 @@ namespace GameUpSDK.Editor.Setup
                     intId = el.FindPropertyRelative("intId")?.intValue ?? 0,
 
                     BannerSize = (BannerSize)(el.FindPropertyRelative("BannerSize")?.intValue ?? 0),
+                    BannerFormat = (BannerFormatType)(el.FindPropertyRelative("BannerFormat")?.intValue ?? 0),
                     CollapsiblePlacement =
                         (CollapsibleBannerPlacement)(el.FindPropertyRelative("CollapsiblePlacement")?.intValue ?? 0)
                 });
@@ -184,6 +188,8 @@ namespace GameUpSDK.Editor.Setup
                 if (el.FindPropertyRelative("Id") != null) el.FindPropertyRelative("Id").stringValue = e.Id ?? "";
                 if (el.FindPropertyRelative("intId") != null) el.FindPropertyRelative("intId").intValue = e.intId;
 
+                if (el.FindPropertyRelative("BannerFormat") != null)
+                    el.FindPropertyRelative("BannerFormat").intValue = (int)e.BannerFormat;
                 if (el.FindPropertyRelative("BannerSize") != null)
                     el.FindPropertyRelative("BannerSize").intValue = (int)e.BannerSize;
                 if (el.FindPropertyRelative("CollapsiblePlacement") != null)
@@ -250,6 +256,8 @@ namespace GameUpSDK.Editor.Setup
                 if (defaultAdType == AdUnitType.Banner)
                 {
                     EditorGUILayout.Space();
+                    configData.defaultBannerFormat =
+                        (BannerFormatType)EditorGUILayout.EnumPopup("Banner Format", configData.defaultBannerFormat);
                     configData.defaultBannerSize =
                         (BannerSize)EditorGUILayout.EnumPopup("Banner Size", configData.defaultBannerSize);
                     configData.defaultCollapsible =
@@ -297,7 +305,9 @@ namespace GameUpSDK.Editor.Setup
                 {
                     EditorGUILayout.BeginHorizontal();
                     GUILayout.Space(32f);
-                    GUILayout.Label("↳ Size:", EditorStyles.miniLabel, GUILayout.Width(45));
+                    GUILayout.Label("↳ Format:", EditorStyles.miniLabel, GUILayout.Width(45));
+                    e.BannerFormat = (BannerFormatType)EditorGUILayout.EnumPopup(e.BannerFormat, GUILayout.Width(100));
+                    GUILayout.Label("Size:", EditorStyles.miniLabel, GUILayout.Width(45));
                     e.BannerSize = (BannerSize)EditorGUILayout.EnumPopup(e.BannerSize, GUILayout.Width(100));
                     GUILayout.Label("Collapsible:", EditorStyles.miniLabel, GUILayout.Width(70));
                     e.CollapsiblePlacement =
