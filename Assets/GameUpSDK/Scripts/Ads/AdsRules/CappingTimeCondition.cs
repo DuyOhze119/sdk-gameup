@@ -5,12 +5,10 @@ namespace GameUpSDK.Ads
 {
     public class CappingTimeCondition : IAdCondition
     {
-        private readonly string _cappingGroup;
         private readonly AdUnitType _adUnitType;
 
-        public CappingTimeCondition(AdUnitType adUnitType = AdUnitType.Interstitial, string cappingGroup = "default")
+        public CappingTimeCondition(AdUnitType adUnitType = AdUnitType.Interstitial)
         {
-            _cappingGroup = cappingGroup;
             _adUnitType = adUnitType;
         }
 
@@ -18,9 +16,9 @@ namespace GameUpSDK.Ads
         {
             if (adType == _adUnitType)
             {
-                if (!AdCappingManager.Instance.IsCappingReady(_cappingGroup))
+                if (!AdCappingManager.Instance.IsCappingReady(_adUnitType))
                 {
-                    reason = $"capping_not_ready_{_cappingGroup}";
+                    reason = $"capping_not_ready_{_adUnitType}";
                     return false;
                 }
             }
@@ -31,7 +29,7 @@ namespace GameUpSDK.Ads
 
         public string GetString()
         {
-            return $"Condition: Capping Time: {_cappingGroup}";
+            return $"Condition: Capping Time: {_adUnitType}";
         }
     }
 

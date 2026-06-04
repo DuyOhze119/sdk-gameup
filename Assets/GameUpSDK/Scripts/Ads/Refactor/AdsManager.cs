@@ -172,7 +172,7 @@ namespace GameUpSDK.Ads
                 network.InterstitialAd.OnAdClosed += (where) =>
                 {
                     AdCappingManager.Instance.ResumeAllCapping();
-                    AdCappingManager.Instance.ResetCapping();
+                    AdCappingManager.Instance.ResetCapping(AdUnitType.Interstitial);
                     RestoreBanners();
                     AdHistoryTracker.MarkAdClosed(AdUnitType.Interstitial);
                 };
@@ -184,6 +184,7 @@ namespace GameUpSDK.Ads
                 network.RewardedAd.OnAdClosed += (where) =>
                 {
                     AdCappingManager.Instance.ResumeAllCapping();
+                    AdCappingManager.Instance.ResetCapping(AdUnitType.RewardedVideo);
                     RestoreBanners();
                     AdHistoryTracker.MarkAdClosed(AdUnitType.RewardedVideo);
                 };
@@ -195,6 +196,7 @@ namespace GameUpSDK.Ads
                 network.AppOpenAd.OnAdClosed += (where) =>
                 {
                     AdCappingManager.Instance.ResumeAllCapping();
+                    AdCappingManager.Instance.ResetCapping(AdUnitType.AppOpen);
                     RestoreBanners();
                     AdHistoryTracker.MarkAdClosed(AdUnitType.AppOpen);
                 };
@@ -206,6 +208,7 @@ namespace GameUpSDK.Ads
                 network.NativeFullScreenAd.OnAdClosed += (where) =>
                 {
                     AdCappingManager.Instance.ResumeAllCapping();
+                    AdCappingManager.Instance.ResetCapping(AdUnitType.NativeAd);
                     RestoreBanners();
                     AdHistoryTracker.MarkAdClosed(AdUnitType.NativeAd);
                 };

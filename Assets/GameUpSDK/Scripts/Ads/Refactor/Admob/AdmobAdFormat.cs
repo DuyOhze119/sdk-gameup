@@ -539,7 +539,11 @@ namespace GameUpSDK.Ads
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
             string unitId = _config.ResolveUnitId(_adType, where);
-            var options = new NativeAdOptions { AdChoicesPlacement = AdChoicesPlacement.TopRightCorner };
+            var options = new NativeAdOptions
+            {
+                AdChoicesPlacement = AdChoicesPlacement.TopRightCorner,
+                MediaAspectRatio = MediaAspectRatio.Any,
+            };
 
             NativeOverlayAd.Load(unitId, new AdRequest(), options, (NativeOverlayAd ad, LoadAdError error) =>
             {
@@ -625,13 +629,14 @@ namespace GameUpSDK.Ads
         private void ChangeOverlayState(string where, bool isExpanded)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            MainThreadDispatcher.Enqueue(() =>
+            MainThreadDispatcher.Enqueue(async () =>
             {
                 string key = GetKey(where);
                 _isExpandedDict[key] = isExpanded;
                 
                 if (_ads.TryGetValue(key, out NativeOverlayAd oldAd) && oldAd != null)
                 {
+                    oldAd.Hide();
                     oldAd.Destroy(); 
                     _ads.Remove(key);
                 }
@@ -641,6 +646,8 @@ namespace GameUpSDK.Ads
                 bool isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
                 
                 Debug.LogError($"Change State Native Ad isExpand: {isExpanded}");
+
+                await Task.Delay(100);
                 LoadAndShow(where, key, isCollapsible && isExpanded);
             });
 #endif

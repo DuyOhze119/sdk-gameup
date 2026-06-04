@@ -116,11 +116,11 @@ namespace GameUpSDK.Ads
             UpdatePosition();
             _onToggleCallback?.Invoke(_isExpanded);
         }
-
         
         public void SetVisible(bool isVisible)
         {
             gameObject.SetActive(isVisible);
+            _isExpanded = isVisible;
             Debug.LogError($"Change Collapsible UI to {isVisible}");
             if (isVisible) UpdatePosition(); 
         }

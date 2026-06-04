@@ -7,8 +7,8 @@ namespace GameUpSDK.Ads
 {
     public class AdCappingManager : MonoSingletonSdk<AdCappingManager>
     {
-        private readonly Dictionary<string, float> _cappingLimits = new Dictionary<string, float>();
-        private readonly Dictionary<string, float> _currentTimers = new Dictionary<string, float>();
+        private readonly Dictionary<AdUnitType, float> _cappingLimits = new Dictionary<AdUnitType, float>();
+        private readonly Dictionary<AdUnitType, float> _currentTimers = new Dictionary<AdUnitType, float>();
         
         private int _pauseRequests = 0;
 
@@ -24,33 +24,36 @@ namespace GameUpSDK.Ads
             if (_pauseRequests > 0) return;
 
             float dt = Time.unscaledDeltaTime;
-            var keys = new List<string>(_currentTimers.Keys);
+            var keys = new List<AdUnitType>(_currentTimers.Keys);
             foreach (var key in keys)
             {
                 _currentTimers[key] += dt;
             }
         }
         
-        public void SetCappingLimit(string groupId, float limit, float seconds)
+        public void SetCappingLimit(AdUnitType groupId, float limit, float seconds)
         {
             _cappingLimits[groupId] = limit;
             _currentTimers.TryAdd(groupId, seconds);
         }
 
-        public bool IsCappingReady(string groupId = "default")
+        public bool IsCappingReady(AdUnitType groupId = AdUnitType.Interstitial)
         {
             float limit = _cappingLimits.GetValueOrDefault(groupId, defaultCappingTime);
             float current = _currentTimers.GetValueOrDefault(groupId, 0f);
-            Debug.LogError($"current: {current} - limit: {limit}");
+            Debug.LogError($"AdUnit: {groupId} current: {current} - limit: {limit}");
             return current >= limit;
         }
 
-        public void ResetCapping()
+        public void ResetCapping(AdUnitType adUnitType)
         {
-            var keys = new List<string>(_currentTimers.Keys);
+            var keys = new List<AdUnitType>(_currentTimers.Keys);
             foreach (var key in keys)
             {
-                _currentTimers[key] = 0;
+                if (key == adUnitType)
+                {
+                    _currentTimers[key] = 0;
+                }
             }
         }
 
