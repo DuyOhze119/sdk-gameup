@@ -520,20 +520,21 @@ namespace GameUpSDK.Ads
 
         private void CloseExpandBanner(string where)
         {
-            MainThreadDispatcher.Enqueue(() =>
+            MainThreadDispatcher.Enqueue(async () =>
             {
                 var key = GetKey(where);
+                
+                HideActiveUI();
+                StopAutoRefresh();
+                OnCollapsedNativeBanner?.Invoke(where);
                 if (_expandedAds.TryGetValue(key, out var ad) && ad != null)
                 {
                     _expandedAds.Remove(key);
                     ad.Hide();
                     ad.Destroy();
-                    LoadSpecificSizeAd(where, key, false);
+                    await Task.Delay(100);
+                    //LoadSpecificSizeAd(where, key, false);
                 }
-                HideActiveUI();
-                StopAutoRefresh();
-                
-                OnCollapsedNativeBanner?.Invoke(where);
             });
         }
 
@@ -667,6 +668,7 @@ namespace GameUpSDK.Ads
 
         private void OnCollapsedNativeBanner(string where)
         {
+            Debug.Log($"OnCollapsedNativeBanner: {where}");
             var wheres = _config.GetAllWhere();
             foreach (var w in wheres)
             {
