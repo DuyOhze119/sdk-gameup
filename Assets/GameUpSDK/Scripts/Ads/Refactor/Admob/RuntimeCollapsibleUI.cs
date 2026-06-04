@@ -6,7 +6,7 @@ namespace GameUpSDK.Ads
 {
     /// <summary>
     /// Tự động sinh giao diện Nút Gập/Mở Native Ad bằng code lúc Runtime.
-    /// Thiết kế: Có thanh Header ngang và Nút bấm vuông góc phải. Font LegacyRuntime.
+    /// Thiết kế: Nền đen bao quanh, thanh ngang trên đỉnh có Nút bấm vuông góc phải. Font LegacyRuntime.
     /// </summary>
     public class RuntimeCollapsibleUI : MonoBehaviour
     {
@@ -17,12 +17,9 @@ namespace GameUpSDK.Ads
         private Text _arrowText;
         private Canvas _canvas;
 
-        // Thông số Native DP mặc định của Google
-        private const float SMALL_DP = 90f;
-        private const float MEDIUM_DP = 260f;
-        
-        // Chiều cao của thanh Header
+        // Kích thước chuẩn chỉnh theo thiết kế
         private const float HEADER_HEIGHT = 60f; 
+        private const float EXTRA_PADDING_DP = 5f; // Bù hao 5dp để hở viền cho đẹp
 
         public bool IsVisible => gameObject.activeSelf; 
 
@@ -60,18 +57,16 @@ namespace GameUpSDK.Ads
             bgImage.color = new Color(0.1f, 0.1f, 0.1f, 1f); 
 
             // ==========================================
-            // 4. TẠO NÚT BẤM VUÔNG GÓC PHẢI (Btn_Toggle)
+            // 3. TẠO NÚT BẤM VUÔNG GÓC PHẢI (Btn_Toggle)
             // ==========================================
             GameObject btnObj = new GameObject("Btn_Toggle");
             btnObj.transform.SetParent(bgRect.transform, false);
             RectTransform btnRect = btnObj.AddComponent<RectTransform>();
             
-            // Neo nút bấm vào góc phải của Header_Bar
             btnRect.anchorMin = new Vector2(1f, 1f);
             btnRect.anchorMax = new Vector2(1f, 1f);
             btnRect.pivot = new Vector2(1f, 0f);
             
-            // Kích thước nút vuông/chữ nhật (Ví dụ: 80x60)
             btnRect.sizeDelta = new Vector2(80f, HEADER_HEIGHT);
             btnRect.anchoredPosition = Vector2.zero;
 
@@ -79,6 +74,9 @@ namespace GameUpSDK.Ads
             btnImage.color = new Color(0.1f, 0.1f, 0.1f, 1f); 
             Button btn = btnObj.AddComponent<Button>();
             
+            // ==========================================
+            // 4. TẠO TEXT MŨI TÊN
+            // ==========================================
             GameObject txtObj = new GameObject("Txt_Arrow");
             txtObj.transform.SetParent(btnObj.transform, false);
             RectTransform txtRect = txtObj.AddComponent<RectTransform>();
@@ -90,12 +88,10 @@ namespace GameUpSDK.Ads
             arrowText.alignment = TextAnchor.MiddleCenter;
             arrowText.color = new Color(0.7f, 0.7f, 0.7f, 1f); // Màu xám nhạt
             arrowText.fontSize = 24;
-            
-            // SỬ DỤNG FONT YÊU CẦU
             arrowText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             // ==========================================
-            // 6. KHỞI TẠO LOGIC
+            // INIT
             // ==========================================
             RuntimeCollapsibleUI controller = rootObj.AddComponent<RuntimeCollapsibleUI>();
             controller.Init(canvas, bgRect, arrowText, onToggle);
@@ -134,16 +130,32 @@ namespace GameUpSDK.Ads
             _arrowText.text = _isExpanded ? "▼" : "▲";
 
             float dpi = Screen.dpi == 0 ? 160f : Screen.dpi;
-            float targetDP = _isExpanded ? MEDIUM_DP : SMALL_DP;
             
+            // ==========================================================
+            // [SỬA ĐIỂM NÀY]: NỘI SUY CHIỀU CAO ADMOB THEO THIẾT BỊ
+            // ==========================================================
+            float targetDP;
+            if (_isExpanded)
+            {
+                // Đo chiều rộng thiết bị bằng DP
+                float screenWidthDP = Screen.width / (dpi / 160f);
+                
+                // Chiều cao ảnh Google = Chiều rộng / 1.77. Cộng thêm khoảng text/icon ~ 110dp
+                float mediaViewHeightDP = screenWidthDP / 1.77f;
+                targetDP = 110f + mediaViewHeightDP + EXTRA_PADDING_DP;
+            }
+            else
+            {
+                targetDP = 100f + EXTRA_PADDING_DP;
+            }
+
             float physicalPixels = targetDP * (dpi / 160f);
             float safeAreaBottom = Screen.safeArea.y;
 
             // Tính toán chiều cao của phần Native Ad
-            float finalCanvasY = (physicalPixels + safeAreaBottom) / _canvas.scaleFactor;
+            float nativeAdCanvasHeight = (physicalPixels + safeAreaBottom) / _canvas.scaleFactor;
 
-            // Tổng chiều cao = Chiều cao Native Ad + Chiều cao Header (60f)
-            _bgRect.sizeDelta = new Vector2(0f, finalCanvasY + HEADER_HEIGHT);
+            _bgRect.sizeDelta = new Vector2(0f, nativeAdCanvasHeight);
         }
 
         private void Update()
