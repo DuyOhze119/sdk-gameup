@@ -19,7 +19,7 @@ namespace GameUpSDK.Ads
 
         // Kích thước chuẩn chỉnh theo thiết kế
         private const float HEADER_HEIGHT = 60f; 
-        private const float EXTRA_PADDING_DP = 5f; // Bù hao 5dp để hở viền cho đẹp
+        private const float EXTRA_PADDING_DP = 20f; // Bù hao 5dp để hở viền cho đẹp
 
         public bool IsVisible => gameObject.activeSelf; 
 
@@ -117,6 +117,7 @@ namespace GameUpSDK.Ads
             _onToggleCallback?.Invoke(_isExpanded);
         }
 
+        
         public void SetVisible(bool isVisible)
         {
             gameObject.SetActive(isVisible);

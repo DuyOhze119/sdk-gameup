@@ -588,13 +588,13 @@ namespace GameUpSDK.Ads
 #if ADMOB_DEPENDENCIES_INSTALLED
             MainThreadDispatcher.Enqueue(() =>
             {
-                Debug.Log("Restoring native ad");
+                Debug.Log("Restoring native ad with ");
                 string key = GetKey(where);
                 _shouldShow[key] = true;
 
                 var entry = _config.GetEntry(_adType, where);
                 var isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
-                var expand = (!_isExpandedDict.TryGetValue(where, out bool isExpanded) || isExpanded) && isCollapsible;
+                var expand = (!_isExpandedDict.TryGetValue(key, out bool isExpanded) || isExpanded) && isCollapsible;
 
                 if (IsAvailable(where))
                 {
