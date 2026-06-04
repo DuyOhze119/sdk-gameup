@@ -523,8 +523,15 @@ namespace GameUpSDK.Ads
             MainThreadDispatcher.Enqueue(() =>
             {
                 var key = GetKey(where);
-                if (_expandedAds.TryGetValue(key, out var ad) && ad != null) ad.Hide();
+                if (_expandedAds.TryGetValue(key, out var ad) && ad != null)
+                {
+                    _expandedAds.Remove(key);
+                    ad.Hide();
+                    ad.Destroy();
+                    LoadSpecificSizeAd(where, key, false);
+                }
                 HideActiveUI();
+                StopAutoRefresh();
                 
                 OnCollapsedNativeBanner?.Invoke(where);
             });
