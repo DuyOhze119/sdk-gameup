@@ -51,6 +51,7 @@ MonoBehaviour:
     defaultIdAndroid: 
     defaultIdIOS: 
     defaultBannerSize: 2
+    defaultBannerFormat: 0
     defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []
@@ -59,6 +60,7 @@ MonoBehaviour:
     defaultIdAndroid: 
     defaultIdIOS: 
     defaultBannerSize: 2
+    defaultBannerFormat: 0
     defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []
@@ -67,6 +69,7 @@ MonoBehaviour:
     defaultIdAndroid: 
     defaultIdIOS: 
     defaultBannerSize: 2
+    defaultBannerFormat: 0
     defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []
@@ -75,6 +78,7 @@ MonoBehaviour:
     defaultIdAndroid: 
     defaultIdIOS: 
     defaultBannerSize: 2
+    defaultBannerFormat: 0
     defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []
@@ -83,6 +87,7 @@ MonoBehaviour:
     defaultIdAndroid: 
     defaultIdIOS: 
     defaultBannerSize: 2
+    defaultBannerFormat: 0
     defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []

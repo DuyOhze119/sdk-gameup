@@ -96,7 +96,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mediationPriority: 010000000200000003000000
-  bannerSize: 2
 --- !u!1001 &2918277009939808649
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -57,6 +57,10 @@ namespace GameUpSDK.Editor.Setup
                 configProp.FindPropertyRelative("defaultIdIOS").stringValue = defaultIdIOS;
 
             // SỬA: Đổi .enumValueIndex thành .intValue
+            
+            var colBannerFormat = configProp.FindPropertyRelative("defaultBannerFormat");
+            if (colBannerFormat != null) colBannerFormat.intValue = (int)defaultBannerFormat;
+            
             var bsProp = configProp.FindPropertyRelative("defaultBannerSize");
             if (bsProp != null) bsProp.intValue = (int)defaultBannerSize;
 

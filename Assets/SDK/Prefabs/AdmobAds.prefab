@@ -50,6 +50,7 @@ MonoBehaviour:
     defaultIdAndroid: ca-app-pub-3940256099942544/1033173712
     defaultIdIOS: 
     defaultBannerSize: 2
+    defaultBannerFormat: 0
     defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []
@@ -58,6 +59,7 @@ MonoBehaviour:
     defaultIdAndroid: ca-app-pub-3940256099942544/5224354917
     defaultIdIOS: 
     defaultBannerSize: 2
+    defaultBannerFormat: 0
     defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []
@@ -66,34 +68,25 @@ MonoBehaviour:
     defaultIdAndroid: ca-app-pub-3940256099942544/9257395921
     defaultIdIOS: 
     defaultBannerSize: 2
+    defaultBannerFormat: 0
     defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []
   bannerConfig:
-    useMultiAdUnitIds: 1
+    useMultiAdUnitIds: 0
     defaultIdAndroid: ca-app-pub-3940256099942544/6300978111
     defaultIdIOS: 
     defaultBannerSize: 2
-    defaultCollapsible: 0
-    multiIdsAndroid:
-    - AdType: 0
-      NameId: home
-      Id: abc
-      intId: 1
-      BannerSize: 2
-      CollapsiblePlacement: 0
-    - AdType: 0
-      NameId: gameplay
-      Id: bcdef
-      intId: 2
-      BannerSize: 2
-      CollapsiblePlacement: 2
+    defaultBannerFormat: 1
+    defaultCollapsible: 2
+    multiIdsAndroid: []
     multiIdsIOS: []
   nativeAdConfig:
     useMultiAdUnitIds: 0
     defaultIdAndroid: ca-app-pub-3940256099942544/2247696110
     defaultIdIOS: 
     defaultBannerSize: 2
+    defaultBannerFormat: 0
     defaultCollapsible: 0
     multiIdsAndroid: []
     multiIdsIOS: []

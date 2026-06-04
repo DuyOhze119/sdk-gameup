@@ -45,6 +45,7 @@ namespace GameUpSDK.Ads
                 AdType = type,
                 NameId = where,
                 BannerSize = defaultBannerSize,
+                BannerFormat = defaultBannerFormat,
                 CollapsiblePlacement = defaultCollapsible
             };
         }

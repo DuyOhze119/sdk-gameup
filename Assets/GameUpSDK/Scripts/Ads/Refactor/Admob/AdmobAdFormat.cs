@@ -769,6 +769,7 @@ namespace GameUpSDK.Ads
             var placements = _config.GetAllPlacements();
             foreach (var p in placements)
             {
+                Debug.LogError($"Load Banner: {p}");
                 GetTarget(p).Load(p);
             }
         }
@@ -782,9 +783,10 @@ namespace GameUpSDK.Ads
             var entry = _config.GetEntry(AdUnitType.Banner, where);
             if (entry != null && entry.BannerFormat == BannerFormatType.NativeOverlay)
             {
+                Debug.LogError("Load NativeOverlay Banner");
                 return _nativeOverlayBanner;
             }
-
+            Debug.LogError("Load Standard Banner");
             return _standardBanner;
         }
     }
