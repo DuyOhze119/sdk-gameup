@@ -640,7 +640,8 @@ namespace GameUpSDK.Ads
                 var entry = _config.GetEntry(_adType, where);
                 bool isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
                 
-                LoadAndShow(where, key, isCollapsible);
+                Debug.LogError($"Change State Native Ad isExpand: {isExpanded}");
+                LoadAndShow(where, key, isCollapsible && isExpanded);
             });
 #endif
         }
@@ -650,7 +651,7 @@ namespace GameUpSDK.Ads
 #if ADMOB_DEPENDENCIES_INSTALLED
             MainThreadDispatcher.Enqueue(async () =>
             {
-                Debug.LogError($"Rendering native ad with state where: {where} - isExpanded: {isExpanded}");
+                Debug.LogError($"Rendering native ad with state isExpanded: {isExpanded}");
                 string key = GetKey(where);
                 if (_ads.TryGetValue(key, out NativeOverlayAd ad) && ad != null)
                 {
