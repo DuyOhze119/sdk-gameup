@@ -533,7 +533,7 @@ namespace GameUpSDK.Ads
                     ad.Hide();
                     ad.Destroy();
                     await Task.Delay(100);
-                    //LoadSpecificSizeAd(where, key, false);
+                    LoadSpecificSizeAd(where, key, false);
                 }
             });
         }
