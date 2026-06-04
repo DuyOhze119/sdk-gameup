@@ -450,10 +450,8 @@ namespace GameUpSDK.Ads
 
     public class AdmobNativeOverlayBannerAd : BaseAdFormat, IBannerAd
     {
-#if ADMOB_DEPENDENCIES_INSTALLED
-        private readonly Dictionary<string, NativeOverlayAd> _ads = new Dictionary<string, NativeOverlayAd>();
-        private readonly Dictionary<string, bool> _shouldShow = new Dictionary<string, bool>();
-        private readonly Dictionary<string, bool> _isExpandedDict = new Dictionary<string, bool>();
+        private readonly Dictionary<string, NativeOverlayAd> _expandedAds = new Dictionary<string, NativeOverlayAd>();
+        private readonly Dictionary<string, NativeOverlayAd> _collapsedAds = new Dictionary<string, NativeOverlayAd>();
 
         private readonly Dictionary<string, RuntimeCollapsibleUI> _activeUIs =
             new Dictionary<string, RuntimeCollapsibleUI>();
@@ -462,88 +460,146 @@ namespace GameUpSDK.Ads
             new Dictionary<string, CancellationTokenSource>();
 
         private readonly int REFRESH_TIME_SECONDS = 30;
-#endif
 
-        // Cho phép nhận adType linh hoạt từ Dispatcher
         public AdmobNativeOverlayBannerAd(AdUnitConfig config, AdUnitType adType = AdUnitType.NativeAd) : base(config,
             adType, "Admob_NativeOverlay")
         {
         }
 
-        public override bool IsAvailable(string where = null)
-        {
-#if ADMOB_DEPENDENCIES_INSTALLED
-            return _ads.ContainsKey(GetKey(where)) && _ads[GetKey(where)] != null;
-#endif
-            return false;
-        }
+        public override bool IsAvailable(string where = null) =>
+            _expandedAds.ContainsKey(GetKey(where)) || _collapsedAds.ContainsKey(GetKey(where));
 
         protected override void RequestAdInternal(string unitId, string where)
         {
-#if ADMOB_DEPENDENCIES_INSTALLED
-            LoadAdNgam(unitId, where, GetKey(where));
-#endif
-        }
-
-        private void LoadAdNgam(string unitId, string where, string key)
-        {
-#if ADMOB_DEPENDENCIES_INSTALLED
-            MainThreadDispatcher.Enqueue(() =>
-            {
-                var options = new NativeAdOptions { AdChoicesPlacement = AdChoicesPlacement.TopRightCorner };
-                NativeOverlayAd.Load(unitId, new AdRequest(), options, (NativeOverlayAd ad, LoadAdError error) =>
-                {
-                    MainThreadDispatcher.Enqueue(() =>
-                    {
-                        if (error != null || ad == null)
-                        {
-                            HandleLoadFailed(unitId, where, error?.GetMessage());
-                            return;
-                        }
-
-                        if (_ads.ContainsKey(key) && _ads[key] != null) _ads[key].Destroy();
-                        _ads[key] = ad;
-                        HandleLoadSuccess(unitId, where);
-                    });
-                });
-            });
-#endif
+            LoadSpecificSizeAd(where, GetKey(where), false);
         }
 
         public void Show(string where)
         {
-#if ADMOB_DEPENDENCIES_INSTALLED
             MainThreadDispatcher.Enqueue(() =>
             {
-                string key = GetKey(where);
-                _shouldShow[key] = true;
+                var key = GetKey(where);
 
                 var entry = _config.GetEntry(_adType, where);
-                bool isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
 
-                if (IsAvailable(where))
+                var isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
+
+                if (isCollapsible)
                 {
-                    NotifyAdDisplayed(where);
-                    RenderAdWithState(where, isCollapsible);
-                    StartAutoRefresh(where);
+                    HideCollapseAds();
+                    if (_expandedAds.TryGetValue(key, out var eAd) && eAd != null)
+                    {
+                        NotifyAdDisplayed(where);
+                        RenderAdInstance(where, eAd, NativeTemplateId.Medium);
+                        StartAutoRefresh(where);
+                    }
+                    else
+                    {
+                        LoadSpecificSizeAd(where, key, true);
+                    }
                 }
                 else
                 {
-                    LoadAndShow(where, key, isCollapsible);
+                    HideExpandedAds();
+                    if (_collapsedAds.TryGetValue(key, out var eAd) && eAd != null)
+                    {
+                        NotifyAdDisplayed(where);
+                        RenderAdInstance(where, eAd, NativeTemplateId.Small);
+                        StartAutoRefresh(where);
+                    }
+                    else
+                    {
+                        LoadSpecificSizeAd(where, key, true);
+                    }
                 }
             });
-#endif
         }
 
-        private void LoadAndShow(string where, string key, bool isCollapsible)
+        private void HideCollapseAds()
         {
-#if ADMOB_DEPENDENCIES_INSTALLED
-            string unitId = _config.ResolveUnitId(_adType, where);
-            var options = new NativeAdOptions
+            var keys = _collapsedAds.Keys;
+            foreach (var key in keys)
             {
-                AdChoicesPlacement = AdChoicesPlacement.TopRightCorner,
-                MediaAspectRatio = MediaAspectRatio.Any,
-            };
+                if (_collapsedAds.TryGetValue(key, out var cAd) && cAd != null)
+                {
+                    cAd.Hide();
+                }
+            }
+        }
+
+        private void HideExpandedAds()
+        {
+            var keys = _expandedAds.Keys;
+            foreach (var key in keys)
+            {
+                if (_expandedAds.TryGetValue(key, out var cAd) && cAd != null)
+                {
+                    cAd.Hide();
+                }
+            }
+        }
+
+        public void Hide(string where)
+        {
+            var key = GetKey(where);
+            StopAutoRefresh();
+
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                if (_expandedAds.TryGetValue(key, out var eAd) && eAd != null) eAd.Hide();
+                if (_collapsedAds.TryGetValue(key, out var cAd) && cAd != null) cAd.Hide();
+                if (_activeUIs.TryGetValue(key, out var ui) && ui != null) ui.SetVisible(false);
+            });
+        }
+
+        public void Restore(string where)
+        {
+            LoadSpecificSizeAd(where, GetKey(where), true);
+        }
+
+        private void ChangeToSmallBanner(string where, bool isExpanded)
+        {
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                string key = GetKey(where);
+
+                if (_expandedAds.TryGetValue(key, out var ad) && ad != null) ad.Hide();
+
+                var targetDict = isExpanded ? _expandedAds : _collapsedAds;
+
+                var keys = targetDict.Keys;
+                foreach (var smallKey in keys)
+                {
+                    var smallWhere = WhereByKey(smallKey);
+                    if (targetDict.TryGetValue(key, out var targetAd) && targetAd != null)
+                    {
+                        RenderAdInstance(smallWhere, targetAd, NativeTemplateId.Small);
+                    }
+                    else
+                    {
+                        LoadSpecificSizeAd(smallWhere, smallKey, true);
+                    } 
+                    StartAutoRefresh(smallWhere);
+                }
+                
+                HideActiveUI();
+            });
+        }
+
+        private void HideActiveUI()
+        {
+            foreach (var ui in _activeUIs)
+            {
+                ui.Value.SetVisible(false);
+            }
+        }
+
+        private void LoadSpecificSizeAd(string where, string key, bool showAfterLoad)
+        {
+            var unitId = _config.ResolveUnitId(_adType, where);
+            var entry = _config.GetEntry(_adType, where);
+            var isExpanded = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
+            var options = new NativeAdOptions { AdChoicesPlacement = AdChoicesPlacement.TopRightCorner };
 
             NativeOverlayAd.Load(unitId, new AdRequest(), options, (NativeOverlayAd ad, LoadAdError error) =>
             {
@@ -551,188 +607,93 @@ namespace GameUpSDK.Ads
                 {
                     if (error != null || ad == null)
                     {
-                        NotifyAdDisplayFailed(where, error?.GetMessage());
+                        if (showAfterLoad) NotifyAdDisplayFailed(where, error?.GetMessage());
                         return;
                     }
 
-                    if (!_shouldShow.ContainsKey(key) || !_shouldShow[key])
+                    var targetDict = isExpanded ? _expandedAds : _collapsedAds;
+
+                    if (targetDict.ContainsKey(key) && targetDict[key] != null) targetDict[key].Destroy();
+                    targetDict[key] = ad;
+
+
+                    HandleLoadSuccess(unitId, where);
+                    if (showAfterLoad)
                     {
-                        ad.Destroy();
-                        return;
+                        NotifyAdDisplayed(where);
+                        RenderAdInstance(where, ad, isExpanded ? NativeTemplateId.Medium : NativeTemplateId.Small);
+                        StartAutoRefresh(where);
                     }
-
-                    if (_ads.ContainsKey(key) && _ads[key] != null) _ads[key].Destroy();
-                    _ads[key] = ad;
-
-                    NotifyAdDisplayed(where);
-                    RenderAdWithState(where, isCollapsible);
-                    StartAutoRefresh(where);
                 });
             });
-#endif
         }
 
-        public void Hide(string where)
+        private void RenderAdInstance(string where, NativeOverlayAd ad, string templateId)
         {
-#if ADMOB_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-            _shouldShow[key] = false;
-            StopAutoRefresh(where);
+            var entry = _config.GetEntry(_adType, where);
+            var pos = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top
+                ? AdPosition.Top
+                : AdPosition.Bottom;
 
-            MainThreadDispatcher.Enqueue(() =>
+            var style = new NativeTemplateStyle
             {
-                if (_ads.TryGetValue(key, out NativeOverlayAd ad) && ad != null) ad.Hide();
-                if (_activeUIs.TryGetValue(key, out var ui) && ui != null) ui.SetVisible(false);
-            });
-#endif
-        }
+                TemplateId = templateId,
+                MainBackgroundColor = new Color(0.1f, 0.1f, 0.1f, 1f)
+            };
 
-        public void Restore(string where)
-        {
-#if ADMOB_DEPENDENCIES_INSTALLED
-            MainThreadDispatcher.Enqueue(() =>
+            ad.RenderTemplate(style, pos);
+
+            if (entry.CollapsiblePlacement != CollapsibleBannerPlacement.None)
             {
-                Debug.Log("Restoring native ad with ");
-                string key = GetKey(where);
-                _shouldShow[key] = true;
-
-                var entry = _config.GetEntry(_adType, where);
-                var isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
-                var expand = (!_isExpandedDict.TryGetValue(key, out bool isExpanded) || isExpanded) && isCollapsible;
-
-                if (IsAvailable(where))
+                var key = GetKey(where);
+                EnsureUIExists(key, where);
+                _activeUIs[key].SetVisible(true);
+            }
+            else
+            {
+                foreach (var ui in _activeUIs)
                 {
-                    NotifyAdDisplayed(where);
-                    RenderAdWithState(where, expand);
-                    StartAutoRefresh(where);
+                    ui.Value.SetVisible(false);
                 }
-                else
-                {
-                    LoadAndShow(where, key, expand);
-                }
-            });
-#endif
+            }
         }
-
 
         private void EnsureUIExists(string key, string where)
         {
-#if ADMOB_DEPENDENCIES_INSTALLED
             if (!_activeUIs.ContainsKey(key) || _activeUIs[key] == null)
             {
                 _activeUIs[key] =
-                    RuntimeCollapsibleUI.Create((isExpanded) => { ChangeOverlayState(where, isExpanded); });
+                    RuntimeCollapsibleUI.Create((isExpanded) => { ChangeToSmallBanner(where, false); });
             }
-#endif
-        }
-
-        private void ChangeOverlayState(string where, bool isExpanded)
-        {
-#if ADMOB_DEPENDENCIES_INSTALLED
-            MainThreadDispatcher.Enqueue(async () =>
-            {
-                string key = GetKey(where);
-                _isExpandedDict[key] = isExpanded;
-                
-                if (_ads.TryGetValue(key, out NativeOverlayAd oldAd) && oldAd != null)
-                {
-                    oldAd.Hide();
-                    oldAd.Destroy(); 
-                    _ads.Remove(key);
-                }
-
-                StopAutoRefresh(where);
-                var entry = _config.GetEntry(_adType, where);
-                bool isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
-                
-                Debug.LogError($"Change State Native Ad isExpand: {isExpanded}");
-
-                await Task.Delay(100);
-                LoadAndShow(where, key, isCollapsible && isExpanded);
-            });
-#endif
-        }
-
-        private void RenderAdWithState(string where, bool isExpanded)
-        {
-#if ADMOB_DEPENDENCIES_INSTALLED
-            MainThreadDispatcher.Enqueue(async () =>
-            {
-                Debug.LogError($"Rendering native ad with state isExpanded: {isExpanded}");
-                string key = GetKey(where);
-                if (_ads.TryGetValue(key, out NativeOverlayAd ad) && ad != null)
-                {
-                    _isExpandedDict[key] = isExpanded;
-                    var entry = _config.GetEntry(_adType, where);
-                    var pos = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top ? AdPosition.Top : AdPosition.Bottom;
-
-                    var isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
-                    
-                    var targetTemplate = NativeTemplateId.Small;
-                    if (isCollapsible) 
-                    {
-                        targetTemplate = isExpanded ? NativeTemplateId.Medium : NativeTemplateId.Small;
-                    }
-
-                    var style = new NativeTemplateStyle
-                    {
-                        TemplateId = targetTemplate,
-                        MainBackgroundColor = new Color(0.1f, 0.1f, 0.1f, 1f),
-                    };
-                    
-
-                    ad.RenderTemplate(style, pos);
-
-                    if (isExpanded)
-                    {
-                        Debug.LogError($"Show ui expand");
-                        EnsureUIExists(key, where);
-                        _activeUIs[key].SetVisible(true);
-                    }
-                    else
-                    {
-                        foreach (var ui in _activeUIs)
-                        {
-                            ui.Value.SetVisible(false);
-                        }
-                    }
-                }
-            });
-#endif
         }
 
         private void StartAutoRefresh(string where)
         {
-#if ADMOB_DEPENDENCIES_INSTALLED
             string key = GetKey(where);
-            StopAutoRefresh(where);
-
+            StopAutoRefresh();
             var cts = new CancellationTokenSource();
             _refreshTokens[key] = cts;
             RunRefreshLoop(where, cts.Token);
-#endif
         }
 
-        private void StopAutoRefresh(string where)
+        private void StopAutoRefresh()
         {
-#if ADMOB_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-            if (_refreshTokens.TryGetValue(key, out var cts) && cts != null)
+            var keys = _refreshTokens.Keys;
+            foreach (var key in keys)
             {
-                cts.Cancel();
-                cts.Dispose();
-                _refreshTokens.Remove(key);
+                if (_refreshTokens.TryGetValue(key, out var cts) && cts != null)
+                {
+                    cts.Cancel();
+                    cts.Dispose();
+                }
             }
-#endif
+            
+            _refreshTokens.Clear();
         }
 
         private async void RunRefreshLoop(string where, CancellationToken token)
         {
-#if ADMOB_DEPENDENCIES_INSTALLED
             string key = GetKey(where);
-            string unitId = _config.ResolveUnitId(_adType, where);
-            var options = new NativeAdOptions { AdChoicesPlacement = AdChoicesPlacement.TopRightCorner };
-
             try
             {
                 while (!token.IsCancellationRequested)
@@ -740,37 +701,12 @@ namespace GameUpSDK.Ads
                     await Task.Delay(TimeSpan.FromSeconds(REFRESH_TIME_SECONDS), token);
                     if (token.IsCancellationRequested) break;
 
-                    MainThreadDispatcher.Enqueue(() =>
-                    {
-                        if (_shouldShow.TryGetValue(key, out bool show) && show)
-                        {
-                            NativeOverlayAd.Load(unitId, new AdRequest(), options,
-                                (NativeOverlayAd newAd, LoadAdError error) =>
-                                {
-                                    if (error == null && newAd != null && !token.IsCancellationRequested)
-                                    {
-                                        if (_shouldShow.TryGetValue(key, out bool stillShow) && stillShow)
-                                        {
-                                            if (_ads.ContainsKey(key) && _ads[key] != null) _ads[key].Destroy();
-                                            _ads[key] = newAd;
-                                            bool currentState = !_isExpandedDict.ContainsKey(key) ||
-                                                                _isExpandedDict[key];
-                                            RenderAdWithState(where, currentState);
-                                        }
-                                        else
-                                        {
-                                            newAd.Destroy();
-                                        }
-                                    }
-                                });
-                        }
-                    });
+                    MainThreadDispatcher.Enqueue(() => { LoadSpecificSizeAd(where, key, true); });
                 }
             }
             catch (TaskCanceledException)
             {
             }
-#endif
         }
     }
 

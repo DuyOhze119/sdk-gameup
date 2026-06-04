@@ -40,6 +40,8 @@ namespace GameUpSDK.Ads
 
         protected string GetKey(string where) => _config.ResolveUnitId(_adType, where);
 
+        protected string WhereByKey(string key) => _config.WhereByKey(_adType, key);
+
         public virtual void Load(string where = null)
         {
             string unitId = _config.ResolveUnitId(_adType, where);

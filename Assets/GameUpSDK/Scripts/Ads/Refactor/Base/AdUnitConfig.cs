@@ -49,6 +49,25 @@ namespace GameUpSDK.Ads
                 CollapsiblePlacement = defaultCollapsible
             };
         }
+        
+        public string WhereByKey(AdUnitType type, string key)
+        {
+            bool isAndroid = GetRuntimeAdPlatform() == RuntimeAdPlatform.Android;
+            var multiIds = isAndroid ? multiIdsAndroid : multiIdsIOS;
+            
+            if (useMultiAdUnitIds && !string.IsNullOrWhiteSpace(key)) 
+            {
+                foreach (var entry in multiIds)
+                {
+                    if (entry != null && entry.AdType == type && entry.IsValid() &&
+                        string.Equals(entry.Id?.Trim(), key.Trim(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        return entry.NameId;
+                    }
+                }
+            }
+            return "default";
+        }
 
         public List<string> GetAllPlacements()
         {
@@ -81,7 +100,7 @@ namespace GameUpSDK.Ads
         }
         
         public string ResolveUnitId(AdUnitType type, string where) => GetEntry(type, where).Id;
-
+        
         private enum RuntimeAdPlatform { Android, IOS }
         private RuntimeAdPlatform GetRuntimeAdPlatform()
         {
