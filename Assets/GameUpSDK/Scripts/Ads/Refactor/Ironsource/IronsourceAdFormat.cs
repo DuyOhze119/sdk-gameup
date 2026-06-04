@@ -284,6 +284,11 @@ namespace GameUpSDK.Ads
 #endif
         }
 
+        public void Restore(string where)
+        {
+            Show(where);
+        }
+
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
         private static LevelPlayAdSize GetLevelPlayAdSize(BannerSize size)
         {

@@ -51,6 +51,7 @@ namespace GameUpSDK.Ads
     {
         void Show(string where);
         void Hide(string where);
+        void Restore(string where);
     }
 
     public interface IAppOpenAd : IAdFormat

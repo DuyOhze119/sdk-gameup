@@ -155,7 +155,7 @@ namespace GameUpSDK.Ads
             // Tính toán chiều cao của phần Native Ad
             float nativeAdCanvasHeight = (physicalPixels + safeAreaBottom) / _canvas.scaleFactor;
 
-            _bgRect.sizeDelta = new Vector2(0f, nativeAdCanvasHeight);
+            _bgRect.sizeDelta = new Vector2(0f, nativeAdCanvasHeight + HEADER_HEIGHT);
         }
 
         private void Update()

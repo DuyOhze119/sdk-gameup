@@ -147,7 +147,7 @@ namespace GameUpSDK.Ads
                 {
                     foreach (var placement in _activeBanners)
                     {
-                        network.BannerAd.Show(placement);
+                        network.BannerAd.Restore(placement);
                     }
                 }
             }

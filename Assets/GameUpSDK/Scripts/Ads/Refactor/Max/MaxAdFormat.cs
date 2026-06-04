@@ -375,5 +375,10 @@ namespace GameUpSDK.Ads
             if (!string.IsNullOrEmpty(unitId)) MaxSdk.HideBanner(unitId);
 #endif
         }
+
+        public void Restore(string where)
+        {
+            Show(where);
+        }
     }
 }

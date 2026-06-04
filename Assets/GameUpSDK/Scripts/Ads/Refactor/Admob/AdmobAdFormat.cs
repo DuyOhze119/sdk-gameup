@@ -374,6 +374,11 @@ namespace GameUpSDK.Ads
 #endif
         }
 
+        public void Restore(string where)
+        {
+            Show(where);
+        }
+
 #if ADMOB_DEPENDENCIES_INSTALLED
         private AdSize GetAdMobBannerSize(BannerSize size)
         {
@@ -516,18 +521,10 @@ namespace GameUpSDK.Ads
                 var entry = _config.GetEntry(_adType, where);
                 bool isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
 
-                // 1. CHỈ TẠO VÀ BẬT UI NẾU CẤU HÌNH LÀ COLLAPSIBLE (TOP / BOTTOM)
-                if (isCollapsible)
-                {
-                    EnsureUIExists(key, where);
-                    _activeUIs[key].SetVisible(true);
-                }
-
-                // 2. HIỂN THỊ QUẢNG CÁO
                 if (IsAvailable(where))
                 {
                     NotifyAdDisplayed(where);
-                    RenderAdWithState(where, isCollapsible); // Nếu Collapsible thì True (Medium), ngược lại Small
+                    RenderAdWithState(where, isCollapsible);
                     StartAutoRefresh(where);
                 }
                 else
@@ -554,7 +551,6 @@ namespace GameUpSDK.Ads
                         return;
                     }
 
-                    // Nếu người dùng đã kịp gọi Hide() trước khi load xong thì hủy quảng cáo luôn
                     if (!_shouldShow.ContainsKey(key) || !_shouldShow[key])
                     {
                         ad.Destroy();
@@ -590,9 +586,32 @@ namespace GameUpSDK.Ads
 #endif
         }
 
-        // ==========================================
-        // LOGIC QUẢN LÝ GIAO DIỆN & TRẠNG THÁI
-        // ==========================================
+        public void Restore(string where)
+        {
+#if ADMOB_DEPENDENCIES_INSTALLED
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                string key = GetKey(where);
+                _shouldShow[key] = true;
+
+                var entry = _config.GetEntry(_adType, where);
+                bool isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
+                var expand = (!_isExpandedDict.TryGetValue(where, out bool isExpanded) || isExpanded) && isCollapsible;
+
+                if (IsAvailable(where))
+                {
+                    NotifyAdDisplayed(where);
+                    RenderAdWithState(where, expand);
+                    StartAutoRefresh(where);
+                }
+                else
+                {
+                    LoadAndShow(where, key, expand);
+                }
+            });
+#endif
+        }
+
 
         private void EnsureUIExists(string key, string where)
         {
@@ -617,7 +636,7 @@ namespace GameUpSDK.Ads
         private void RenderAdWithState(string where, bool isExpanded)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            MainThreadDispatcher.Enqueue(() =>
+            MainThreadDispatcher.Enqueue(async () =>
             {
                 string key = GetKey(where);
                 if (_ads.TryGetValue(key, out NativeOverlayAd ad) && ad != null)
@@ -642,7 +661,26 @@ namespace GameUpSDK.Ads
                         MainBackgroundColor = new Color(0.1f, 0.1f, 0.1f, 1f),
                     };
 
+                    if (targetTemplate == NativeTemplateId.Small)
+                    {
+                        ad.Hide();
+                        await Task.Delay(50);
+                    }
+
                     ad.RenderTemplate(style, pos);
+
+                    if (isExpanded)
+                    {
+                        EnsureUIExists(key, where);
+                        _activeUIs[key].SetVisible(true);
+                    }
+                    else
+                    {
+                        foreach (var ui in _activeUIs)
+                        {
+                            ui.Value.SetVisible(false);
+                        }
+                    }
                 }
             });
 #endif
@@ -689,29 +727,24 @@ namespace GameUpSDK.Ads
 
                     MainThreadDispatcher.Enqueue(() =>
                     {
-                        // Kiểm tra nếu biến bảo vệ còn True mới cho gọi ngầm
                         if (_shouldShow.TryGetValue(key, out bool show) && show)
                         {
                             NativeOverlayAd.Load(unitId, new AdRequest(), options,
                                 (NativeOverlayAd newAd, LoadAdError error) =>
                                 {
-                                    // Khi tải xong, check lại lần nữa kẻo người dùng vừa ẩn đi
                                     if (error == null && newAd != null && !token.IsCancellationRequested)
                                     {
                                         if (_shouldShow.TryGetValue(key, out bool stillShow) && stillShow)
                                         {
                                             if (_ads.ContainsKey(key) && _ads[key] != null) _ads[key].Destroy();
                                             _ads[key] = newAd;
-
-                                            // Render lại bằng trạng thái bung hay gập hiện tại
-                                            bool currentState = _isExpandedDict.ContainsKey(key)
-                                                ? _isExpandedDict[key]
-                                                : true;
+                                            bool currentState = !_isExpandedDict.ContainsKey(key) ||
+                                                                _isExpandedDict[key];
                                             RenderAdWithState(where, currentState);
                                         }
                                         else
                                         {
-                                            newAd.Destroy(); // Rác -> Hủy
+                                            newAd.Destroy();
                                         }
                                     }
                                 });
@@ -778,6 +811,11 @@ namespace GameUpSDK.Ads
 
         public void Hide(string where = "default") => GetTarget(where).Hide(where);
 
+        public void Restore(string where)
+        {
+            GetTarget(where).Restore(where);
+        }
+
         private IBannerAd GetTarget(string where)
         {
             var entry = _config.GetEntry(AdUnitType.Banner, where);
@@ -786,6 +824,7 @@ namespace GameUpSDK.Ads
                 Debug.LogError("Load NativeOverlay Banner");
                 return _nativeOverlayBanner;
             }
+
             Debug.LogError("Load Standard Banner");
             return _standardBanner;
         }
