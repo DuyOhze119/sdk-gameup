@@ -448,10 +448,11 @@ namespace GameUpSDK.Ads
         }
     }
 
-    public class AdmobNativeOverlayBannerAd : BaseAdFormat, IBannerAd
+    public class AdmobNativeExpandBannerAd : BaseAdFormat, IBannerAd
     {
+        public Action<string> OnCollapsedNativeBanner = delegate { };
+        
         private readonly Dictionary<string, NativeOverlayAd> _expandedAds = new Dictionary<string, NativeOverlayAd>();
-        private readonly Dictionary<string, NativeOverlayAd> _collapsedAds = new Dictionary<string, NativeOverlayAd>();
 
         private readonly Dictionary<string, RuntimeCollapsibleUI> _activeUIs =
             new Dictionary<string, RuntimeCollapsibleUI>();
@@ -461,13 +462,13 @@ namespace GameUpSDK.Ads
 
         private readonly int REFRESH_TIME_SECONDS = 30;
 
-        public AdmobNativeOverlayBannerAd(AdUnitConfig config, AdUnitType adType = AdUnitType.NativeAd) : base(config,
+        public AdmobNativeExpandBannerAd(AdUnitConfig config, AdUnitType adType = AdUnitType.NativeAd) : base(config,
             adType, "Admob_NativeOverlay")
         {
         }
 
         public override bool IsAvailable(string where = null) =>
-            _expandedAds.ContainsKey(GetKey(where)) || _collapsedAds.ContainsKey(GetKey(where));
+            _expandedAds.ContainsKey(GetKey(where));
 
         protected override void RequestAdInternal(string unitId, string where)
         {
@@ -486,7 +487,6 @@ namespace GameUpSDK.Ads
 
                 if (isCollapsible)
                 {
-                    HideCollapseAds();
                     if (_expandedAds.TryGetValue(key, out var eAd) && eAd != null)
                     {
                         NotifyAdDisplayed(where);
@@ -498,47 +498,9 @@ namespace GameUpSDK.Ads
                         LoadSpecificSizeAd(where, key, true);
                     }
                 }
-                else
-                {
-                    HideExpandedAds();
-                    if (_collapsedAds.TryGetValue(key, out var eAd) && eAd != null)
-                    {
-                        NotifyAdDisplayed(where);
-                        RenderAdInstance(where, eAd, NativeTemplateId.Small);
-                        StartAutoRefresh(where);
-                    }
-                    else
-                    {
-                        LoadSpecificSizeAd(where, key, true);
-                    }
-                }
             });
         }
-
-        private void HideCollapseAds()
-        {
-            var keys = _collapsedAds.Keys;
-            foreach (var key in keys)
-            {
-                if (_collapsedAds.TryGetValue(key, out var cAd) && cAd != null)
-                {
-                    cAd.Hide();
-                }
-            }
-        }
-
-        private void HideExpandedAds()
-        {
-            var keys = _expandedAds.Keys;
-            foreach (var key in keys)
-            {
-                if (_expandedAds.TryGetValue(key, out var cAd) && cAd != null)
-                {
-                    cAd.Hide();
-                }
-            }
-        }
-
+        
         public void Hide(string where)
         {
             var key = GetKey(where);
@@ -547,7 +509,6 @@ namespace GameUpSDK.Ads
             MainThreadDispatcher.Enqueue(() =>
             {
                 if (_expandedAds.TryGetValue(key, out var eAd) && eAd != null) eAd.Hide();
-                if (_collapsedAds.TryGetValue(key, out var cAd) && cAd != null) cAd.Hide();
                 if (_activeUIs.TryGetValue(key, out var ui) && ui != null) ui.SetVisible(false);
             });
         }
@@ -557,32 +518,15 @@ namespace GameUpSDK.Ads
             LoadSpecificSizeAd(where, GetKey(where), true);
         }
 
-        private void ChangeToSmallBanner(string where, bool isExpanded)
+        private void CloseExpandBanner(string where)
         {
             MainThreadDispatcher.Enqueue(() =>
             {
-                string key = GetKey(where);
-
+                var key = GetKey(where);
                 if (_expandedAds.TryGetValue(key, out var ad) && ad != null) ad.Hide();
-
-                var targetDict = isExpanded ? _expandedAds : _collapsedAds;
-
-                var keys = targetDict.Keys;
-                foreach (var smallKey in keys)
-                {
-                    var smallWhere = WhereByKey(smallKey);
-                    if (targetDict.TryGetValue(key, out var targetAd) && targetAd != null)
-                    {
-                        RenderAdInstance(smallWhere, targetAd, NativeTemplateId.Small);
-                    }
-                    else
-                    {
-                        LoadSpecificSizeAd(smallWhere, smallKey, true);
-                    } 
-                    StartAutoRefresh(smallWhere);
-                }
-                
                 HideActiveUI();
+                
+                OnCollapsedNativeBanner?.Invoke(where);
             });
         }
 
@@ -610,12 +554,9 @@ namespace GameUpSDK.Ads
                         if (showAfterLoad) NotifyAdDisplayFailed(where, error?.GetMessage());
                         return;
                     }
-
-                    var targetDict = isExpanded ? _expandedAds : _collapsedAds;
-
-                    if (targetDict.ContainsKey(key) && targetDict[key] != null) targetDict[key].Destroy();
-                    targetDict[key] = ad;
-
+                    
+                    if (_expandedAds.ContainsKey(key) && _expandedAds[key] != null) _expandedAds[key].Destroy();
+                    _expandedAds[key] = ad;
 
                     HandleLoadSuccess(unitId, where);
                     if (showAfterLoad)
@@ -643,19 +584,9 @@ namespace GameUpSDK.Ads
 
             ad.RenderTemplate(style, pos);
 
-            if (entry.CollapsiblePlacement != CollapsibleBannerPlacement.None)
-            {
-                var key = GetKey(where);
-                EnsureUIExists(key, where);
-                _activeUIs[key].SetVisible(true);
-            }
-            else
-            {
-                foreach (var ui in _activeUIs)
-                {
-                    ui.Value.SetVisible(false);
-                }
-            }
+            var key = GetKey(where);
+            EnsureUIExists(key, where);
+            _activeUIs[key].SetVisible(true);
         }
 
         private void EnsureUIExists(string key, string where)
@@ -663,7 +594,7 @@ namespace GameUpSDK.Ads
             if (!_activeUIs.ContainsKey(key) || _activeUIs[key] == null)
             {
                 _activeUIs[key] =
-                    RuntimeCollapsibleUI.Create((isExpanded) => { ChangeToSmallBanner(where, false); });
+                    RuntimeCollapsibleUI.Create(() => { CloseExpandBanner(where); });
             }
         }
 
@@ -713,16 +644,30 @@ namespace GameUpSDK.Ads
     public class AdmobBannerDispatcher : IBannerAd
     {
         private readonly AdmobBannerAd _standardBanner;
-        private readonly AdmobNativeOverlayBannerAd _nativeOverlayBanner;
+        private readonly AdmobNativeExpandBannerAd _nativeExpandBanner;
         private readonly AdUnitConfig _config;
 
         public AdmobBannerDispatcher(AdUnitConfig config)
         {
             _config = config;
             _standardBanner = new AdmobBannerAd(config);
-            _nativeOverlayBanner = new AdmobNativeOverlayBannerAd(config, AdUnitType.Banner);
+            _nativeExpandBanner = new AdmobNativeExpandBannerAd(config, AdUnitType.Banner);
             WireUpEvents(_standardBanner);
-            WireUpEvents(_nativeOverlayBanner);
+            WireUpEvents(_nativeExpandBanner);
+
+            _nativeExpandBanner.OnCollapsedNativeBanner += OnCollapsedNativeBanner;
+        }
+
+        private void OnCollapsedNativeBanner(string where)
+        {
+            var wheres = _config.GetAllWhere();
+            foreach (var w in wheres)
+            {
+                if (_standardBanner.IsAvailable(w))
+                {
+                    _standardBanner.Show(w);
+                }
+            }
         }
 
         public bool IsAvailable(string where = null) => GetTarget(where).IsAvailable(where);
@@ -753,7 +698,6 @@ namespace GameUpSDK.Ads
             var placements = _config.GetAllPlacements();
             foreach (var p in placements)
             {
-                Debug.LogError($"Load Banner: {p}");
                 GetTarget(p).Load(p);
             }
         }
@@ -772,11 +716,9 @@ namespace GameUpSDK.Ads
             var entry = _config.GetEntry(AdUnitType.Banner, where);
             if (entry != null && entry.BannerFormat == BannerFormatType.NativeOverlay)
             {
-                Debug.LogError("Load NativeOverlay Banner");
-                return _nativeOverlayBanner;
+                return _nativeExpandBanner;
             }
 
-            Debug.LogError("Load Standard Banner");
             return _standardBanner;
         }
     }

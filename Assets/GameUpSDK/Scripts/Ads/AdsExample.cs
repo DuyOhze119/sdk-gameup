@@ -159,9 +159,9 @@ namespace GameUpSDK
 
             if (GUILayout.Button("Show Native Banner UI", GUILayout.Height(30)))
             {
-                RuntimeCollapsibleUI.Create(b =>
+                RuntimeCollapsibleUI.Create(() =>
                 {
-                    Debug.Log($"Banner: {b}");
+                    Debug.Log($"Banner change");
                 });
             }
             

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace GameUpSDK.Ads
@@ -8,26 +9,24 @@ namespace GameUpSDK.Ads
     public class AdUnitConfig
     {
         public bool useMultiAdUnitIds;
-        
-        [Header("Default Single IDs")]
-        public string defaultIdAndroid;
+
+        [Header("Default Single IDs")] public string defaultIdAndroid;
         public string defaultIdIOS;
-        
+
         // Bổ sung cấu hình mặc định khi không dùng Multi Ids
         public BannerSize defaultBannerSize = BannerSize.Adaptive;
         public BannerFormatType defaultBannerFormat = BannerFormatType.StandardBanner;
         public CollapsibleBannerPlacement defaultCollapsible = CollapsibleBannerPlacement.None;
-        
-        [Header("Multi IDs")]
-        public List<AdUnitIdEntry> multiIdsAndroid = new List<AdUnitIdEntry>();
+
+        [Header("Multi IDs")] public List<AdUnitIdEntry> multiIdsAndroid = new List<AdUnitIdEntry>();
         public List<AdUnitIdEntry> multiIdsIOS = new List<AdUnitIdEntry>();
 
         public AdUnitIdEntry GetEntry(AdUnitType type, string where)
         {
             bool isAndroid = GetRuntimeAdPlatform() == RuntimeAdPlatform.Android;
             var multiIds = isAndroid ? multiIdsAndroid : multiIdsIOS;
-            
-            if (useMultiAdUnitIds && !string.IsNullOrWhiteSpace(where)) 
+
+            if (useMultiAdUnitIds && !string.IsNullOrWhiteSpace(where))
             {
                 foreach (var entry in multiIds)
                 {
@@ -38,9 +37,10 @@ namespace GameUpSDK.Ads
                     }
                 }
             }
-            
+
             // Fallback (Hoặc dành cho chế độ Default ID)
-            return new AdUnitIdEntry {
+            return new AdUnitIdEntry
+            {
                 Id = isAndroid ? defaultIdAndroid : defaultIdIOS,
                 AdType = type,
                 NameId = where,
@@ -49,13 +49,13 @@ namespace GameUpSDK.Ads
                 CollapsiblePlacement = defaultCollapsible
             };
         }
-        
+
         public string WhereByKey(AdUnitType type, string key)
         {
             bool isAndroid = GetRuntimeAdPlatform() == RuntimeAdPlatform.Android;
             var multiIds = isAndroid ? multiIdsAndroid : multiIdsIOS;
-            
-            if (useMultiAdUnitIds && !string.IsNullOrWhiteSpace(key)) 
+
+            if (useMultiAdUnitIds && !string.IsNullOrWhiteSpace(key))
             {
                 foreach (var entry in multiIds)
                 {
@@ -66,13 +66,14 @@ namespace GameUpSDK.Ads
                     }
                 }
             }
+
             return "default";
         }
 
         public List<string> GetAllPlacements()
         {
             var placements = new List<string>();
-            
+
             if (!useMultiAdUnitIds)
             {
                 placements.Add("default");
@@ -84,7 +85,7 @@ namespace GameUpSDK.Ads
 
             foreach (var entry in multiIds)
             {
-                if (entry != null&& entry.IsValid() && !string.IsNullOrWhiteSpace(entry.NameId))
+                if (entry != null && entry.IsValid() && !string.IsNullOrWhiteSpace(entry.NameId))
                 {
                     string cleanName = entry.NameId.Trim();
                     if (!placements.Contains(cleanName))
@@ -93,15 +94,32 @@ namespace GameUpSDK.Ads
                     }
                 }
             }
-            
-            placements.Add("default"); 
 
             return placements;
         }
-        
+
+        public List<string> GetAllWhere()
+        {
+            bool isAndroid = GetRuntimeAdPlatform() == RuntimeAdPlatform.Android;
+            var multiIds = isAndroid ? multiIdsAndroid : multiIdsIOS;
+            if (useMultiAdUnitIds)
+            {
+                return multiIds.Select(s => s.NameId).ToList();
+            }
+            else
+            {
+                return new List<string> { "default" };
+            }
+        }
+
         public string ResolveUnitId(AdUnitType type, string where) => GetEntry(type, where).Id;
-        
-        private enum RuntimeAdPlatform { Android, IOS }
+
+        private enum RuntimeAdPlatform
+        {
+            Android,
+            IOS
+        }
+
         private RuntimeAdPlatform GetRuntimeAdPlatform()
         {
 #if UNITY_ANDROID
@@ -109,7 +127,9 @@ namespace GameUpSDK.Ads
 #elif UNITY_IOS || UNITY_IPHONE
             return RuntimeAdPlatform.IOS;
 #elif UNITY_EDITOR
-            return UnityEditor.EditorUserBuildSettings.activeBuildTarget == UnityEditor.BuildTarget.iOS ? RuntimeAdPlatform.IOS : RuntimeAdPlatform.Android;
+            return UnityEditor.EditorUserBuildSettings.activeBuildTarget == UnityEditor.BuildTarget.iOS
+                ? RuntimeAdPlatform.IOS
+                : RuntimeAdPlatform.Android;
 #else
             return RuntimeAdPlatform.Android;
 #endif

@@ -10,20 +10,17 @@ namespace GameUpSDK.Ads
     /// </summary>
     public class RuntimeCollapsibleUI : MonoBehaviour
     {
-        private Action<bool> _onToggleCallback;
-        private bool _isExpanded = true;
-        
+        private Action _onToggleCallback;
+
         private RectTransform _bgRect;
         private Text _arrowText;
         private Canvas _canvas;
 
         // Kích thước chuẩn chỉnh theo thiết kế
-        private const float HEADER_HEIGHT = 60f; 
+        private const float HEADER_HEIGHT = 60f;
         private const float EXTRA_PADDING_DP = 20f; // Bù hao 5dp để hở viền cho đẹp
 
-        public bool IsVisible => gameObject.activeSelf; 
-
-        public static RuntimeCollapsibleUI Create(Action<bool> onToggle)
+        public static RuntimeCollapsibleUI Create(Action onToggle)
         {
             // 1. Tạo Root & Canvas
             GameObject rootObj = new GameObject("GameUp_NativeCollapsibleUI");
@@ -46,15 +43,15 @@ namespace GameUpSDK.Ads
             GameObject bgObj = new GameObject("Bg_Panel");
             bgObj.transform.SetParent(rootObj.transform, false);
             RectTransform bgRect = bgObj.AddComponent<RectTransform>();
-            
+
             bgRect.anchorMin = new Vector2(0f, 0f);
             bgRect.anchorMax = new Vector2(1f, 0f); // Tràn ngang
             bgRect.pivot = new Vector2(0.5f, 0f);
-            bgRect.offsetMin = Vector2.zero; 
+            bgRect.offsetMin = Vector2.zero;
             bgRect.offsetMax = Vector2.zero;
 
             Image bgImage = bgObj.AddComponent<Image>();
-            bgImage.color = new Color(0.1f, 0.1f, 0.1f, 1f); 
+            bgImage.color = new Color(0.1f, 0.1f, 0.1f, 1f);
 
             // ==========================================
             // 3. TẠO NÚT BẤM VUÔNG GÓC PHẢI (Btn_Toggle)
@@ -62,25 +59,26 @@ namespace GameUpSDK.Ads
             GameObject btnObj = new GameObject("Btn_Toggle");
             btnObj.transform.SetParent(bgRect.transform, false);
             RectTransform btnRect = btnObj.AddComponent<RectTransform>();
-            
+
             btnRect.anchorMin = new Vector2(1f, 1f);
             btnRect.anchorMax = new Vector2(1f, 1f);
             btnRect.pivot = new Vector2(1f, 0f);
-            
+
             btnRect.sizeDelta = new Vector2(80f, HEADER_HEIGHT);
             btnRect.anchoredPosition = Vector2.zero;
 
             Image btnImage = btnObj.AddComponent<Image>();
-            btnImage.color = new Color(0.1f, 0.1f, 0.1f, 1f); 
+            btnImage.color = new Color(0.1f, 0.1f, 0.1f, 1f);
             Button btn = btnObj.AddComponent<Button>();
-            
+
             // ==========================================
             // 4. TẠO TEXT MŨI TÊN
             // ==========================================
             GameObject txtObj = new GameObject("Txt_Arrow");
             txtObj.transform.SetParent(btnObj.transform, false);
             RectTransform txtRect = txtObj.AddComponent<RectTransform>();
-            txtRect.anchorMin = Vector2.zero; txtRect.anchorMax = Vector2.one; 
+            txtRect.anchorMin = Vector2.zero;
+            txtRect.anchorMax = Vector2.one;
             txtRect.sizeDelta = Vector2.zero;
 
             Text arrowText = txtObj.AddComponent<Text>();
@@ -95,13 +93,13 @@ namespace GameUpSDK.Ads
             // ==========================================
             RuntimeCollapsibleUI controller = rootObj.AddComponent<RuntimeCollapsibleUI>();
             controller.Init(canvas, bgRect, arrowText, onToggle);
-            
+
             btn.onClick.AddListener(controller.OnClicked);
 
             return controller;
         }
 
-        private void Init(Canvas canvas, RectTransform bgRect, Text arrowText, Action<bool> onToggle)
+        private void Init(Canvas canvas, RectTransform bgRect, Text arrowText, Action onToggle)
         {
             _canvas = canvas;
             _bgRect = bgRect;
@@ -112,49 +110,33 @@ namespace GameUpSDK.Ads
 
         private void OnClicked()
         {
-            _isExpanded = !_isExpanded;
             UpdatePosition();
-            _onToggleCallback?.Invoke(_isExpanded);
+            _onToggleCallback?.Invoke();
         }
-        
+
         public void SetVisible(bool isVisible)
         {
             gameObject.SetActive(isVisible);
-            _isExpanded = isVisible;
-            Debug.LogError($"Change Collapsible UI to {isVisible}");
-            if (isVisible) UpdatePosition(); 
+            if (isVisible) UpdatePosition();
         }
 
         private void UpdatePosition()
         {
             if (_canvas == null || _bgRect == null) return;
 
-            _arrowText.text = _isExpanded ? "▼" : "▲";
+            _arrowText.text = "▼";
 
             float dpi = Screen.dpi == 0 ? 160f : Screen.dpi;
             
-            // ==========================================================
-            // [SỬA ĐIỂM NÀY]: NỘI SUY CHIỀU CAO ADMOB THEO THIẾT BỊ
-            // ==========================================================
             float targetDP;
-            if (_isExpanded)
-            {
-                // Đo chiều rộng thiết bị bằng DP
-                float screenWidthDP = Screen.width / (dpi / 160f);
-                
-                // Chiều cao ảnh Google = Chiều rộng / 1.77. Cộng thêm khoảng text/icon ~ 110dp
-                float mediaViewHeightDP = screenWidthDP / 1.77f;
-                targetDP = 110f + mediaViewHeightDP + EXTRA_PADDING_DP;
-            }
-            else
-            {
-                targetDP = 100f + EXTRA_PADDING_DP;
-            }
+            float screenWidthDP = Screen.width / (dpi / 160f);
+
+            float mediaViewHeightDP = screenWidthDP / 1.77f;
+            targetDP = 110f + mediaViewHeightDP + EXTRA_PADDING_DP;
 
             float physicalPixels = targetDP * (dpi / 160f);
             float safeAreaBottom = Screen.safeArea.y;
-
-            // Tính toán chiều cao của phần Native Ad
+            
             float nativeAdCanvasHeight = (physicalPixels + safeAreaBottom) / _canvas.scaleFactor;
 
             _bgRect.sizeDelta = new Vector2(0f, nativeAdCanvasHeight + HEADER_HEIGHT);
@@ -162,7 +144,7 @@ namespace GameUpSDK.Ads
 
         private void Update()
         {
-            if (Time.frameCount % 30 == 0) 
+            if (Time.frameCount % 30 == 0)
             {
                 UpdatePosition();
             }
