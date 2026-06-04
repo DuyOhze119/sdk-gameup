@@ -120,6 +120,7 @@ namespace GameUpSDK.Ads
         public void SetVisible(bool isVisible)
         {
             gameObject.SetActive(isVisible);
+            Debug.LogError($"Change Collapsible UI to {isVisible}");
             if (isVisible) UpdatePosition(); 
         }
 

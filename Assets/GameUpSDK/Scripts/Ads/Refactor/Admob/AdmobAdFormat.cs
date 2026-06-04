@@ -577,10 +577,7 @@ namespace GameUpSDK.Ads
 
             MainThreadDispatcher.Enqueue(() =>
             {
-                // Tắt quảng cáo
                 if (_ads.TryGetValue(key, out NativeOverlayAd ad) && ad != null) ad.Hide();
-
-                // Tắt UI nếu có
                 if (_activeUIs.TryGetValue(key, out var ui) && ui != null) ui.SetVisible(false);
             });
 #endif
@@ -591,11 +588,12 @@ namespace GameUpSDK.Ads
 #if ADMOB_DEPENDENCIES_INSTALLED
             MainThreadDispatcher.Enqueue(() =>
             {
+                Debug.Log("Restoring native ad");
                 string key = GetKey(where);
                 _shouldShow[key] = true;
 
                 var entry = _config.GetEntry(_adType, where);
-                bool isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
+                var isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
                 var expand = (!_isExpandedDict.TryGetValue(where, out bool isExpanded) || isExpanded) && isCollapsible;
 
                 if (IsAvailable(where))
@@ -638,6 +636,7 @@ namespace GameUpSDK.Ads
 #if ADMOB_DEPENDENCIES_INSTALLED
             MainThreadDispatcher.Enqueue(async () =>
             {
+                Debug.LogError($"Rendering native ad with state where: {where} - isExpanded: {isExpanded}");
                 string key = GetKey(where);
                 if (_ads.TryGetValue(key, out NativeOverlayAd ad) && ad != null)
                 {
@@ -671,6 +670,7 @@ namespace GameUpSDK.Ads
 
                     if (isExpanded)
                     {
+                        Debug.LogError($"Show ui expand");
                         EnsureUIExists(key, where);
                         _activeUIs[key].SetVisible(true);
                     }
