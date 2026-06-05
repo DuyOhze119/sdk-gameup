@@ -1,12 +1,12 @@
 package com.plugins.nativebridge;
 
 import android.app.Activity;
-import android.graphics.Color;
-import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.TextView;
 import com.google.android.gms.ads.AdLoader;
 import com.google.android.gms.ads.AdRequest;
@@ -17,40 +17,37 @@ import com.google.android.gms.ads.nativead.NativeAd;
 import com.google.android.gms.ads.nativead.NativeAdView;
 
 public class UnityNativeFullScreen {
-    // 1. ĐỊNH NGHĨA INTERFACE CALLBACK
     public interface INativeAdCallback {
         void onAdLoaded();
         void onAdFailedToLoad(String error);
         void onAdClosed();
     }
 
-    private static FrameLayout mainContainer;
+    private static View mainContainer;
     private static NativeAd loadedAd = null;
     private static boolean isAdLoading = false; 
-    
-    // Lưu trữ callback do Unity truyền sang
     private static INativeAdCallback mCallback;
 
-    // 2. NHẬN CALLBACK QUA HÀM LOAD
     public static void loadAd(final Activity activity, final String adUnitId, final INativeAdCallback callback) {
-        mCallback = callback; // Lưu lại để dùng
-
-        if (loadedAd != null || isAdLoading) {
-            return;
-        }
+        mCallback = callback; 
+        if (loadedAd != null || isAdLoading) return;
 
         isAdLoading = true;
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
+                // Đưa logo AdChoices qua góc trái
+                com.google.android.gms.ads.nativead.NativeAdOptions adOptions = 
+                    new com.google.android.gms.ads.nativead.NativeAdOptions.Builder()
+                        .setAdChoicesPlacement(com.google.android.gms.ads.nativead.NativeAdOptions.ADCHOICES_TOP_LEFT)
+                        .build();
+
                 AdLoader adLoader = new AdLoader.Builder(activity, adUnitId)
                     .forNativeAd(new NativeAd.OnNativeAdLoadedListener() {
                         @Override
                         public void onNativeAdLoaded(NativeAd nativeAd) {
                             loadedAd = nativeAd;
                             isAdLoading = false;
-                            
-                            // GỌI CALLBACK THAY VÌ SEND MESSAGE
                             if (mCallback != null) mCallback.onAdLoaded();
                         }
                     })
@@ -60,11 +57,10 @@ public class UnityNativeFullScreen {
                             super.onAdFailedToLoad(adError);
                             isAdLoading = false;
                             loadedAd = null;
-                            
-                            // GỌI CALLBACK
                             if (mCallback != null) mCallback.onAdFailedToLoad(adError.getMessage());
                         }
                     })
+                    .withNativeAdOptions(adOptions)
                     .build();
                 adLoader.loadAd(new AdRequest.Builder().build());
             }
@@ -87,76 +83,52 @@ public class UnityNativeFullScreen {
     }
 
     private static void renderFullScreenAd(final Activity activity, final NativeAd nativeAd) {
-        mainContainer = new FrameLayout(activity);
-        mainContainer.setBackgroundColor(Color.BLACK);
-        FrameLayout.LayoutParams rootParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        activity.addContentView(mainContainer, rootParams);
+        int layoutId = activity.getResources().getIdentifier("gameup_native_fullscreen", "layout", activity.getPackageName());
+        mainContainer = LayoutInflater.from(activity).inflate(layoutId, null);
 
-        NativeAdView adView = new NativeAdView(activity);
-        adView.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        NativeAdView adView = mainContainer.findViewById(activity.getResources().getIdentifier("native_ad_view", "id", activity.getPackageName()));
+        MediaView mediaView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_media", "id", activity.getPackageName()));
+        TextView headlineView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_headline", "id", activity.getPackageName()));
+        TextView bodyView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_body", "id", activity.getPackageName()));
+        Button ctaView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_call_to_action", "id", activity.getPackageName()));
+        ImageView iconView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_app_icon", "id", activity.getPackageName()));
+        com.google.android.gms.ads.nativead.AdChoicesView adChoicesView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_choices", "id", activity.getPackageName()));
 
-        MediaView mediaView = new MediaView(activity);
-        mediaView.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        adView.addView(mediaView);
         adView.setMediaView(mediaView);
+        adView.setHeadlineView(headlineView);
+        adView.setBodyView(bodyView);
+        adView.setCallToActionView(ctaView);
+        adView.setIconView(iconView);
+        adView.setAdChoicesView(adChoicesView);
 
-        TextView txtHeadline = new TextView(activity);
-        txtHeadline.setText(nativeAd.getHeadline());
-        txtHeadline.setTextColor(Color.WHITE);
-        txtHeadline.setTextSize(20);
-        FrameLayout.LayoutParams headlineParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        headlineParams.gravity = Gravity.BOTTOM | Gravity.START;
-        headlineParams.setMargins(50, 0, 50, 280);
-        txtHeadline.setLayoutParams(headlineParams);
-        adView.addView(txtHeadline);
-        adView.setHeadlineView(txtHeadline);
+        headlineView.setText(nativeAd.getHeadline());
 
-        Button btnCta = new Button(activity);
-        btnCta.setText(nativeAd.getCallToAction());
-        btnCta.setBackgroundColor(Color.parseColor("#FF4081"));
-        btnCta.setTextColor(Color.WHITE);
-        FrameLayout.LayoutParams ctaParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        ctaParams.gravity = Gravity.BOTTOM;
-        ctaParams.setMargins(50, 0, 50, 100);
-        btnCta.setLayoutParams(ctaParams);
-        adView.addView(btnCta);
-        adView.setCallToActionView(btnCta);
+        if (nativeAd.getBody() == null) bodyView.setVisibility(View.GONE);
+        else { bodyView.setVisibility(View.VISIBLE); bodyView.setText(nativeAd.getBody()); }
 
-        mainContainer.addView(adView);
+        if (nativeAd.getCallToAction() == null) ctaView.setVisibility(View.INVISIBLE);
+        else { ctaView.setVisibility(View.VISIBLE); ctaView.setText(nativeAd.getCallToAction()); }
+
+        if (nativeAd.getIcon() == null) iconView.setVisibility(View.GONE);
+        else { iconView.setVisibility(View.VISIBLE); iconView.setImageDrawable(nativeAd.getIcon().getDrawable()); }
+
         adView.setNativeAd(nativeAd);
 
-        // 6. Nút Đóng dạng vòng tròn (Hiển thị ngay lập tức)
-                android.graphics.drawable.GradientDrawable circleBackground = new android.graphics.drawable.GradientDrawable();
-                circleBackground.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-                circleBackground.setColor(Color.parseColor("#88000000")); 
-                circleBackground.setStroke(3, Color.WHITE); 
-        
-                final Button btnClose = new Button(activity);
-                btnClose.setBackground(circleBackground);
-                btnClose.setTextColor(Color.WHITE);
-                btnClose.setTextSize(16); // Size 16 để chữ X vừa vặn
-                btnClose.setGravity(Gravity.CENTER);
-                btnClose.setPadding(0, 0, 0, 0); 
-                
-                FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(90, 90);
-                closeParams.gravity = Gravity.TOP | Gravity.END;
-                closeParams.setMargins(0, 60, 40, 0); 
-                btnClose.setLayoutParams(closeParams);
-        
-                // Hiển thị chữ X luôn và cho phép click ngay
-                btnClose.setText("X");
-                btnClose.setEnabled(true);
-                btnClose.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        hideAd(activity);
-                    }
-                });
-        
-                mainContainer.addView(btnClose);
+        // Nút Đóng (Tắt Quảng Cáo)
+        View btnClose = mainContainer.findViewById(activity.getResources().getIdentifier("btn_close_ad", "id", activity.getPackageName()));
+        btnClose.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                hideAd(activity);
+            }
+        });
+
+        // Đẩy lên màn hình Unity
+        FrameLayout.LayoutParams rootParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        activity.addContentView(mainContainer, rootParams);
     }
 
-    public static void hideAd(Activity activity) {
+    public static void hideAd(final Activity activity) {
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -168,8 +140,6 @@ public class UnityNativeFullScreen {
                     loadedAd.destroy();
                     loadedAd = null; 
                 }
-                
-                // GỌI CALLBACK
                 if (mCallback != null) mCallback.onAdClosed();
             }
         });
