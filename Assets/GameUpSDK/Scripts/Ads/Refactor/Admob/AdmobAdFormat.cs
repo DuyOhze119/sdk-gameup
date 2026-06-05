@@ -490,6 +490,7 @@ namespace GameUpSDK.Ads
                 {
                     if (_expandedAds.TryGetValue(key, out var eAd) && eAd != null)
                     {
+                        Debug.Log($"[GameUp] Show ad with preload ad");
                         NotifyAdDisplayed(where);
                         RenderAdInstance(where, eAd, NativeTemplateId.Medium);
                         StartAutoRefresh(where);
@@ -531,7 +532,7 @@ namespace GameUpSDK.Ads
             MainThreadDispatcher.Enqueue(() =>
             {
                 Hide(where);
-                OnCollapsedNativeBanner?.Invoke(where);
+                //OnCollapsedNativeBanner?.Invoke(where);
             });
         }
 
@@ -561,7 +562,14 @@ namespace GameUpSDK.Ads
                         return;
                     }
 
-                    if (_expandedAds.ContainsKey(key) && _expandedAds[key] != null) _expandedAds[key].Destroy();
+                    if (_expandedAds.TryGetValue(key, out  var nativeAd))
+                    {
+                        if (nativeAd != null)
+                        {
+                            nativeAd.Destroy();
+                            nativeAd = null;
+                        }
+                    }
                     _expandedAds[key] = ad;
 
                     HandleLoadSuccess(unitId, where);
@@ -632,7 +640,6 @@ namespace GameUpSDK.Ads
 
         private async void RunRefreshLoop(string where, CancellationToken token)
         {
-            return;
             string key = GetKey(where);
             try
             {
