@@ -62,7 +62,7 @@ namespace GameUpSDK.Editor
             // 4. SINH CÁC FILE CẤU HÌNH CHO ANDROID LIBRARY
             isModified |= CreateFileIfMissing(
                 Path.Combine(targetLibPath, "project.properties"), 
-                "target=android-33\nandroid.library=true"
+                "android.library=true"
             );
 
             isModified |= CreateFileIfMissing(
