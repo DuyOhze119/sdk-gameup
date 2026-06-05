@@ -96,7 +96,7 @@ namespace GameUpSDK.Ads
                 onFailed: (err) => { MainThreadDispatcher.Enqueue(() => { _isLoading[key] = false; _isLoaded[key] = false; HandleLoadFailed(unitId, where, err); }); },
                 onDisplayed: () => { MainThreadDispatcher.Enqueue(() => NotifyAdDisplayed(where)); },
                 onClosed: () => { MainThreadDispatcher.Enqueue(() => { _isLoaded[key] = false; NotifyAdClosed(where); OnCollapsedNativeBanner?.Invoke(where);}); },
-                onClicked: () => { MainThreadDispatcher.Enqueue(() => { }; },
+                onClicked: () => { MainThreadDispatcher.Enqueue(() => { }); },
                 onPaid: (val) => { MainThreadDispatcher.Enqueue(() => TrackRevenue(unitId, where, "NativeBanner_Android", val)); }
             );
 
