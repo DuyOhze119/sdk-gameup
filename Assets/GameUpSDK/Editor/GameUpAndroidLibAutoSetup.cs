@@ -64,10 +64,18 @@ namespace GameUpSDK.Editor
                 Path.Combine(targetLibPath, "project.properties"), 
                 "android.library=true"
             );
+            
+            string manifestContent = 
+                @"<?xml version=""1.0"" encoding=""utf-8""?>
+<manifest xmlns:android=""http://schemas.android.com/apk/res/android""
+    package=""com.gameup.ads.nativeui"">
+    <uses-sdk android:minSdkVersion=""24"" android:targetSdkVersion=""35"" />
+    <application />
+</manifest>";
 
             isModified |= CreateFileIfMissing(
                 Path.Combine(targetLibPath, "AndroidManifest.xml"), 
-                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n    package=\"com.gameup.ads.nativeui\">\n    <application />\n</manifest>"
+                manifestContent
             );
 
             string resRawPath = Path.Combine(targetLibPath, "res", "raw");
