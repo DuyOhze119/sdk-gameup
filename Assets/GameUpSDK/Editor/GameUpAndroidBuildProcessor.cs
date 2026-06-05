@@ -28,8 +28,14 @@ namespace GameUpSDK.Editor
 # ==========================================
 # GAMEUP SDK PROGUARD RULES (AUTO GENERATED)
 # ==========================================
+
+# 1. Rules cho Native FullScreen
 -keep class com.plugins.nativebridge.UnityNativeFullScreen { *; }
 -keep interface com.plugins.nativebridge.UnityNativeFullScreen$INativeAdCallback { *; }
+
+# 2. Rules cho Native Collapsible Banner
+-keep class com.gameup.ads.NativeBannerManager { *; }
+-keep interface com.gameup.ads.NativeBannerManager$AdCallback { *; }
 ";
                 // Chèn thêm luật vào cuối file
                 File.AppendAllText(proguardFilePath, "\n" + proGuardRules);

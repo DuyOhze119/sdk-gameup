@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="gameup_native_bg">#1A1A1A</color>
+    <color name="gameup_btn_bg">#121212</color>
+    <color name="gameup_text_gray">#B3B3B3</color>
+</resources>
