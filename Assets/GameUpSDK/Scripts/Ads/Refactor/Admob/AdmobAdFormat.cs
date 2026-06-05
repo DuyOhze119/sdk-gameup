@@ -451,7 +451,7 @@ namespace GameUpSDK.Ads
     public class AdmobNativeExpandBannerAd : BaseAdFormat, IBannerAd
     {
         public Action<string> OnCollapsedNativeBanner = delegate { };
-        
+
         private readonly Dictionary<string, NativeOverlayAd> _expandedAds = new Dictionary<string, NativeOverlayAd>();
 
         private readonly Dictionary<string, RuntimeCollapsibleUI> _activeUIs =
@@ -501,7 +501,7 @@ namespace GameUpSDK.Ads
                 }
             });
         }
-        
+
         public void Hide(string where)
         {
             var key = GetKey(where);
@@ -509,7 +509,13 @@ namespace GameUpSDK.Ads
 
             MainThreadDispatcher.Enqueue(() =>
             {
-                if (_expandedAds.TryGetValue(key, out var eAd) && eAd != null) eAd.Hide();
+                Debug.Log($"[GameUp] Hide ad: {where} - {_expandedAds.Count}");
+                if (_expandedAds.TryGetValue(key, out var eAd) && eAd != null)
+                {
+                    Debug.Log($"[GameUp] Hiding ad: {where}");
+                    eAd.Hide();
+                }
+
                 if (_activeUIs.TryGetValue(key, out var ui) && ui != null) ui.SetVisible(false);
             });
         }
@@ -554,7 +560,7 @@ namespace GameUpSDK.Ads
                         if (showAfterLoad) NotifyAdDisplayFailed(where, error?.GetMessage());
                         return;
                     }
-                    
+
                     if (_expandedAds.ContainsKey(key) && _expandedAds[key] != null) _expandedAds[key].Destroy();
                     _expandedAds[key] = ad;
 
@@ -588,6 +594,7 @@ namespace GameUpSDK.Ads
             var key = GetKey(where);
             EnsureUIExists(key, where);
             _activeUIs[key].SetVisible(true);
+            _expandedAds[key] = ad;
         }
 
         private void EnsureUIExists(string key, string where)
@@ -619,12 +626,13 @@ namespace GameUpSDK.Ads
                     cts.Dispose();
                 }
             }
-            
+
             _refreshTokens.Clear();
         }
 
         private async void RunRefreshLoop(string where, CancellationToken token)
         {
+            return;
             string key = GetKey(where);
             try
             {
@@ -665,11 +673,15 @@ namespace GameUpSDK.Ads
             foreach (var w in wheres)
             {
                 if (_standardBanner.IsAvailable(w))
-                {           
+                {
                     Debug.Log($"OnCollapsedNativeBanner: {where} - show banner {w}");
                     _standardBanner.Show(w);
+                    AdsEvent.RaiseBannerSwap(where, w);
+                    return;
                 }
             }
+
+            AdsEvent.RaiseBannerSwap(where, string.Empty);
         }
 
         public bool IsAvailable(string where = null) => GetTarget(where).IsAvailable(where);

@@ -76,6 +76,7 @@ namespace GameUpSDK.Ads
         private void OnDestroy()
         {
             AdsEvent.OnImpressionDataReady -= GameUpAnalytics.LogAdImpression;
+            AdsEvent.OnBannerSwap -= OnBannerSwapped;
         }
 
         private void Update()
@@ -87,6 +88,9 @@ namespace GameUpSDK.Ads
         {
             AdsEvent.OnImpressionDataReady -= GameUpAnalytics.LogAdImpression;
             AdsEvent.OnImpressionDataReady += GameUpAnalytics.LogAdImpression;
+            
+            AdsEvent.OnBannerSwap -= OnBannerSwapped;
+            AdsEvent.OnBannerSwap += OnBannerSwapped;
 
             foreach (var provider in mediationPriority)
             {
@@ -112,6 +116,15 @@ namespace GameUpSDK.Ads
             }
         }
 
+        private void OnBannerSwapped(string last, string current)
+        {
+            _activeBanners.Remove(last);
+            if (!string.IsNullOrEmpty(current))
+            {
+                _activeBanners.Add(current);
+            }
+        }
+        
         private void OnBannerLoaded(string where)
         {
             Debug.Log($"OnBannerLoaded: {where}");
