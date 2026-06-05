@@ -57,7 +57,7 @@ namespace GameUpSDK.Ads
         {
             _instance = this;
 
-#if UNITY_ANDROID && ADMOB_DEPENDENCIES_INSTALLED
+#if UNITY_ANDROID && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
             using (AndroidJavaClass unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
             {
                 _currentActivity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
