@@ -2,179 +2,221 @@
 #import <UIKit/UIKit.h>
 #import <GoogleMobileAds/GoogleMobileAds.h>
 
-// Hàm lấy ViewController hiện tại của Unity
 extern UIViewController* UnityGetGLViewController();
 
-// 1. Định nghĩa các kiểu Callback (Con trỏ hàm) từ C#
-typedef void (*NativeAdLoadedCallback)();
-typedef void (*NativeAdFailedCallback)(const char* error);
-typedef void (*NativeAdClosedCallback)();
+typedef void (*Action_Void)();
+typedef void (*Action_String)(const char* error);
+typedef void (*Action_Double)(double value);
 
-@interface UnityiOSNativeFullScreen : NSObject <GADNativeAdLoaderDelegate>
-@property(nonatomic, strong) GADAdLoader *adLoader;
-@property(nonatomic, strong) GADNativeAd *loadedAd;
-@property(nonatomic, strong) UIView *mainContainer;
-@property(nonatomic, assign) BOOL isAdLoading;
+typedef NS_ENUM(NSInteger, AdState) {
+    AdStateIdle, AdStateLoaded, AdStateShowing
+};
 
-// 2. Lưu trữ các Callback
-@property(nonatomic, assign) NativeAdLoadedCallback onLoadedCallback;
-@property(nonatomic, assign) NativeAdFailedCallback onFailedCallback;
-@property(nonatomic, assign) NativeAdClosedCallback onClosedCallback;
+@interface NativeBannerManager : NSObject <GADNativeAdLoaderDelegate, GADNativeAdDelegate>
+@property (nonatomic, strong) GADAdLoader *adLoader;
+@property (nonatomic, strong) GADNativeAd *currentNativeAd;
+@property (nonatomic, strong) UIView *currentAdLayout;
+@property (nonatomic, assign) AdState currentState;
+@property (nonatomic, assign) BOOL isLoadingAd;
+
+// Trỏ tham chiếu tới các View để Update In-Place
+@property (nonatomic, strong) GADNativeAdView *nativeAdView;
+@property (nonatomic, strong) UILabel *headlineLabel;
+@property (nonatomic, strong) UILabel *bodyLabel;
+@property (nonatomic, strong) UIButton *ctaBtn;
+@property (nonatomic, strong) UIImageView *iconView;
+
+@property (nonatomic, assign) Action_Void onLoaded;
+@property (nonatomic, assign) Action_String onFailed;
+@property (nonatomic, assign) Action_Void onDisplayed;
+@property (nonatomic, assign) Action_Void onClosed;
+@property (nonatomic, assign) Action_Void onClicked;
+@property (nonatomic, assign) Action_Double onPaid;
 
 + (instancetype)sharedInstance;
 - (void)loadAd:(NSString *)adUnitId;
-- (BOOL)isAdReady;
-- (void)showAd;
+- (void)showAd:(BOOL)isTop;
 - (void)hideAd;
 @end
 
-@implementation UnityiOSNativeFullScreen
+@implementation NativeBannerManager
 
 + (instancetype)sharedInstance {
-    static UnityiOSNativeFullScreen *sharedInstance = nil;
+    static NativeBannerManager *sharedInstance = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        sharedInstance = [[UnityiOSNativeFullScreen alloc] init];
+        sharedInstance = [[self alloc] init];
+        sharedInstance.currentState = AdStateIdle;
+        sharedInstance.isLoadingAd = NO;
     });
     return sharedInstance;
 }
 
 - (void)loadAd:(NSString *)adUnitId {
-    if (self.loadedAd != nil || self.isAdLoading) return;
+    if (self.isLoadingAd) return;
+    self.isLoadingAd = YES;
 
-    self.isAdLoading = YES;
     UIViewController *rootVC = UnityGetGLViewController();
+    
+    GADNativeAdViewAdOptions *viewOptions = [[GADNativeAdViewAdOptions alloc] init];
+    viewOptions.preferredAdChoicesPosition = GADAdChoicesPositionTopLeftCorner;
 
     self.adLoader = [[GADAdLoader alloc] initWithAdUnitID:adUnitId
                                        rootViewController:rootVC
-                                                  adTypes:@[ GADAdFormatNative ]
-                                                  options:nil];
+                                                  adTypes:@[GADAdLoaderAdTypeNative]
+                                                  options:@[viewOptions]];
     self.adLoader.delegate = self;
     [self.adLoader loadRequest:[GADRequest request]];
 }
 
-- (BOOL)isAdReady {
-    return self.loadedAd != nil;
-}
-
-- (void)showAd {
-    if (!self.loadedAd) return;
-
+- (void)showAd:(BOOL)isTop {
+    if (self.currentState != AdStateLoaded || !self.currentNativeAd) return;
+    [self hideAd]; 
+    
     UIViewController *rootVC = UnityGetGLViewController();
-    CGRect screenBounds = [UIScreen mainScreen].bounds;
-
-    self.mainContainer = [[UIView alloc] initWithFrame:screenBounds];
-    self.mainContainer.backgroundColor = [UIColor blackColor];
-    [rootVC.view addSubview:self.mainContainer];
-
-    GADNativeAdView *adView = [[GADNativeAdView alloc] initWithFrame:screenBounds];
-    [self.mainContainer addSubview:adView];
-
-    GADMediaView *mediaView = [[GADMediaView alloc] initWithFrame:screenBounds];
-    [adView addSubview:mediaView];
-    adView.mediaView = mediaView;
-
-    UILabel *headlineLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, screenBounds.size.height - 180, screenBounds.size.width - 40, 40)];
-    headlineLabel.text = self.loadedAd.headline;
-    headlineLabel.textColor = [UIColor whiteColor];
-    headlineLabel.font = [UIFont boldSystemFontOfSize:20];
-    [adView addSubview:headlineLabel];
-    adView.headlineView = headlineLabel;
-
-    UIButton *ctaButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    ctaButton.frame = CGRectMake(20, screenBounds.size.height - 100, screenBounds.size.width - 40, 50);
-    [ctaButton setTitle:self.loadedAd.callToAction forState:UIControlStateNormal];
-    [ctaButton setBackgroundColor:[UIColor colorWithRed:1.0 green:0.25 blue:0.51 alpha:1.0]]; 
-    [ctaButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    ctaButton.layer.cornerRadius = 8;
-    [adView addSubview:ctaButton];
-    adView.callToActionView = ctaButton;
-
-    adView.nativeAd = self.loadedAd;
-
-    // --- NÚT ĐÓNG HÌNH TRÒN (Hiển thị ngay lập tức) ---
-    UIButton *closeButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    closeButton.frame = CGRectMake(screenBounds.size.width - 65, 50, 45, 45); 
+    UIView *rootView = rootVC.view;
     
-    closeButton.layer.cornerRadius = 22.5; 
-    closeButton.layer.masksToBounds = YES;
-    closeButton.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.5];
-    closeButton.layer.borderWidth = 1.5; 
-    closeButton.layer.borderColor = [UIColor whiteColor].CGColor;
+    CGFloat screenWidth = rootView.bounds.size.width;
+    UIEdgeInsets safeArea = UIEdgeInsetsZero;
+    if (@available(iOS 11.0, *)) { safeArea = rootView.safeAreaInsets; }
     
-    // Đặt chữ X, chỉnh font và mở khóa cho phép bấm ngay
-    [closeButton setTitle:@"X" forState:UIControlStateNormal];
-    [closeButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    closeButton.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium]; 
-    closeButton.userInteractionEnabled = YES; 
+    CGFloat headerHeight = 36.0;
+    CGFloat mediaHeight = 180.0;
+    CGFloat footerHeight = 60.0;
+    CGFloat totalAdHeight = headerHeight + mediaHeight + footerHeight;
+    CGFloat yPos = isTop ? safeArea.top : (rootView.bounds.size.height - safeArea.bottom - totalAdHeight);
+
+    self.currentAdLayout = [[UIView alloc] initWithFrame:CGRectMake(0, yPos, screenWidth, totalAdHeight)];
+    self.currentAdLayout.backgroundColor = [UIColor colorWithRed:26.0/255.0 green:26.0/255.0 blue:26.0/255.0 alpha:1.0];
     
-    // Gắn sự kiện click gọi hàm hideAd
-    [closeButton addTarget:self action:@selector(hideAd) forControlEvents:UIControlEventTouchUpInside];
+    self.nativeAdView = [[GADNativeAdView alloc] initWithFrame:CGRectMake(0, headerHeight, screenWidth, mediaHeight + footerHeight)];
+    [self.currentAdLayout addSubview:self.nativeAdView];
     
-    [self.mainContainer addSubview:closeButton];
+    GADMediaView *mediaView = [[GADMediaView alloc] initWithFrame:CGRectMake(0, 0, screenWidth, mediaHeight)];
+    [self.nativeAdView addSubview:mediaView];
+    self.nativeAdView.mediaView = mediaView;
     
+    self.iconView = [[UIImageView alloc] initWithFrame:CGRectMake(8, mediaHeight + 8, 44, 44)];
+    self.iconView.contentMode = UIViewContentModeScaleAspectFill;
+    self.iconView.clipsToBounds = YES;
+    self.iconView.layer.cornerRadius = 8.0;
+    [self.nativeAdView addSubview:self.iconView];
+    
+    self.ctaBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.ctaBtn.frame = CGRectMake(screenWidth - 8 - 80, mediaHeight + 12, 80, 36);
+    self.ctaBtn.backgroundColor = [UIColor colorWithRed:33.0/255.0 green:150.0/255.0 blue:243.0/255.0 alpha:1.0];
+    [self.ctaBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    self.ctaBtn.titleLabel.font = [UIFont boldSystemFontOfSize:13];
+    self.ctaBtn.layer.cornerRadius = 4.0;
+    [self.nativeAdView addSubview:self.ctaBtn];
+    
+    CGFloat textWidth = screenWidth - 8 - 44 - 8 - 80 - 8; 
+    self.headlineLabel = [[UILabel alloc] initWithFrame:CGRectMake(60, mediaHeight + 10, textWidth, 20)];
+    self.headlineLabel.textColor = [UIColor whiteColor];
+    self.headlineLabel.font = [UIFont boldSystemFontOfSize:15];
+    [self.nativeAdView addSubview:self.headlineLabel];
+    
+    self.bodyLabel = [[UILabel alloc] initWithFrame:CGRectMake(60, mediaHeight + 30, textWidth, 18)];
+    self.bodyLabel.textColor = [UIColor colorWithRed:179.0/255.0 green:179.0/255.0 blue:179.0/255.0 alpha:1.0];
+    self.bodyLabel.font = [UIFont systemFontOfSize:12];
+    [self.nativeAdView addSubview:self.bodyLabel];
+    
+    // Đổ dữ liệu vào Frame bằng hàm populateUI
+    [self populateUI];
+    
+    UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    closeBtn.frame = CGRectMake(screenWidth - 64, 0, 64, headerHeight);
+    [closeBtn setTitle:@"▼" forState:UIControlStateNormal];
+    [closeBtn setTitleColor:[UIColor colorWithRed:179.0/255.0 green:179.0/255.0 blue:179.0/255.0 alpha:1.0] forState:UIControlStateNormal];
+    closeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:16];
+    [closeBtn addTarget:self action:@selector(closeTapped) forControlEvents:UIControlEventTouchUpInside];
+    closeBtn.backgroundColor = [UIColor colorWithRed:18.0/255.0 green:18.0/255.0 blue:18.0/255.0 alpha:1.0];
+    
+    UIBezierPath *maskPath = [UIBezierPath bezierPathWithRoundedRect:closeBtn.bounds byRoundingCorners:UIRectCornerBottomLeft cornerRadii:CGSizeMake(8.0, 8.0)];
+    CAShapeLayer *maskLayer = [CAShapeLayer layer];
+    maskLayer.path = maskPath.CGPath;
+    closeBtn.layer.mask = maskLayer;
+    [self.currentAdLayout addSubview:closeBtn];
+    
+    [rootView addSubview:self.currentAdLayout];
+    self.currentState = AdStateShowing;
+    if (self.onDisplayed) self.onDisplayed();
 }
 
-// Ẩn quảng cáo và dọn dẹp
+// Hàm tráo nội dung quảng cáo
+- (void)populateUI {
+    self.nativeAdView.iconView = self.iconView;
+    self.nativeAdView.callToActionView = self.ctaBtn;
+    self.nativeAdView.headlineView = self.headlineLabel;
+    self.nativeAdView.bodyView = self.bodyLabel;
+
+    self.headlineLabel.text = self.currentNativeAd.headline;
+    self.bodyLabel.text = self.currentNativeAd.body;
+    self.iconView.image = self.currentNativeAd.icon.image;
+    [self.ctaBtn setTitle:self.currentNativeAd.callToAction forState:UIControlStateNormal];
+    
+    self.nativeAdView.nativeAd = self.currentNativeAd;
+    self.currentNativeAd.delegate = self;
+}
+
 - (void)hideAd {
-    if (self.mainContainer) {
-        [self.mainContainer removeFromSuperview];
-        self.mainContainer = nil;
+    if (self.currentAdLayout) {
+        [self.currentAdLayout removeFromSuperview];
+        self.currentAdLayout = nil;
     }
-    if (self.loadedAd) {
-        self.loadedAd = nil; 
-    }
-    
-    // GỌI CALLBACK ĐÓNG VỀ C#
-    if (self.onClosedCallback) {
-        self.onClosedCallback();
-    }
+    self.currentNativeAd = nil;
+    self.currentState = AdStateIdle;
 }
 
-#pragma mark - GADNativeAdLoaderDelegate Implementation
+- (void)closeTapped {
+    [self hideAd];
+    if (self.onClosed) self.onClosed();
+}
+
 - (void)adLoader:(GADAdLoader *)adLoader didReceiveNativeAd:(GADNativeAd *)nativeAd {
-    self.loadedAd = nativeAd;
-    self.isAdLoading = NO;
+    self.isLoadingAd = NO;
+    if (self.currentState == AdStateIdle) return; 
     
-    // GỌI CALLBACK THÀNH CÔNG VỀ C#
-    if (self.onLoadedCallback) {
-        self.onLoadedCallback();
+    self.currentNativeAd = nativeAd;
+    
+    // [CHÌA KHÓA AUTO-REFRESH] Nếu đang hiển thị UI, cập nhật tại chỗ!
+    if (self.currentState == AdStateShowing && self.currentAdLayout != nil) {
+        [self populateUI];
+    } else {
+        self.currentState = AdStateLoaded;
     }
+    
+    __weak typeof(self) weakSelf = self;
+    nativeAd.paidEventHandler = ^(GADAdValue * _Nonnull value) {
+        if (weakSelf.onPaid) weakSelf.onPaid([value.value doubleValue] * 0.000001);
+    };
+    if (self.onLoaded) self.onLoaded();
 }
 
 - (void)adLoader:(GADAdLoader *)adLoader didFailToReceiveAdWithError:(NSError *)error {
-    self.isAdLoading = NO;
-    self.loadedAd = nil;
-    
-    // GỌI CALLBACK LỖI VỀ C# (Gửi chuỗi lỗi qua)
-    if (self.onFailedCallback) {
-        self.onFailedCallback(error.localizedDescription.UTF8String);
-    }
+    self.isLoadingAd = NO;
+    if (self.currentState != AdStateShowing) self.currentState = AdStateIdle;
+    if (self.onFailed) self.onFailed([error.localizedDescription UTF8String]);
+}
+
+- (void)nativeAdDidRecordClick:(GADNativeAd *)nativeAd {
+    if (self.onClicked) self.onClicked();
 }
 @end
 
-// 3. C-Style Linker cập nhật (Thêm tham số Callback vào Load)
 extern "C" {
-    void _iosLoadNativeAd(const char* adUnitId, NativeAdLoadedCallback onLoaded, NativeAdFailedCallback onFailed, NativeAdClosedCallback onClosed) {
-        NSString *unitIdStr = [NSString stringWithUTF8String:adUnitId];
-        
-        UnityiOSNativeFullScreen *instance = [UnityiOSNativeFullScreen sharedInstance];
-        instance.onLoadedCallback = onLoaded;
-        instance.onFailedCallback = onFailed;
-        instance.onClosedCallback = onClosed;
-        
-        [instance loadAd:unitIdStr];
+    void NativeBanner_SetCallbacks(Action_Void onLoaded, Action_String onFailed, Action_Void onDisplayed, Action_Void onClosed, Action_Void onClicked, Action_Double onPaid) {
+        NativeBannerManager *mgr = [NativeBannerManager sharedInstance];
+        mgr.onLoaded = onLoaded; mgr.onFailed = onFailed; mgr.onDisplayed = onDisplayed;
+        mgr.onClosed = onClosed; mgr.onClicked = onClicked; mgr.onPaid = onPaid;
     }
-
-    bool _iosIsNativeAdReady() {
-        return [[UnityiOSNativeFullScreen sharedInstance] isAdReady];
+    void NativeBanner_LoadAd(const char* adUnitId) {
+        [[NativeBannerManager sharedInstance] loadAd:[NSString stringWithUTF8String:adUnitId]];
     }
-
-    void _iosShowNativeAd() {
-        [[UnityiOSNativeFullScreen sharedInstance] showAd];
+    void NativeBanner_ShowAd(bool isTop) {
+        [[NativeBannerManager sharedInstance] showAd:isTop];
     }
-
-    void _iosHideNativeAd() {
-        [[UnityiOSNativeFullScreen sharedInstance] hideAd];
+    void NativeBanner_HideAd() {
+        [[NativeBannerManager sharedInstance] hideAd];
     }
 }

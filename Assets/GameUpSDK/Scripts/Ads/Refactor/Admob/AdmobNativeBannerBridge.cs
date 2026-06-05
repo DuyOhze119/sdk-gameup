@@ -1,25 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace GameUpSDK.Ads
 {
     public class AdmobNativeBannerBridge : BaseAdFormat, IBannerAd
     {
-        public event Action<string> OnCollapsedNativeBanner;
-        // =========================================================
-        // KHAI BÁO BIẾN DÀNH CHO ANDROID
-        // =========================================================
-#if UNITY_ANDROID && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
+        public event Action<string> OnCollapsedNativeBanner = delegate { }; 
+#if UNITY_ANDROID && !UNITY_EDITOR
         private AndroidJavaObject _nativeManager;
         private AndroidJavaObject _currentActivity;
 #endif
 
-        // =========================================================
-        // KHAI BÁO IMPORT DÀNH CHO IOS (OBJECTIVE-C)
-        // =========================================================
-#if UNITY_IOS && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
+#if UNITY_IOS && !UNITY_EDITOR
         [DllImport("__Internal")]
         private static extern void NativeBanner_LoadAd(string adUnitId);
 
@@ -40,24 +36,28 @@ namespace GameUpSDK.Ads
         delegate void Action_Double(double value);
 #endif
 
-        // =========================================================
-        // BIẾN QUẢN LÝ TRẠNG THÁI CHUNG
-        // =========================================================
         private Dictionary<string, bool> _isLoaded = new Dictionary<string, bool>();
         private Dictionary<string, bool> _isLoading = new Dictionary<string, bool>();
 
-        // (Android) Chống dọn rác GC
-        private Dictionary<string, NativeAdCallbackProxy> _proxies = new Dictionary<string, NativeAdCallbackProxy>();
+        // [AUTO-REFRESH VÀO ĐÂY] Quản lý vòng lặp Refresh
+        private Dictionary<string, CancellationTokenSource> _refreshTokens = new Dictionary<string, CancellationTokenSource>();
+        private readonly int REFRESH_TIME_SECONDS = 30;
 
-        // (iOS) Singleton ẩn để hứng Callback tĩnh từ Objective-C
+#if UNITY_ANDROID || UNITY_EDITOR
+        private Dictionary<string, NativeAdCallbackProxy> _proxies = new Dictionary<string, NativeAdCallbackProxy>();
+#endif
+
+#if UNITY_IOS && !UNITY_EDITOR
         private static AdmobNativeBannerBridge _instance;
         private string _currentActiveWhere;
+#endif
 
-        public AdmobNativeBannerBridge(AdUnitConfig config) : base(config, AdUnitType.Banner, "Admob_NativeBridge")
+        public AdmobNativeBannerBridge(AdUnitConfig config) : base(config, AdUnitType.NativeAd, "Admob_NativeBridge")
         {
+#if UNITY_IOS && !UNITY_EDITOR
             _instance = this;
-
-#if UNITY_ANDROID && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
+            NativeBanner_SetCallbacks(OnLoaded_iOS, OnFailed_iOS, OnDisplayed_iOS, OnClosed_iOS, OnClicked_iOS, OnPaid_iOS);
+#elif UNITY_ANDROID && !UNITY_EDITOR
             using (AndroidJavaClass unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
             {
                 _currentActivity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
@@ -66,12 +66,6 @@ namespace GameUpSDK.Ads
             {
                 _nativeManager = managerClass.CallStatic<AndroidJavaObject>("getInstance");
             }
-#elif UNITY_IOS && !UNITY_EDITOR
-            // Đăng ký các hàm Callback tĩnh cho iOS
-            NativeBanner_SetCallbacks(
-                OnLoaded_iOS, OnFailed_iOS, OnDisplayed_iOS, 
-                OnClosed_iOS, OnClicked_iOS, OnPaid_iOS
-            );
 #endif
         }
 
@@ -87,23 +81,25 @@ namespace GameUpSDK.Ads
             if (_isLoading.TryGetValue(key, out bool loading) && loading) return;
 
             _isLoading[key] = true;
-            _isLoaded[key] = false;
-            _currentActiveWhere = where; // Lưu vết vị trí đang xử lý
 
-#if UNITY_ANDROID && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
+#if UNITY_ANDROID && !UNITY_EDITOR
             var proxy = new NativeAdCallbackProxy(
                 onLoaded: () => { MainThreadDispatcher.Enqueue(() => { _isLoading[key] = false; _isLoaded[key] = true; HandleLoadSuccess(unitId, where); }); },
                 onFailed: (err) => { MainThreadDispatcher.Enqueue(() => { _isLoading[key] = false; _isLoaded[key] = false; HandleLoadFailed(unitId, where, err); }); },
                 onDisplayed: () => { MainThreadDispatcher.Enqueue(() => NotifyAdDisplayed(where)); },
-                onClosed: () => { MainThreadDispatcher.Enqueue(() => { _isLoaded[key] = false; NotifyAdClosed(where); OnCollapsedNativeBanner?.Invoke(where); Load(where);}); },
-                onClicked: () => { MainThreadDispatcher.Enqueue(() => { }); },
+                onClosed: () => { MainThreadDispatcher.Enqueue(() => { 
+                    _isLoaded[key] = false; 
+                    StopAutoRefresh(where); // Dừng AutoRefresh khi đóng 
+                    NotifyAdClosed(where); 
+                    OnCollapsedNativeBanner?.Invoke(where);
+                }); },
+                onClicked: () => { },
                 onPaid: (val) => { MainThreadDispatcher.Enqueue(() => TrackRevenue(unitId, where, "NativeBanner_Android", val)); }
             );
-
             _proxies[key] = proxy;
             _nativeManager.Call("loadAd", _currentActivity, unitId, proxy);
-
-#elif UNITY_IOS && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
+#elif UNITY_IOS && !UNITY_EDITOR
+            _currentActiveWhere = where;
             NativeBanner_LoadAd(unitId);
 #else
             Debug.Log($"[Bridge] Fake Loading in Editor for {where}");
@@ -115,19 +111,21 @@ namespace GameUpSDK.Ads
             string key = GetKey(where);
             var entry = _config.GetEntry(_adType, where);
             bool isTop = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top;
-            _currentActiveWhere = where;
 
             if (IsAvailable(where))
             {
-#if UNITY_ANDROID && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
+#if UNITY_ANDROID && !UNITY_EDITOR
                 if (_proxies.TryGetValue(key, out var proxy))
                 {
                     _nativeManager.Call("showAd", _currentActivity, isTop, proxy);
                     _isLoaded[key] = false; 
+                    StartAutoRefresh(where); // Kích hoạt AutoRefresh
                 }
-#elif UNITY_IOS && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
+#elif UNITY_IOS && !UNITY_EDITOR
+                _currentActiveWhere = where;
                 NativeBanner_ShowAd(isTop);
                 _isLoaded[key] = false;
+                StartAutoRefresh(where); // Kích hoạt AutoRefresh
 #else
                 Debug.Log($"[Bridge] Fake Show in Editor for {where}");
 #endif
@@ -140,6 +138,7 @@ namespace GameUpSDK.Ads
             string key = GetKey(where);
             _isLoaded[key] = false;
             _isLoading[key] = false;
+            StopAutoRefresh(where); // Dừng AutoRefresh ngay lập tức
 
 #if UNITY_ANDROID && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
             _nativeManager.Call("hideAd", _currentActivity);
@@ -153,10 +152,50 @@ namespace GameUpSDK.Ads
             Show(where);
         }
 
-        // =========================================================
-        // KHU VỰC HỨNG CALLBACK TỪ NỀN TẢNG iOS (CẦN [AOT.MonoPInvokeCallback])
-        // =========================================================
-#if UNITY_IOS && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
+        // ==========================================
+        // KHỐI LOGIC AUTO REFRESH CỦA NATIVE
+        // ==========================================
+        private void StartAutoRefresh(string where)
+        {
+            string key = GetKey(where);
+            StopAutoRefresh(where);
+            var cts = new CancellationTokenSource();
+            _refreshTokens[key] = cts;
+            RunRefreshLoop(where, cts.Token);
+        }
+
+        private void StopAutoRefresh(string where)
+        {
+            string key = GetKey(where);
+            if (_refreshTokens.TryGetValue(key, out var cts) && cts != null)
+            {
+                cts.Cancel();
+                cts.Dispose();
+                _refreshTokens.Remove(key);
+            }
+        }
+
+        private async void RunRefreshLoop(string where, CancellationToken token)
+        {
+            string key = GetKey(where);
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(REFRESH_TIME_SECONDS), token);
+                    if (token.IsCancellationRequested) break;
+
+                    MainThreadDispatcher.Enqueue(() =>
+                    {
+                        // Gọi tải lại. Nếu đang SHOWING, Native OS sẽ tự động Update giao diện (In-place)
+                        RequestAdInternal(_config.ResolveUnitId(_adType, where), where);
+                    });
+                }
+            }
+            catch (TaskCanceledException) { }
+        }
+
+#if UNITY_IOS && !UNITY_EDITOR
         [AOT.MonoPInvokeCallback(typeof(Action_Void))]
         private static void OnLoaded_iOS() => MainThreadDispatcher.Enqueue(() => {
             string key = _instance.GetKey(_instance._currentActiveWhere);
@@ -178,9 +217,9 @@ namespace GameUpSDK.Ads
         private static void OnClosed_iOS() => MainThreadDispatcher.Enqueue(() => {
             string key = _instance.GetKey(_instance._currentActiveWhere);
             _instance._isLoaded[key] = false;
+            _instance.StopAutoRefresh(_instance._currentActiveWhere);
             _instance.NotifyAdClosed(_instance._currentActiveWhere);
-            OnCollapsedNativeBanner?.Invoke(_instance._currentActiveWhere);
-            _instance.Load(where);
+            _instance.OnCollapsedNativeBanner.Invoke(_instance._currentActiveWhere);
         });
 
         [AOT.MonoPInvokeCallback(typeof(Action_Void))]
@@ -192,10 +231,8 @@ namespace GameUpSDK.Ads
     }
 
 #if UNITY_ANDROID || UNITY_EDITOR
-    // Lớp Proxy cho Android (Giữ nguyên)
     public class NativeAdCallbackProxy : AndroidJavaProxy
     {
-        // ... (Code Proxy Android giữ nguyên như bản trước) ...
         private readonly Action _onLoaded;
         private readonly Action<string> _onFailed;
         private readonly Action _onDisplayed;
