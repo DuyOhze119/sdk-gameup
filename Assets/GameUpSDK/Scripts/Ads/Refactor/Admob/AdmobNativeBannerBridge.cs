@@ -11,7 +11,7 @@ namespace GameUpSDK.Ads
         // =========================================================
         // KHAI BÁO BIẾN DÀNH CHO ANDROID
         // =========================================================
-#if UNITY_ANDROID && !UNITY_EDITOR
+#if UNITY_ANDROID && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
         private AndroidJavaObject _nativeManager;
         private AndroidJavaObject _currentActivity;
 #endif
@@ -19,7 +19,7 @@ namespace GameUpSDK.Ads
         // =========================================================
         // KHAI BÁO IMPORT DÀNH CHO IOS (OBJECTIVE-C)
         // =========================================================
-#if UNITY_IOS && !UNITY_EDITOR
+#if UNITY_IOS && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
         [DllImport("__Internal")]
         private static extern void NativeBanner_LoadAd(string adUnitId);
 
@@ -57,7 +57,7 @@ namespace GameUpSDK.Ads
         {
             _instance = this;
 
-#if UNITY_ANDROID && !UNITY_EDITOR
+#if UNITY_ANDROID && ADMOB_DEPENDENCIES_INSTALLED
             using (AndroidJavaClass unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
             {
                 _currentActivity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
@@ -90,20 +90,20 @@ namespace GameUpSDK.Ads
             _isLoaded[key] = false;
             _currentActiveWhere = where; // Lưu vết vị trí đang xử lý
 
-#if UNITY_ANDROID && !UNITY_EDITOR
+#if UNITY_ANDROID && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
             var proxy = new NativeAdCallbackProxy(
                 onLoaded: () => { MainThreadDispatcher.Enqueue(() => { _isLoading[key] = false; _isLoaded[key] = true; HandleLoadSuccess(unitId, where); }); },
                 onFailed: (err) => { MainThreadDispatcher.Enqueue(() => { _isLoading[key] = false; _isLoaded[key] = false; HandleLoadFailed(unitId, where, err); }); },
                 onDisplayed: () => { MainThreadDispatcher.Enqueue(() => NotifyAdDisplayed(where)); },
                 onClosed: () => { MainThreadDispatcher.Enqueue(() => { _isLoaded[key] = false; NotifyAdClosed(where); OnCollapsedNativeBanner?.Invoke(where);}); },
-                onClicked: () => { MainThreadDispatcher.Enqueue(() => NotifyAdClicked(where)); },
+                onClicked: () => { MainThreadDispatcher.Enqueue(() => { }; },
                 onPaid: (val) => { MainThreadDispatcher.Enqueue(() => TrackRevenue(unitId, where, "NativeBanner_Android", val)); }
             );
 
             _proxies[key] = proxy;
             _nativeManager.Call("loadAd", _currentActivity, unitId, proxy);
 
-#elif UNITY_IOS && !UNITY_EDITOR
+#elif UNITY_IOS && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
             NativeBanner_LoadAd(unitId);
 #else
             Debug.Log($"[Bridge] Fake Loading in Editor for {where}");
@@ -119,13 +119,13 @@ namespace GameUpSDK.Ads
 
             if (IsAvailable(where))
             {
-#if UNITY_ANDROID && !UNITY_EDITOR
+#if UNITY_ANDROID && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
                 if (_proxies.TryGetValue(key, out var proxy))
                 {
                     _nativeManager.Call("showAd", _currentActivity, isTop, proxy);
                     _isLoaded[key] = false; 
                 }
-#elif UNITY_IOS && !UNITY_EDITOR
+#elif UNITY_IOS && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
                 NativeBanner_ShowAd(isTop);
                 _isLoaded[key] = false;
 #else
@@ -141,9 +141,9 @@ namespace GameUpSDK.Ads
             _isLoaded[key] = false;
             _isLoading[key] = false;
 
-#if UNITY_ANDROID && !UNITY_EDITOR
+#if UNITY_ANDROID && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
             _nativeManager.Call("hideAd", _currentActivity);
-#elif UNITY_IOS && !UNITY_EDITOR
+#elif UNITY_IOS && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
             NativeBanner_HideAd();
 #endif
         }
@@ -156,7 +156,7 @@ namespace GameUpSDK.Ads
         // =========================================================
         // KHU VỰC HỨNG CALLBACK TỪ NỀN TẢNG iOS (CẦN [AOT.MonoPInvokeCallback])
         // =========================================================
-#if UNITY_IOS && !UNITY_EDITOR
+#if UNITY_IOS && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
         [AOT.MonoPInvokeCallback(typeof(Action_Void))]
         private static void OnLoaded_iOS() => MainThreadDispatcher.Enqueue(() => {
             string key = _instance.GetKey(_instance._currentActiveWhere);
@@ -183,7 +183,7 @@ namespace GameUpSDK.Ads
         });
 
         [AOT.MonoPInvokeCallback(typeof(Action_Void))]
-        private static void OnClicked_iOS() => MainThreadDispatcher.Enqueue(() => _instance.NotifyAdClicked(_instance._currentActiveWhere));
+        private static void OnClicked_iOS() => MainThreadDispatcher.Enqueue(() => {});
 
         [AOT.MonoPInvokeCallback(typeof(Action_Double))]
         private static void OnPaid_iOS(double value) => MainThreadDispatcher.Enqueue(() => _instance.TrackRevenue("ios_native", _instance._currentActiveWhere, "NativeBanner_iOS", value));
