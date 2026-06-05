@@ -95,7 +95,7 @@ namespace GameUpSDK.Ads
                 onLoaded: () => { MainThreadDispatcher.Enqueue(() => { _isLoading[key] = false; _isLoaded[key] = true; HandleLoadSuccess(unitId, where); }); },
                 onFailed: (err) => { MainThreadDispatcher.Enqueue(() => { _isLoading[key] = false; _isLoaded[key] = false; HandleLoadFailed(unitId, where, err); }); },
                 onDisplayed: () => { MainThreadDispatcher.Enqueue(() => NotifyAdDisplayed(where)); },
-                onClosed: () => { MainThreadDispatcher.Enqueue(() => { _isLoaded[key] = false; NotifyAdClosed(where); OnCollapsedNativeBanner?.Invoke(where);}); },
+                onClosed: () => { MainThreadDispatcher.Enqueue(() => { _isLoaded[key] = false; NotifyAdClosed(where); OnCollapsedNativeBanner?.Invoke(where); Load(where);}); },
                 onClicked: () => { MainThreadDispatcher.Enqueue(() => { }); },
                 onPaid: (val) => { MainThreadDispatcher.Enqueue(() => TrackRevenue(unitId, where, "NativeBanner_Android", val)); }
             );
@@ -180,6 +180,7 @@ namespace GameUpSDK.Ads
             _instance._isLoaded[key] = false;
             _instance.NotifyAdClosed(_instance._currentActiveWhere);
             OnCollapsedNativeBanner?.Invoke(_instance._currentActiveWhere);
+            _instance.Load(where);
         });
 
         [AOT.MonoPInvokeCallback(typeof(Action_Void))]

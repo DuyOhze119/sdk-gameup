@@ -2,5 +2,5 @@
 <resources>
     <color name="gameup_native_bg">#1A1A1A</color>
     <color name="gameup_btn_bg">#121212</color>
-    <color name="gameup_text_gray">#B3B3B3</color>
+    <color name="gameup_text_gray">#C41E3A</color>
 </resources>
