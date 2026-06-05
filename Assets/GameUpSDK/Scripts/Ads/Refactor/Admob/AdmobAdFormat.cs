@@ -448,17 +448,16 @@ namespace GameUpSDK.Ads
         }
     }
 
-    public class AdmobNativeExpandBannerAd : BaseAdFormat, IBannerAd
+public class AdmobNativeExpandBannerAd : BaseAdFormat, IBannerAd
     {
         public Action<string> OnCollapsedNativeBanner = delegate { };
 
         private readonly Dictionary<string, NativeOverlayAd> _expandedAds = new Dictionary<string, NativeOverlayAd>();
-
-        private readonly Dictionary<string, RuntimeCollapsibleUI> _activeUIs =
-            new Dictionary<string, RuntimeCollapsibleUI>();
-
-        private readonly Dictionary<string, CancellationTokenSource> _refreshTokens =
-            new Dictionary<string, CancellationTokenSource>();
+        private readonly Dictionary<string, RuntimeCollapsibleUI> _activeUIs = new Dictionary<string, RuntimeCollapsibleUI>();
+        private readonly Dictionary<string, CancellationTokenSource> _refreshTokens = new Dictionary<string, CancellationTokenSource>();
+        
+        // [THÊM MỚI]: Biến cực kỳ quan trọng để chặn "Quảng cáo bóng ma"
+        private readonly Dictionary<string, bool> _shouldShow = new Dictionary<string, bool>();
 
         private readonly int REFRESH_TIME_SECONDS = 30;
 
@@ -472,6 +471,7 @@ namespace GameUpSDK.Ads
 
         protected override void RequestAdInternal(string unitId, string where)
         {
+            // Preload ngầm
             LoadSpecificSizeAd(where, GetKey(where), false);
         }
 
@@ -481,16 +481,17 @@ namespace GameUpSDK.Ads
             MainThreadDispatcher.Enqueue(() =>
             {
                 var key = GetKey(where);
+                
+                // 1. Cắm cờ: Xác nhận Game ĐANG MUỐN hiển thị Native Ad này
+                _shouldShow[key] = true;
 
                 var entry = _config.GetEntry(_adType, where);
-
                 var isCollapsible = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
 
                 if (isCollapsible)
                 {
                     if (_expandedAds.TryGetValue(key, out var eAd) && eAd != null)
                     {
-                        Debug.Log($"[GameUp] Show ad with preload ad");
                         NotifyAdDisplayed(where);
                         RenderAdInstance(where, eAd, NativeTemplateId.Medium);
                         StartAutoRefresh(where);
@@ -510,11 +511,22 @@ namespace GameUpSDK.Ads
 
             MainThreadDispatcher.Enqueue(() =>
             {
+                // 2. Rút cờ: Báo cho hệ thống biết Game KHÔNG CÒN muốn hiển thị nữa
+                _shouldShow[key] = false;
+
                 Debug.Log($"[GameUp] Hide ad: {where} - {_expandedAds.Count}");
+                
                 if (_expandedAds.TryGetValue(key, out var eAd) && eAd != null)
                 {
-                    Debug.Log($"[GameUp] Hiding ad: {where}");
+                    Debug.Log($"[GameUp] Hiding & Destroying ad: {where}");
+                    // Gọi Hide để hệ điều hành gỡ hình ảnh ngay lập tức
                     eAd.Hide();
+                    
+                    // Gọi Destroy để xóa sạch vùng nhớ, chặn hoàn toàn khả năng kẹt màn hình
+                    eAd.Destroy(); 
+                    
+                    // Xóa khỏi Dictionary để lần sau Show() buộc phải load cái mới an toàn
+                    _expandedAds.Remove(key);
                 }
 
                 if (_activeUIs.TryGetValue(key, out var ui) && ui != null) ui.SetVisible(false);
@@ -532,16 +544,8 @@ namespace GameUpSDK.Ads
             MainThreadDispatcher.Enqueue(() =>
             {
                 Hide(where);
-                //OnCollapsedNativeBanner?.Invoke(where);
+                OnCollapsedNativeBanner?.Invoke(where);
             });
-        }
-
-        private void HideActiveUI()
-        {
-            foreach (var ui in _activeUIs)
-            {
-                ui.Value.SetVisible(false);
-            }
         }
 
         private void LoadSpecificSizeAd(string where, string key, bool showAfterLoad)
@@ -562,17 +566,29 @@ namespace GameUpSDK.Ads
                         return;
                     }
 
-                    if (_expandedAds.TryGetValue(key, out  var nativeAd))
+                    // =========================================================
+                    // 3. CHỐT CHẶN BÓNG MA (GHOST AD BLOCKER)
+                    // =========================================================
+                    // Nếu mạng tải xong mà biến _shouldShow báo False (Nghĩa là người dùng vừa ấn Hide)
+                    if (showAfterLoad && (!_shouldShow.ContainsKey(key) || !_shouldShow[key]))
+                    {
+                        Debug.Log($"[GameUp] Chặn thành công Quảng cáo Bóng ma do mạng tải trễ tại {where}");
+                        ad.Destroy(); // Giết ngay lập tức, không cho phép Render lên màn hình
+                        return;
+                    }
+
+                    if (_expandedAds.TryGetValue(key, out var nativeAd))
                     {
                         if (nativeAd != null)
                         {
+                            nativeAd.Hide(); // Thêm Hide trước khi Destroy cho an toàn tuyệt đối
                             nativeAd.Destroy();
-                            nativeAd = null;
                         }
                     }
+                    
                     _expandedAds[key] = ad;
-
                     HandleLoadSuccess(unitId, where);
+                    
                     if (showAfterLoad)
                     {
                         NotifyAdDisplayed(where);
@@ -634,7 +650,6 @@ namespace GameUpSDK.Ads
                     cts.Dispose();
                 }
             }
-
             _refreshTokens.Clear();
         }
 
