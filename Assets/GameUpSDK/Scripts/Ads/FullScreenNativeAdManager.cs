@@ -17,6 +17,7 @@ namespace GameUpSDK
         public event Action OnAdLoadedEvent;
         public event Action<string> OnAdLoadFailedEvent;
         public event Action OnAdClosedEvent;
+        public event Action OnAdDisplayedEvent;
 
 #if UNITY_IOS && !UNITY_EDITOR
         // 1. Khai báo kiểu Delegate tương đương con trỏ hàm trong C
@@ -124,6 +125,7 @@ namespace GameUpSDK
         {
             if (IsAdReady())
             {
+                HandleAdDisplayed();
 #if UNITY_ANDROID && !UNITY_EDITOR
                 bridgeClass.CallStatic("showAd", currentActivity);
 #elif UNITY_IOS && !UNITY_EDITOR
@@ -168,6 +170,12 @@ namespace GameUpSDK
         {
             Debug.Log("[NativeBridge] Ad Closed");
             MainThreadDispatcher.Enqueue(() => OnAdClosedEvent?.Invoke());
+        }
+        
+        internal void HandleAdDisplayed()
+        {
+            Debug.Log("[NativeBridge] Ad Displayed");
+            MainThreadDispatcher.Enqueue(() => OnAdDisplayedEvent?.Invoke());
         }
     }
 }

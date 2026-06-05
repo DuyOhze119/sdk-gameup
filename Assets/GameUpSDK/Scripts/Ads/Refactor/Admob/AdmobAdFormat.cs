@@ -403,6 +403,7 @@ namespace GameUpSDK.Ads
 
         public AdmobNativeFullscreenAd(AdUnitConfig config) : base(config, AdUnitType.NativeAd, "Admob")
         {
+            FullScreenNativeAdManager.Instance.OnAdDisplayedEvent += OnNativeAdDisplayed;
             FullScreenNativeAdManager.Instance.OnAdClosedEvent += OnNativeAdClosed;
             FullScreenNativeAdManager.Instance.OnAdLoadedEvent += OnNativeAdLoaded;
             FullScreenNativeAdManager.Instance.OnAdLoadFailedEvent += OnNativeAdLoadFailed;
@@ -445,6 +446,11 @@ namespace GameUpSDK.Ads
         private void OnNativeAdLoadFailed(string error)
         {
             HandleLoadFailed(_bannerId, _where, error);
+        }
+
+        private void OnNativeAdDisplayed()
+        {
+            NotifyAdDisplayed(_where);
         }
     }
 
