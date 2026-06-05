@@ -1,4 +1,4 @@
-#if UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
+#if UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED    
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -6,99 +6,82 @@ using UnityEngine;
 namespace GameUpSDK.Editor
 {
     /// <summary>
-    /// Script tự động dò tìm vị trí thư mục 'res' của Native Ads ở bất kỳ đâu trong project
-    /// (kể cả trong thư mục Packages) và tự động đóng gói nó thành chuẩn .androidlib
+    /// Script tự động trích xuất giao diện Native UI từ trong UPM Package (Immutable) 
+    /// ra ngoài thư mục Assets/Plugins/Android của Project để Unity có thể build được.
     /// </summary>
     [InitializeOnLoad]
     public class GameUpAndroidLibAutoSetup
     {
         static GameUpAndroidLibAutoSetup()
         {
-            // Chạy ngầm sau khi Editor compile xong
             EditorApplication.delayCall += AutoSetupAndroidLib;
         }
 
         private static void AutoSetupAndroidLib()
         {
-            // 1. TỰ ĐỘNG DÒ TÌM ĐƯỜNG DẪN ĐỘNG (DYNAMIC PATH FINDING)
-            // Tìm GUID của file layout XML để xác định vị trí thực tế của thư mục res
-            string[] guids = AssetDatabase.FindAssets("gameup_native_collapsible");
-            if (guids.Length == 0)
+            // 1. ĐỊNH NGHĨA ĐƯỜNG DẪN ĐÍCH NẰM NGOÀI ASSETS (WRITABLE FOLDER)
+            string targetAndroidPluginPath = Path.Combine(Application.dataPath, "Plugins", "Android");
+            string targetLibPath = Path.Combine(targetAndroidPluginPath, "GameUpNativeAds.androidlib");
+
+            // Nếu đích đến đã có đầy đủ rồi thì dừng script để tiết kiệm tài nguyên
+            if (Directory.Exists(targetLibPath) && File.Exists(Path.Combine(targetLibPath, "AndroidManifest.xml")))
             {
-                // Chưa import UI hoặc đã bị đổi tên -> Bỏ qua
                 return;
             }
 
-            // Lấy đường dẫn tuyệt đối của file XML (vd: .../Plugins/Android/res/layout/gameup_native_collapsible.xml)
-            string layoutFilePath = Path.GetFullPath(AssetDatabase.GUIDToAssetPath(guids[0]));
+            // 2. TÌM KIẾM TÀI NGUYÊN GỐC BÊN TRONG UPM PACKAGE
+            string[] guids = AssetDatabase.FindAssets("gameup_native_collapsible");
+            if (guids.Length == 0) return; // Không tìm thấy file gốc
 
-            // Dùng File System để truy ngược lên lấy các thư mục cha
-            DirectoryInfo layoutDir = new DirectoryInfo(Path.GetDirectoryName(layoutFilePath)); // Thư mục 'layout'
-            DirectoryInfo resDir = layoutDir.Parent; // Thư mục 'res'
-            DirectoryInfo parentDir = resDir.Parent; // Thư mục chứa 'res' (Android hoặc .androidlib)
+            // Lấy đường dẫn của file XML đầu tiên tìm được
+            string sourceLayoutPath = Path.GetFullPath(AssetDatabase.GUIDToAssetPath(guids[0]));
+            
+            // Dò ngược lên thư mục 'res'
+            DirectoryInfo layoutDir = new DirectoryInfo(Path.GetDirectoryName(sourceLayoutPath));
+            DirectoryInfo sourceResDir = layoutDir.Parent;
 
+            if (sourceResDir == null || sourceResDir.Name != "res") return;
+
+            // 3. TIẾN HÀNH SAO CHÉP VÀ KHỞI TẠO TẠI THƯ MỤC ASSETS
             bool isModified = false;
-            string androidLibPath = "";
 
-            // 2. KIỂM TRA VÀ TỰ ĐỘNG DI CHUYỂN
-            // Nếu cha của 'res' không phải là thư mục .androidlib -> Cần di chuyển!
-            if (!parentDir.Name.EndsWith(".androidlib"))
+            if (!Directory.Exists(targetLibPath))
             {
-                androidLibPath = Path.Combine(parentDir.FullName, "GameUpNativeAds.androidlib");
-
-                if (!Directory.Exists(androidLibPath))
-                {
-                    Directory.CreateDirectory(androidLibPath);
-                }
-
-                string targetResPath = Path.Combine(androidLibPath, "res");
-
-                // Bốc toàn bộ thư mục 'res' thả vào bên trong '.androidlib'
-                MoveDirectory(resDir.FullName, targetResPath);
-
-                // Dọn dẹp xác thư mục res cũ
-                if (Directory.Exists(resDir.FullName))
-                    Directory.Delete(resDir.FullName, true);
-
-                // Xóa luôn file .meta cũ của thư mục res để Unity khỏi báo lỗi rác
-                string resMeta = resDir.FullName + ".meta";
-                if (File.Exists(resMeta))
-                    File.Delete(resMeta);
-
+                Directory.CreateDirectory(targetLibPath);
                 isModified = true;
-                Debug.Log("[GameUpSDK] Đã di chuyển thành công thư mục 'res' vào chuẩn .androidlib");
-            }
-            else
-            {
-                // Đã nằm đúng vị trí trong .androidlib, chỉ cần lấy đường dẫn
-                androidLibPath = parentDir.FullName;
             }
 
-            // 3. BẢO ĐẢM CÁC FILE CẤU HÌNH BẮT BUỘC LUÔN TỒN TẠI
+            string targetResPath = Path.Combine(targetLibPath, "res");
+            if (!Directory.Exists(targetResPath))
+            {
+                // Copy toàn bộ thư mục res từ Package ra Assets
+                CopyDirectory(sourceResDir.FullName, targetResPath);
+                isModified = true;
+            }
+
+            // 4. SINH CÁC FILE CẤU HÌNH CHO ANDROID LIBRARY
             isModified |= CreateFileIfMissing(
-                Path.Combine(androidLibPath, "project.properties"),
+                Path.Combine(targetLibPath, "project.properties"), 
                 "target=android-33\nandroid.library=true"
             );
 
             isModified |= CreateFileIfMissing(
-                Path.Combine(androidLibPath, "AndroidManifest.xml"),
+                Path.Combine(targetLibPath, "AndroidManifest.xml"), 
                 "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n    package=\"com.gameup.ads.nativeui\">\n    <application />\n</manifest>"
             );
 
-            // Sinh file chặn R8/ProGuard xóa UI của chúng ta
-            string resRawPath = Path.Combine(androidLibPath, "res", "raw");
+            string resRawPath = Path.Combine(targetLibPath, "res", "raw");
             if (!Directory.Exists(resRawPath)) Directory.CreateDirectory(resRawPath);
 
             isModified |= CreateFileIfMissing(
-                Path.Combine(resRawPath, "keep.xml"),
+                Path.Combine(resRawPath, "keep.xml"), 
                 "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<resources xmlns:tools=\"http://schemas.android.com/tools\"\n    tools:keep=\"@layout/gameup_native_collapsible, @drawable/gameup_bg_rounded, @color/*, @dimen/*\" />"
             );
 
-            // 4. BÁO CHO UNITY BIẾT ĐỂ NẠP LẠI ASSET
             if (isModified)
             {
                 AssetDatabase.Refresh();
-                Debug.Log("[GameUpSDK] Hoàn tất cấu hình tự động Android Library cho Native Ads!");
+                Debug.Log("<b>[GameUpSDK]</b> Đã trích xuất và khởi tạo cấu hình Native Ads UI ra thư mục <b>Assets/Plugins/Android/GameUpNativeAds.androidlib</b> thành công! Bạn có thể tùy biến giao diện tại đây.");
             }
         }
 
@@ -109,24 +92,26 @@ namespace GameUpSDK.Editor
                 File.WriteAllText(path, content);
                 return true;
             }
-
             return false;
         }
 
-        private static void MoveDirectory(string sourceDir, string destinationDir)
+        private static void CopyDirectory(string sourceDir, string destinationDir)
         {
             if (!Directory.Exists(destinationDir)) Directory.CreateDirectory(destinationDir);
 
             foreach (var file in Directory.GetFiles(sourceDir))
             {
+                // Không copy các file .meta của thư mục Package vì Unity sẽ tự sinh file .meta mới cho thư mục Assets
+                if (file.EndsWith(".meta")) continue; 
+
                 string destFile = Path.Combine(destinationDir, Path.GetFileName(file));
-                if (!File.Exists(destFile)) File.Move(file, destFile);
+                File.Copy(file, destFile, false);
             }
 
             foreach (var dir in Directory.GetDirectories(sourceDir))
             {
                 string destDir = Path.Combine(destinationDir, Path.GetFileName(dir));
-                MoveDirectory(dir, destDir);
+                CopyDirectory(dir, destDir);
             }
         }
     }
