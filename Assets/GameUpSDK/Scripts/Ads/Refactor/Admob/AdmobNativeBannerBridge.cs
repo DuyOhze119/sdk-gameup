@@ -66,7 +66,7 @@ namespace GameUpSDK.Ads
             {
                 _nativeManager = managerClass.CallStatic<AndroidJavaObject>("getInstance");
             }
-#elif UNITY_IOS && !UNITY_EDITOR
+#elif UNITY_IOS && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
             // Đăng ký các hàm Callback tĩnh cho iOS
             NativeBanner_SetCallbacks(
                 OnLoaded_iOS, OnFailed_iOS, OnDisplayed_iOS, 
