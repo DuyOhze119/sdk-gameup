@@ -477,6 +477,7 @@ namespace GameUpSDK.Ads
 
         public void Show(string where)
         {
+            Debug.Log($"[GameUp] Show ad: {GetKey(where)}");
             MainThreadDispatcher.Enqueue(() =>
             {
                 var key = GetKey(where);
@@ -515,26 +516,16 @@ namespace GameUpSDK.Ads
 
         public void Restore(string where)
         {
-            LoadSpecificSizeAd(where, GetKey(where), true);
+            Debug.Log("Restore Native Banner");
+            Show(where);
         }
 
         private void CloseExpandBanner(string where)
         {
-            MainThreadDispatcher.Enqueue(async () =>
+            MainThreadDispatcher.Enqueue(() =>
             {
-                var key = GetKey(where);
-                
-                HideActiveUI();
-                StopAutoRefresh();
+                Hide(where);
                 OnCollapsedNativeBanner?.Invoke(where);
-                if (_expandedAds.TryGetValue(key, out var ad) && ad != null)
-                {
-                    _expandedAds.Remove(key);
-                    ad.Hide();
-                    ad.Destroy();
-                    await Task.Delay(100);
-                    LoadSpecificSizeAd(where, key, false);
-                }
             });
         }
 
@@ -548,6 +539,7 @@ namespace GameUpSDK.Ads
 
         private void LoadSpecificSizeAd(string where, string key, bool showAfterLoad)
         {
+            Debug.Log($"Load Specific Size Ad: {where}");
             var unitId = _config.ResolveUnitId(_adType, where);
             var entry = _config.GetEntry(_adType, where);
             var isExpanded = entry.CollapsiblePlacement != CollapsibleBannerPlacement.None;
@@ -579,6 +571,7 @@ namespace GameUpSDK.Ads
 
         private void RenderAdInstance(string where, NativeOverlayAd ad, string templateId)
         {
+            Debug.Log($"Render ad instance: {where} - {templateId}");
             var entry = _config.GetEntry(_adType, where);
             var pos = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top
                 ? AdPosition.Top
@@ -668,12 +661,12 @@ namespace GameUpSDK.Ads
 
         private void OnCollapsedNativeBanner(string where)
         {
-            Debug.Log($"OnCollapsedNativeBanner: {where}");
             var wheres = _config.GetAllWhere();
             foreach (var w in wheres)
             {
                 if (_standardBanner.IsAvailable(w))
-                {
+                {           
+                    Debug.Log($"OnCollapsedNativeBanner: {where} - show banner {w}");
                     _standardBanner.Show(w);
                 }
             }
