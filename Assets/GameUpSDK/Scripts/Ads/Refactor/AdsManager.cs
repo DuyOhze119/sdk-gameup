@@ -52,6 +52,8 @@ namespace GameUpSDK.Ads
 
         public static Action<string> OnBannerLoadedEvent = delegate { };
         
+        public bool IsInitialized { get; private set; }
+        
         protected void Awake()
         {
             DontDestroyOnLoad(gameObject);
@@ -114,6 +116,7 @@ namespace GameUpSDK.Ads
             {
                 network.BannerAd.OnAdLoaded += OnBannerLoaded;
             }
+            IsInitialized = true;
         }
 
         private void OnBannerSwapped(string last, string current)
