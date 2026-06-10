@@ -149,6 +149,7 @@ namespace GameUpSDK.Ads
                     foreach (var placement in _activeBanners)
                     {
                         network.BannerAd.Hide(placement);
+                        Debug.Log($"Temporarily HideBanner: {placement}");
                     }
                 }
             }
@@ -164,6 +165,7 @@ namespace GameUpSDK.Ads
                     foreach (var placement in _activeBanners)
                     {
                         network.BannerAd.Restore(placement);
+                        Debug.Log($"Temporarily RestoreBanner: {placement}");
                     }
                 }
             }

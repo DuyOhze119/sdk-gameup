@@ -8,6 +8,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.TextView;
+import android.widget.ImageView;
 
 import com.google.android.gms.ads.AdListener;
 import com.google.android.gms.ads.AdLoader;
@@ -97,7 +98,7 @@ public class NativeBannerManager {
                 TextView headlineView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_headline", "id", activity.getPackageName()));
                 android.widget.Button ctaView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_call_to_action", "id", activity.getPackageName()));
                 TextView bodyView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_body", "id", activity.getPackageName()));
-                android.widget.ImageView iconView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_app_icon", "id", activity.getPackageName()));
+                ImageView iconView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_app_icon", "id", activity.getPackageName()));
                 com.google.android.gms.ads.nativead.AdChoicesView adChoicesView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_choices", "id", activity.getPackageName()));
 
                 adView.setMediaView(mediaView);
@@ -131,6 +132,28 @@ public class NativeBannerManager {
                 }
 
                 adView.setNativeAd(currentNativeAd);
+
+                // ===============================================
+                // KÍCH HOẠT HIỆU ỨNG BLUR BACKGROUND CHO BANNER
+                // ===============================================
+                ImageView blurBg = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_blur_bg", "id", activity.getPackageName()));
+                if (blurBg != null && currentNativeAd.getImages() != null && currentNativeAd.getImages().size() > 0) {
+                    try {
+                        android.graphics.drawable.Drawable drawable = currentNativeAd.getImages().get(0).getDrawable();
+                        if (drawable instanceof android.graphics.drawable.BitmapDrawable) {
+                            android.graphics.Bitmap bitmap = ((android.graphics.drawable.BitmapDrawable) drawable).getBitmap();
+                            // Scale ảnh siêu nhỏ lại (1/10) để tạo hiệu ứng Blur tự nhiên
+                            int w = Math.round(bitmap.getWidth() * 0.1f);
+                            int h = Math.round(bitmap.getHeight() * 0.1f);
+                            if (w > 0 && h > 0) {
+                                android.graphics.Bitmap scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, w, h, true);
+                                blurBg.setImageBitmap(scaled);
+                                // Phủ thêm 1 lớp sương mù trắng 70% (Light Theme)
+                                blurBg.setColorFilter(android.graphics.Color.argb(180, 255, 255, 255)); 
+                            }
+                        }
+                    } catch (Exception ignored) { }
+                }
 
                 View btnClose = currentAdLayout.findViewById(activity.getResources().getIdentifier("btn_close_ad", "id", activity.getPackageName()));
                 btnClose.setOnClickListener(new View.OnClickListener() {

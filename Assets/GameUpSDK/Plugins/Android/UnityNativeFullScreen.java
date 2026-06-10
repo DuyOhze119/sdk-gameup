@@ -82,7 +82,7 @@ public class UnityNativeFullScreen {
         });
     }
 
-    private static void renderFullScreenAd(final Activity activity, final NativeAd nativeAd) {
+private static void renderFullScreenAd(final Activity activity, final NativeAd nativeAd) {
         int layoutId = activity.getResources().getIdentifier("gameup_native_fullscreen", "layout", activity.getPackageName());
         mainContainer = LayoutInflater.from(activity).inflate(layoutId, null);
 
@@ -114,7 +114,28 @@ public class UnityNativeFullScreen {
 
         adView.setNativeAd(nativeAd);
 
-        // Nút Đóng (Tắt Quảng Cáo)
+        // ===============================================
+        // KÍCH HOẠT HIỆU ỨNG BLUR BACKGROUND THÔNG MINH
+        // ===============================================
+        ImageView blurBg = mainContainer.findViewById(activity.getResources().getIdentifier("ad_blur_bg", "id", activity.getPackageName()));
+        if (blurBg != null && nativeAd.getImages() != null && nativeAd.getImages().size() > 0) {
+            try {
+                android.graphics.drawable.Drawable drawable = nativeAd.getImages().get(0).getDrawable();
+                if (drawable instanceof android.graphics.drawable.BitmapDrawable) {
+                    android.graphics.Bitmap bitmap = ((android.graphics.drawable.BitmapDrawable) drawable).getBitmap();
+                    // Scale ảnh siêu nhỏ lại (1/10) để tạo hiệu ứng Blur tự nhiên
+                    int w = Math.round(bitmap.getWidth() * 0.1f);
+                    int h = Math.round(bitmap.getHeight() * 0.1f);
+                    if (w > 0 && h > 0) {
+                        android.graphics.Bitmap scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, w, h, true);
+                        blurBg.setImageBitmap(scaled);
+                        // Phủ thêm 1 lớp sương mù trắng 70% (Light Theme)
+                        blurBg.setColorFilter(android.graphics.Color.argb(180, 255, 255, 255)); 
+                    }
+                }
+            } catch (Exception ignored) { }
+        }
+
         View btnClose = mainContainer.findViewById(activity.getResources().getIdentifier("btn_close_ad", "id", activity.getPackageName()));
         btnClose.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -123,7 +144,6 @@ public class UnityNativeFullScreen {
             }
         });
 
-        // Đẩy lên màn hình Unity
         FrameLayout.LayoutParams rootParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         activity.addContentView(mainContainer, rootParams);
     }
