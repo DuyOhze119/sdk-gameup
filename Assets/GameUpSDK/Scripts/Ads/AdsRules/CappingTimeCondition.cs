@@ -7,9 +7,10 @@ namespace GameUpSDK.Ads
     {
         private readonly AdUnitType _adUnitType;
 
-        public CappingTimeCondition(AdUnitType adUnitType = AdUnitType.Interstitial)
+        public CappingTimeCondition(AdUnitType adUnitType = AdUnitType.Interstitial, float cappingTime = 60f, float startCounter = 60f)
         {
             _adUnitType = adUnitType;
+            AdCappingManager.Instance.SetCappingLimit(_adUnitType, cappingTime, startCounter);
         }
 
         public bool CanShow(AdUnitType adType, string where, out string reason)
