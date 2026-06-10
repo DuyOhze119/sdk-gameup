@@ -49,7 +49,7 @@ typedef NS_ENUM(NSInteger, AdState) {
 
     UIViewController *rootVC = UnityGetGLViewController();
     
-    // ĐƯA ADCHOICES SANG GÓC TRÁI
+    // Đưa AdChoices sang góc Trái trên cùng
     GADNativeAdViewAdOptions *viewOptions = [[GADNativeAdViewAdOptions alloc] init];
     viewOptions.preferredAdChoicesPosition = GADAdChoicesPositionTopLeftCorner;
 
@@ -72,27 +72,27 @@ typedef NS_ENUM(NSInteger, AdState) {
     UIEdgeInsets safeArea = UIEdgeInsetsZero;
     if (@available(iOS 11.0, *)) { safeArea = rootView.safeAreaInsets; }
     
+    // Tính toán lại kích thước để chứa thêm Description
     CGFloat headerHeight = 36.0;
     CGFloat mediaHeight = 180.0;
-    CGFloat footerHeight = 60.0;
+    CGFloat footerHeight = 68.0; // Tăng thêm 8dp để nhìn thoáng hơn
     CGFloat totalAdHeight = headerHeight + mediaHeight + footerHeight;
     CGFloat yPos = isTop ? safeArea.top : (rootView.bounds.size.height - safeArea.bottom - totalAdHeight);
 
-    // 1. Root Nền Đen
+    // Nền gốc màu tối
     self.currentAdLayout = [[UIView alloc] initWithFrame:CGRectMake(0, yPos, screenWidth, totalAdHeight)];
     self.currentAdLayout.backgroundColor = [UIColor colorWithRed:26.0/255.0 green:26.0/255.0 blue:26.0/255.0 alpha:1.0];
     
-    // 2. GADNativeAdView
     GADNativeAdView *adView = [[GADNativeAdView alloc] initWithFrame:CGRectMake(0, headerHeight, screenWidth, mediaHeight + footerHeight)];
     [self.currentAdLayout addSubview:adView];
     
-    // 3. Media View
+    // Ảnh / Video lớn
     GADMediaView *mediaView = [[GADMediaView alloc] initWithFrame:CGRectMake(0, 0, screenWidth, mediaHeight)];
     [adView addSubview:mediaView];
     adView.mediaView = mediaView;
     
-    // 4. App Icon
-    UIImageView *iconView = [[UIImageView alloc] initWithFrame:CGRectMake(8, mediaHeight + 8, 44, 44)];
+    // App Icon (48x48)
+    UIImageView *iconView = [[UIImageView alloc] initWithFrame:CGRectMake(10, mediaHeight + 10, 48, 48)];
     iconView.image = self.currentNativeAd.icon.image;
     iconView.contentMode = UIViewContentModeScaleAspectFill;
     iconView.clipsToBounds = YES;
@@ -100,47 +100,48 @@ typedef NS_ENUM(NSInteger, AdState) {
     [adView addSubview:iconView];
     adView.iconView = iconView;
     
-    // 5. Nút Tải / Open (Call To Action)
+    // Nút Call To Action nổi bật
     UIButton *ctaBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    ctaBtn.frame = CGRectMake(screenWidth - 8 - 80, mediaHeight + 12, 80, 36);
-    ctaBtn.backgroundColor = [UIColor colorWithRed:33.0/255.0 green:150.0/255.0 blue:243.0/255.0 alpha:1.0]; // Xanh Blue
+    ctaBtn.frame = CGRectMake(screenWidth - 10 - 80, mediaHeight + 14, 80, 40);
+    ctaBtn.backgroundColor = [UIColor colorWithRed:33.0/255.0 green:150.0/255.0 blue:243.0/255.0 alpha:1.0]; // Xanh dương
     [ctaBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     ctaBtn.titleLabel.font = [UIFont boldSystemFontOfSize:13];
     [ctaBtn setTitle:self.currentNativeAd.callToAction forState:UIControlStateNormal];
-    ctaBtn.layer.cornerRadius = 4.0;
+    ctaBtn.layer.cornerRadius = 6.0;
     [adView addSubview:ctaBtn];
     adView.callToActionView = ctaBtn;
     
-    // 6. Headline & Body
-    CGFloat textWidth = screenWidth - 8 - 44 - 8 - 80 - 8; // Tính khoảng trống còn lại
-    UILabel *headline = [[UILabel alloc] initWithFrame:CGRectMake(60, mediaHeight + 10, textWidth, 20)];
+    // Headline (Tiêu đề)
+    CGFloat textWidth = screenWidth - 10 - 48 - 10 - 80 - 10; 
+    UILabel *headline = [[UILabel alloc] initWithFrame:CGRectMake(68, mediaHeight + 10, textWidth, 20)];
     headline.textColor = [UIColor whiteColor];
     headline.font = [UIFont boldSystemFontOfSize:15];
     headline.text = self.currentNativeAd.headline;
     [adView addSubview:headline];
     adView.headlineView = headline;
     
-    UILabel *body = [[UILabel alloc] initWithFrame:CGRectMake(60, mediaHeight + 30, textWidth, 18)];
-    body.textColor = [UIColor colorWithRed:179.0/255.0 green:179.0/255.0 blue:179.0/255.0 alpha:1.0]; // Xám
+    // Body (Mô tả chi tiết)
+    UILabel *body = [[UILabel alloc] initWithFrame:CGRectMake(68, mediaHeight + 32, textWidth, 18)];
+    body.textColor = [UIColor colorWithRed:179.0/255.0 green:179.0/255.0 blue:179.0/255.0 alpha:1.0]; // Xám nhạt
     body.font = [UIFont systemFontOfSize:12];
     body.text = self.currentNativeAd.body;
     [adView addSubview:body];
     adView.bodyView = body;
     
-    // Gắn dữ liệu Native
+    // Đăng ký AdView với Google
     adView.nativeAd = self.currentNativeAd;
     self.currentNativeAd.delegate = self;
     
-    // 7. Nút Hide ▼ (Header Bar)
+    // Nút Hide (Collapse) ở Header
     UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     closeBtn.frame = CGRectMake(screenWidth - 64, 0, 64, headerHeight);
     [closeBtn setTitle:@"▼" forState:UIControlStateNormal];
-    [closeBtn setTitleColor:[UIColor colorWithRed:179.0/255.0 green:179.0/255.0 blue:179.0/255.0 alpha:1.0] forState:UIControlStateNormal];
+    [closeBtn setTitleColor:[UIColor colorWithRed:224.0/255.0 green:224.0/255.0 blue:224.0/255.0 alpha:1.0] forState:UIControlStateNormal]; // Trắng xám sang trọng
     closeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:16];
     [closeBtn addTarget:self action:@selector(closeTapped) forControlEvents:UIControlEventTouchUpInside];
     closeBtn.backgroundColor = [UIColor colorWithRed:18.0/255.0 green:18.0/255.0 blue:18.0/255.0 alpha:1.0];
     
-    // Bo góc dưới trái cho nút
+    // Bo góc dưới trái nút Collapse
     UIBezierPath *maskPath = [UIBezierPath bezierPathWithRoundedRect:closeBtn.bounds byRoundingCorners:UIRectCornerBottomLeft cornerRadii:CGSizeMake(8.0, 8.0)];
     CAShapeLayer *maskLayer = [CAShapeLayer layer];
     maskLayer.path = maskPath.CGPath;
@@ -167,7 +168,8 @@ typedef NS_ENUM(NSInteger, AdState) {
 }
 
 - (void)adLoader:(GADAdLoader *)adLoader didReceiveNativeAd:(GADNativeAd *)nativeAd {
-    if (self.currentState == AdStateIdle) return;
+    if (self.currentState == AdStateIdle) return; 
+    
     self.currentNativeAd = nativeAd;
     self.currentState = AdStateLoaded;
     

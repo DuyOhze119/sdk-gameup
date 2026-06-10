@@ -24,14 +24,12 @@ public class NativeBannerManager {
         void onClosed(); void onClicked(); void onPaid(double value);
     }
 
-    public enum AdState { IDLE, LOADED, SHOWING }
+    public enum AdState { IDLE, LOADING, LOADED, SHOWING }
     
     private static NativeBannerManager instance;
     private View currentAdLayout;
     private NativeAd currentNativeAd;
     private AdState currentState = AdState.IDLE;
-    private boolean isLoadingAd = false; // Biến chặn Load chồng chéo
-    private final String TAG = "GameUp_NativeJava";
 
     public static NativeBannerManager getInstance() {
         if (instance == null) instance = new NativeBannerManager();
@@ -39,13 +37,14 @@ public class NativeBannerManager {
     }
 
     public void loadAd(final Activity activity, final String adUnitId, final AdCallback callback) {
-        if (isLoadingAd) return; // Nếu đang tải rồi thì bỏ qua
+        if (currentState == AdState.LOADING) return;
 
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                isLoadingAd = true;
-                
+                currentState = AdState.LOADING;
+
+                // Cài đặt AdChoices hiển thị bên góc trái
                 com.google.android.gms.ads.nativead.NativeAdOptions adOptions = 
                     new com.google.android.gms.ads.nativead.NativeAdOptions.Builder()
                         .setAdChoicesPlacement(com.google.android.gms.ads.nativead.NativeAdOptions.ADCHOICES_TOP_LEFT)
@@ -55,32 +54,19 @@ public class NativeBannerManager {
                         .forNativeAd(new NativeAd.OnNativeAdLoadedListener() {
                             @Override
                             public void onNativeAdLoaded(NativeAd nativeAd) {
-                                isLoadingAd = false;
-                                
-                                // Nếu trong lúc chờ tải, user đã bấm tắt thì hủy quảng cáo mới luôn
                                 if (currentState == AdState.IDLE) {
                                     nativeAd.destroy(); return;
                                 }
-                                
                                 if (currentNativeAd != null) currentNativeAd.destroy();
                                 currentNativeAd = nativeAd;
-                                
-                                // [CHÌA KHÓA AUTO-REFRESH] Nếu đang show, thay ruột UI tại chỗ!
-                                if (currentState == AdState.SHOWING && currentAdLayout != null) {
-                                    populateUI(activity, currentNativeAd);
-                                } else {
-                                    currentState = AdState.LOADED;
-                                }
-                                
+                                currentState = AdState.LOADED;
                                 if (callback != null) callback.onLoaded();
                             }
                         })
                         .withAdListener(new AdListener() {
                             @Override
                             public void onAdFailedToLoad(LoadAdError adError) {
-                                isLoadingAd = false;
-                                // Tải Refresh lỗi thì giữ nguyên ảnh cũ không làm gì cả
-                                if (currentState != AdState.SHOWING) currentState = AdState.IDLE;
+                                currentState = AdState.IDLE;
                                 if (callback != null) callback.onFailed(adError.getMessage());
                             }
                             @Override
@@ -106,8 +92,45 @@ public class NativeBannerManager {
                 int layoutId = activity.getResources().getIdentifier("gameup_native_collapsible", "layout", activity.getPackageName());
                 currentAdLayout = LayoutInflater.from(activity).inflate(layoutId, null);
 
-                // Bơm dữ liệu vào UI
-                populateUI(activity, currentNativeAd);
+                NativeAdView adView = currentAdLayout.findViewById(activity.getResources().getIdentifier("native_ad_view", "id", activity.getPackageName()));
+                MediaView mediaView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_media", "id", activity.getPackageName()));
+                TextView headlineView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_headline", "id", activity.getPackageName()));
+                android.widget.Button ctaView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_call_to_action", "id", activity.getPackageName()));
+                TextView bodyView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_body", "id", activity.getPackageName()));
+                android.widget.ImageView iconView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_app_icon", "id", activity.getPackageName()));
+                com.google.android.gms.ads.nativead.AdChoicesView adChoicesView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_choices", "id", activity.getPackageName()));
+
+                adView.setMediaView(mediaView);
+                adView.setHeadlineView(headlineView);
+                adView.setCallToActionView(ctaView);
+                adView.setBodyView(bodyView);
+                adView.setIconView(iconView);
+                adView.setAdChoicesView(adChoicesView);
+
+                headlineView.setText(currentNativeAd.getHeadline());
+
+                if (currentNativeAd.getCallToAction() == null) {
+                    ctaView.setVisibility(View.INVISIBLE);
+                } else { 
+                    ctaView.setVisibility(View.VISIBLE); 
+                    ctaView.setText(currentNativeAd.getCallToAction()); 
+                }
+
+                if (currentNativeAd.getBody() == null) {
+                    bodyView.setVisibility(View.GONE);
+                } else { 
+                    bodyView.setVisibility(View.VISIBLE); 
+                    bodyView.setText(currentNativeAd.getBody()); 
+                }
+
+                if (currentNativeAd.getIcon() == null) {
+                    iconView.setVisibility(View.GONE);
+                } else { 
+                    iconView.setVisibility(View.VISIBLE); 
+                    iconView.setImageDrawable(currentNativeAd.getIcon().getDrawable()); 
+                }
+
+                adView.setNativeAd(currentNativeAd);
 
                 View btnClose = currentAdLayout.findViewById(activity.getResources().getIdentifier("btn_close_ad", "id", activity.getPackageName()));
                 btnClose.setOnClickListener(new View.OnClickListener() {
@@ -130,45 +153,15 @@ public class NativeBannerManager {
         });
     }
 
-    // Hàm tách rời chuyên để bơm dữ liệu vào các thẻ View của Android
-    private void populateUI(Activity activity, NativeAd nativeAd) {
-        if (currentAdLayout == null) return;
-
-        NativeAdView adView = currentAdLayout.findViewById(activity.getResources().getIdentifier("native_ad_view", "id", activity.getPackageName()));
-        MediaView mediaView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_media", "id", activity.getPackageName()));
-        TextView headlineView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_headline", "id", activity.getPackageName()));
-        android.widget.Button ctaView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_call_to_action", "id", activity.getPackageName()));
-        TextView bodyView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_body", "id", activity.getPackageName()));
-        android.widget.ImageView iconView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_app_icon", "id", activity.getPackageName()));
-        com.google.android.gms.ads.nativead.AdChoicesView adChoicesView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_choices", "id", activity.getPackageName()));
-
-        adView.setMediaView(mediaView);
-        adView.setHeadlineView(headlineView);
-        adView.setCallToActionView(ctaView);
-        adView.setBodyView(bodyView);
-        adView.setIconView(iconView);
-        adView.setAdChoicesView(adChoicesView);
-
-        headlineView.setText(nativeAd.getHeadline());
-
-        if (nativeAd.getCallToAction() == null) ctaView.setVisibility(View.INVISIBLE);
-        else { ctaView.setVisibility(View.VISIBLE); ctaView.setText(nativeAd.getCallToAction()); }
-
-        if (nativeAd.getBody() == null) bodyView.setVisibility(View.GONE);
-        else { bodyView.setVisibility(View.VISIBLE); bodyView.setText(nativeAd.getBody()); }
-
-        if (nativeAd.getIcon() == null) iconView.setVisibility(View.GONE);
-        else { iconView.setVisibility(View.VISIBLE); iconView.setImageDrawable(nativeAd.getIcon().getDrawable()); }
-
-        adView.setNativeAd(nativeAd);
-    }
-
     public void hideAd(final Activity activity) {
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 removeCurrentView(activity);
-                if (currentNativeAd != null) { currentNativeAd.destroy(); currentNativeAd = null; }
+                if (currentNativeAd != null) { 
+                    currentNativeAd.destroy(); 
+                    currentNativeAd = null; 
+                }
                 currentState = AdState.IDLE;
             }
         });

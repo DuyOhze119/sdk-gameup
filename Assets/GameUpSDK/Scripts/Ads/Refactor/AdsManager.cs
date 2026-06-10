@@ -52,6 +52,8 @@ namespace GameUpSDK.Ads
 
         public static Action<string> OnBannerLoadedEvent = delegate { };
         
+        public bool IsInitialized { get; private set; }
+        
         protected void Awake()
         {
             DontDestroyOnLoad(gameObject);
@@ -114,6 +116,7 @@ namespace GameUpSDK.Ads
             {
                 network.BannerAd.OnAdLoaded += OnBannerLoaded;
             }
+            IsInitialized = true;
         }
 
         private void OnBannerSwapped(string last, string current)
@@ -328,10 +331,10 @@ namespace GameUpSDK.Ads
             network.InterstitialAd.Show(where, onSuccess, onFail);
         }
 
-        public bool IsAppOpenAdAvailable(string where = null) =>
+        public bool IsAppOpenAdAvailable(string where = "default") =>
             GetAvailableProvider(AdUnitType.AppOpen, where) != null;
 
-        public void ShowAppOpenAds(string where, Action onSuccess = null, Action onFail = null)
+        public void ShowAppOpenAds(string where = "default", Action onSuccess = null, Action onFail = null)
         {
             if (!EvaluateConditions(AdUnitType.AppOpen, where, out var blockReason))
             {
@@ -390,7 +393,7 @@ namespace GameUpSDK.Ads
             GetAvailableProvider(AdUnitType.NativeAd, where) != null;
 
 
-        public void ShowNativeAd(string where, Action onSuccess, Action onFail)
+        public void ShowNativeAd(string where = "default", Action onSuccess = null, Action onFail = null)
         {
             if (!EvaluateConditions(AdUnitType.NativeAd, where, out var blockReason))
             {
@@ -413,7 +416,7 @@ namespace GameUpSDK.Ads
             network.NativeFullScreenAd.Show(where, onSuccess, onFail);
         }
 
-        public void HideNativeAd(string where = null)
+        public void HideNativeAd(string where = "default")
         {
             foreach (var network in _networkDict)
             {

@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
              android:layout_width="match_parent"
              android:layout_height="wrap_content"
-             android:background="@color/gameup_native_bg"
+             android:background="#1A1A1A"
              android:clickable="true"
              android:focusable="true">
 
@@ -10,7 +10,7 @@
             android:id="@+id/native_ad_view"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/gameup_header_height">
+            android:layout_marginTop="36dp">
 
         <RelativeLayout
                 android:layout_width="match_parent"
@@ -28,13 +28,13 @@
                     android:layout_below="@id/ad_media"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:padding="8dp">
+                    android:padding="10dp">
 
                 <ImageView
                         android:id="@+id/ad_app_icon"
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:layout_marginEnd="8dp"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_marginEnd="10dp"
                         android:scaleType="centerCrop" />
 
                 <LinearLayout
@@ -57,18 +57,20 @@
                             android:id="@+id/ad_body"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
                             android:ellipsize="end"
                             android:maxLines="1"
-                            android:textColor="@color/gameup_text_gray"
+                            android:textColor="#B3B3B3"
                             android:textSize="12sp" />
                 </LinearLayout>
 
                 <Button
                         android:id="@+id/ad_call_to_action"
                         android:layout_width="wrap_content"
-                        android:layout_height="36dp"
-                        android:layout_marginStart="8dp"
+                        android:layout_height="40dp"
+                        android:layout_marginStart="10dp"
                         android:backgroundTint="#2196F3"
+                        android:paddingHorizontal="16dp"
                         android:text="OPEN"
                         android:textColor="#FFFFFF"
                         android:textSize="13sp"
@@ -86,8 +88,8 @@
 
     <FrameLayout
             android:id="@+id/btn_close_ad"
-            android:layout_width="@dimen/gameup_btn_width"
-            android:layout_height="@dimen/gameup_header_height"
+            android:layout_width="64dp"
+            android:layout_height="36dp"
             android:layout_gravity="top|end"
             android:background="@drawable/gameup_bg_rounded">
 
@@ -96,8 +98,8 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:text="▼"
-                android:textColor="@color/gameup_text_gray"
-                android:textSize="20sp"
+                android:textColor="#E0E0E0"
+                android:textSize="16sp"
                 android:textStyle="bold" />
     </FrameLayout>
 </FrameLayout>
