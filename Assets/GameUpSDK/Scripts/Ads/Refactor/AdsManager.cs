@@ -54,6 +54,8 @@ namespace GameUpSDK.Ads
         
         public bool IsInitialized { get; private set; }
         
+        public Dictionary<MediationProvider, IAdNetwork> Networks => _networkDict;
+        
         protected void Awake()
         {
             DontDestroyOnLoad(gameObject);
