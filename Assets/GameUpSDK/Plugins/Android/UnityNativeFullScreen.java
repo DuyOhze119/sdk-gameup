@@ -17,10 +17,12 @@ import com.google.android.gms.ads.nativead.NativeAd;
 import com.google.android.gms.ads.nativead.NativeAdView;
 
 public class UnityNativeFullScreen {
+    // THÊM SỰ KIỆN PAID VÀO INTERFACE
     public interface INativeAdCallback {
         void onAdLoaded();
         void onAdFailedToLoad(String error);
         void onAdClosed();
+        void onAdPaid(double value); // <--- MỚI
     }
 
     private static View mainContainer;
@@ -36,7 +38,6 @@ public class UnityNativeFullScreen {
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                // Đưa logo AdChoices qua góc trái
                 com.google.android.gms.ads.nativead.NativeAdOptions adOptions = 
                     new com.google.android.gms.ads.nativead.NativeAdOptions.Builder()
                         .setAdChoicesPlacement(com.google.android.gms.ads.nativead.NativeAdOptions.ADCHOICES_TOP_LEFT)
@@ -48,6 +49,18 @@ public class UnityNativeFullScreen {
                         public void onNativeAdLoaded(NativeAd nativeAd) {
                             loadedAd = nativeAd;
                             isAdLoading = false;
+                            
+                            // ĐĂNG KÝ HỨNG DOANH THU TỪ GOOGLE TRẢ VỀ
+                            loadedAd.setOnPaidEventListener(new com.google.android.gms.ads.OnPaidEventListener() {
+                                @Override
+                                public void onPaidEvent(com.google.android.gms.ads.AdValue adValue) {
+                                    if (mCallback != null) {
+                                        // Đổi từ Micros sang USD
+                                        mCallback.onAdPaid(adValue.getValueMicros() * 0.000001);
+                                    }
+                                }
+                            });
+
                             if (mCallback != null) mCallback.onAdLoaded();
                         }
                     })
@@ -82,7 +95,7 @@ public class UnityNativeFullScreen {
         });
     }
 
-private static void renderFullScreenAd(final Activity activity, final NativeAd nativeAd) {
+    private static void renderFullScreenAd(final Activity activity, final NativeAd nativeAd) {
         int layoutId = activity.getResources().getIdentifier("gameup_native_fullscreen", "layout", activity.getPackageName());
         mainContainer = LayoutInflater.from(activity).inflate(layoutId, null);
 
@@ -114,22 +127,17 @@ private static void renderFullScreenAd(final Activity activity, final NativeAd n
 
         adView.setNativeAd(nativeAd);
 
-        // ===============================================
-        // KÍCH HOẠT HIỆU ỨNG BLUR BACKGROUND THÔNG MINH
-        // ===============================================
         ImageView blurBg = mainContainer.findViewById(activity.getResources().getIdentifier("ad_blur_bg", "id", activity.getPackageName()));
         if (blurBg != null && nativeAd.getImages() != null && nativeAd.getImages().size() > 0) {
             try {
                 android.graphics.drawable.Drawable drawable = nativeAd.getImages().get(0).getDrawable();
                 if (drawable instanceof android.graphics.drawable.BitmapDrawable) {
                     android.graphics.Bitmap bitmap = ((android.graphics.drawable.BitmapDrawable) drawable).getBitmap();
-                    // Scale ảnh siêu nhỏ lại (1/10) để tạo hiệu ứng Blur tự nhiên
                     int w = Math.round(bitmap.getWidth() * 0.1f);
                     int h = Math.round(bitmap.getHeight() * 0.1f);
                     if (w > 0 && h > 0) {
                         android.graphics.Bitmap scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, w, h, true);
                         blurBg.setImageBitmap(scaled);
-                        // Phủ thêm 1 lớp sương mù trắng 70% (Light Theme)
                         blurBg.setColorFilter(android.graphics.Color.argb(180, 255, 255, 255)); 
                     }
                 }

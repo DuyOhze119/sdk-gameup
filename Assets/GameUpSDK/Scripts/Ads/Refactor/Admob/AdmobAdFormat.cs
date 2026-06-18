@@ -407,6 +407,7 @@ namespace GameUpSDK.Ads
             FullScreenNativeAdManager.Instance.OnAdClosedEvent += OnNativeAdClosed;
             FullScreenNativeAdManager.Instance.OnAdLoadedEvent += OnNativeAdLoaded;
             FullScreenNativeAdManager.Instance.OnAdLoadFailedEvent += OnNativeAdLoadFailed;
+            FullScreenNativeAdManager.Instance.OnAdPaidEvent += OnNativeAdPaid;
         }
 
         public override bool IsAvailable(string where = null)
@@ -430,6 +431,11 @@ namespace GameUpSDK.Ads
         public void Hide()
         {
             FullScreenNativeAdManager.Instance.ForceCloseAd();
+        }
+        
+        private void OnNativeAdPaid(double value)
+        {
+            TrackRevenue(_bannerId, _where, "NativeFullscreen", value);
         }
 
         private void OnNativeAdClosed()

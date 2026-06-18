@@ -11,23 +11,22 @@ namespace GameUpSDK
         private bool _initialized;
         private string _adUnitId;
 
-        // Biến lưu Proxy Callback (Android)
         private NativeAdCallbackProxy _callbackProxy;
 
         public event Action OnAdLoadedEvent;
         public event Action<string> OnAdLoadFailedEvent;
         public event Action OnAdClosedEvent;
         public event Action OnAdDisplayedEvent;
+        public event Action<double> OnAdPaidEvent; // <--- MỚI
 
 #if UNITY_IOS && !UNITY_EDITOR
-        // 1. Khai báo kiểu Delegate tương đương con trỏ hàm trong C
         public delegate void NativeAdLoadedDelegate();
         public delegate void NativeAdFailedDelegate(string error);
         public delegate void NativeAdClosedDelegate();
+        public delegate void NativeAdPaidDelegate(double value); // <--- MỚI
 
-        // 2. Cập nhật chữ ký DllImport
         [DllImport("__Internal")]
-        private static extern void _iosLoadNativeAd(string adUnitId, NativeAdLoadedDelegate onLoaded, NativeAdFailedDelegate onFailed, NativeAdClosedDelegate onClosed);
+        private static extern void _iosLoadNativeAd(string adUnitId, NativeAdLoadedDelegate onLoaded, NativeAdFailedDelegate onFailed, NativeAdClosedDelegate onClosed, NativeAdPaidDelegate onPaid);
 
         [DllImport("__Internal")]
         private static extern bool _iosIsNativeAdReady();
@@ -38,29 +37,19 @@ namespace GameUpSDK
         [DllImport("__Internal")]
         private static extern void _iosHideNativeAd();
 
-        // 3. Khai báo các hàm Static hứng Callback từ iOS
         [AOT.MonoPInvokeCallback(typeof(NativeAdLoadedDelegate))]
-        private static void OnIosAdLoaded()
-        {
-            if (Instance != null) Instance.HandleAdLoaded();
-        }
+        private static void OnIosAdLoaded() { if (Instance != null) Instance.HandleAdLoaded(); }
 
         [AOT.MonoPInvokeCallback(typeof(NativeAdFailedDelegate))]
-        private static void OnIosAdFailed(string error)
-        {
-            if (Instance != null) Instance.HandleAdFailedToLoad(error);
-        }
+        private static void OnIosAdFailed(string error) { if (Instance != null) Instance.HandleAdFailedToLoad(error); }
 
         [AOT.MonoPInvokeCallback(typeof(NativeAdClosedDelegate))]
-        private static void OnIosAdClosed()
-        {
-            if (Instance != null) Instance.HandleAdClosed();
-        }
+        private static void OnIosAdClosed() { if (Instance != null) Instance.HandleAdClosed(); }
+
+        [AOT.MonoPInvokeCallback(typeof(NativeAdPaidDelegate))]
+        private static void OnIosAdPaid(double value) { if (Instance != null) Instance.HandleAdPaid(value); } // <--- MỚI
 #endif
 
-        // =======================================================
-        // LỚP PROXY: Cầu nối biến Interface Java thành hàm C# (Dành cho Android)
-        // =======================================================
         private class NativeAdCallbackProxy : AndroidJavaProxy
         {
             private readonly FullScreenNativeAdManager _manager;
@@ -74,6 +63,7 @@ namespace GameUpSDK
             public void onAdLoaded() => _manager.HandleAdLoaded();
             public void onAdFailedToLoad(string error) => _manager.HandleAdFailedToLoad(error);
             public void onAdClosed() => _manager.HandleAdClosed();
+            public void onAdPaid(double value) => _manager.HandleAdPaid(value); // <--- MỚI
         }
 
         protected void Awake()
@@ -94,27 +84,22 @@ namespace GameUpSDK
                 _initialized = true;
             }
             _adUnitId = adUnit;
-            Debug.Log("[NativeBridge] Requesting ad: " + _adUnitId);
 
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (bridgeClass != null && currentActivity != null)
             {
-                // Truyền Proxy sang cho Java
                 bridgeClass.CallStatic("loadAd", currentActivity, _adUnitId, _callbackProxy);
             }
 #elif UNITY_IOS && !UNITY_EDITOR
-            // Truyền trực tiếp các Static Method (Delegates) sang iOS
-            _iosLoadNativeAd(_adUnitId, OnIosAdLoaded, OnIosAdFailed, OnIosAdClosed);
+            // Thêm Delegate Paid vào hàm Load iOS
+            _iosLoadNativeAd(_adUnitId, OnIosAdLoaded, OnIosAdFailed, OnIosAdClosed, OnIosAdPaid);
 #endif
         }
 
         public bool IsAdReady()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            if (bridgeClass != null)
-            {
-                return bridgeClass.CallStatic<bool>("isAdLoaded");
-            }
+            if (bridgeClass != null) return bridgeClass.CallStatic<bool>("isAdLoaded");
 #elif UNITY_IOS && !UNITY_EDITOR
             return _iosIsNativeAdReady();
 #endif
@@ -132,50 +117,27 @@ namespace GameUpSDK
                 _iosShowNativeAd();
 #endif
             }
-            else
-            {
-                RequestAd(_adUnitId);
-            }
+            else RequestAd(_adUnitId);
         }
 
         public void ForceCloseAd()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            if (bridgeClass != null && currentActivity != null)
-            {
-                bridgeClass.CallStatic("hideAd", currentActivity);
-            }
+            if (bridgeClass != null && currentActivity != null) bridgeClass.CallStatic("hideAd", currentActivity);
 #elif UNITY_IOS && !UNITY_EDITOR
             _iosHideNativeAd();
 #endif
         }
 
-        // ==========================================================
-        // CÁC HÀM XỬ LÝ NHẬN TỪ PROXY (ANDROID) & DELEGATE (IOS)
-        // ==========================================================
-
-        internal void HandleAdLoaded()
-        {
-            Debug.Log("[NativeBridge] Ad Loaded Success");
-            MainThreadDispatcher.Enqueue(() => OnAdLoadedEvent?.Invoke());
-        }
-
-        internal void HandleAdFailedToLoad(string error)
-        {
-            Debug.Log("[NativeBridge] Ad Load Failed. Error: " + error);
-            MainThreadDispatcher.Enqueue(() => OnAdLoadFailedEvent?.Invoke(error));
-        }
-
-        internal void HandleAdClosed()
-        {
-            Debug.Log("[NativeBridge] Ad Closed");
-            MainThreadDispatcher.Enqueue(() => OnAdClosedEvent?.Invoke());
-        }
+        internal void HandleAdLoaded() => MainThreadDispatcher.Enqueue(() => OnAdLoadedEvent?.Invoke());
+        internal void HandleAdFailedToLoad(string error) => MainThreadDispatcher.Enqueue(() => OnAdLoadFailedEvent?.Invoke(error));
+        internal void HandleAdClosed() => MainThreadDispatcher.Enqueue(() => OnAdClosedEvent?.Invoke());
+        internal void HandleAdDisplayed() => MainThreadDispatcher.Enqueue(() => OnAdDisplayedEvent?.Invoke());
         
-        internal void HandleAdDisplayed()
+        // HÀM HỨNG VÀ BẮN EVENT SANG CHO FILE ADMOB FORMAT
+        internal void HandleAdPaid(double value)
         {
-            Debug.Log("[NativeBridge] Ad Displayed");
-            MainThreadDispatcher.Enqueue(() => OnAdDisplayedEvent?.Invoke());
+            MainThreadDispatcher.Enqueue(() => OnAdPaidEvent?.Invoke(value));
         }
     }
 }
