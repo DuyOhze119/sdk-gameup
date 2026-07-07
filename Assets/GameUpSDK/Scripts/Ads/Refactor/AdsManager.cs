@@ -311,6 +311,8 @@ namespace GameUpSDK.Ads
         public void ShowInterstitial(string where, int currentLevel, Action onSuccess = null,
             Action onFail = null)
         {
+            if(AdCappingManager.Instance.IsAnyAdShowing) return;
+            
             if (!EvaluateConditions(AdUnitType.Interstitial, where, out var blockReason))
             {
                 Debug.Log($"[GameUpSDK] Interstitial block rules: {blockReason}");
