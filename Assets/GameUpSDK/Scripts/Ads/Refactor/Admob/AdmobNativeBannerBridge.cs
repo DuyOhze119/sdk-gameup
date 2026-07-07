@@ -30,6 +30,7 @@ namespace GameUpSDK.Ads
 #endif 
         private static AdmobNativeBannerBridge _instance;
         private string _currentActiveWhere;
+        private string _currentActiveUnitId; // Lưu lại ID đang xử lý cho iOS callback
 
         public AdmobNativeBannerBridge(AdUnitConfig config) : base(config, AdUnitType.Banner, "Admob_NativeBridge")
         {
@@ -60,6 +61,7 @@ namespace GameUpSDK.Ads
             _isLoading[unitId] = true;
             _isLoaded[unitId] = false;
             _currentActiveWhere = where;
+            _currentActiveUnitId = unitId;
 
 #if UNITY_ANDROID && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
             var proxy = new NativeAdCallbackProxy(
@@ -83,6 +85,7 @@ namespace GameUpSDK.Ads
             var entry = _config.GetEntry(_adType, where, EcpmFloor.All);
             bool isTop = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top;
             _currentActiveWhere = where;
+            _currentActiveUnitId = unitId;
 
             if (IsAvailable(where))
             {
@@ -111,8 +114,86 @@ namespace GameUpSDK.Ads
             NativeBanner_HideAd();
 #endif
         }
+        
         public void Restore(string where) => Show(where);
         
-        // Callback tĩnh iOS giữ nguyên logic nhưng ánh xạ qua unitId tương tự.
+#if UNITY_ANDROID && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
+        // ==========================================
+        // PROXY CLASS CHO ANDROID
+        // ==========================================
+        public class NativeAdCallbackProxy : AndroidJavaProxy
+        {
+            private readonly Action _onLoaded;
+            private readonly Action<string> _onFailed;
+            private readonly Action _onDisplayed;
+            private readonly Action _onClosed;
+            private readonly Action _onClicked;
+            private readonly Action<double> _onPaid;
+
+            public NativeAdCallbackProxy(Action onLoaded, Action<string> onFailed, Action onDisplayed, Action onClosed, Action onClicked, Action<double> onPaid) 
+                : base("com.gameup.ads.NativeBannerManager$AdCallback")
+            {
+                _onLoaded = onLoaded; 
+                _onFailed = onFailed; 
+                _onDisplayed = onDisplayed; 
+                _onClosed = onClosed; 
+                _onClicked = onClicked; 
+                _onPaid = onPaid;
+            }
+
+            public void onLoaded() => _onLoaded?.Invoke();
+            public void onFailed(string error) => _onFailed?.Invoke(error);
+            public void onDisplayed() => _onDisplayed?.Invoke();
+            public void onClosed() => _onClosed?.Invoke();
+            public void onClicked() => _onClicked?.Invoke();
+            public void onPaid(double value) => _onPaid?.Invoke(value);
+        }
+#endif
+
+#if UNITY_IOS && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
+        // ==========================================
+        // STATIC CALLBACKS CHO IOS
+        // ==========================================
+        [AOT.MonoPInvokeCallback(typeof(Action_Void))]
+        private static void OnLoaded_iOS() => MainThreadDispatcher.Enqueue(() => { 
+            if (_instance != null) {
+                _instance._isLoading[_instance._currentActiveUnitId] = false;
+                _instance._isLoaded[_instance._currentActiveUnitId] = true;
+                _instance.HandleLoadSuccess(_instance._currentActiveUnitId, _instance._currentActiveWhere);
+            }
+        });
+
+        [AOT.MonoPInvokeCallback(typeof(Action_String))]
+        private static void OnFailed_iOS(string error) => MainThreadDispatcher.Enqueue(() => {
+            if (_instance != null) {
+                _instance._isLoading[_instance._currentActiveUnitId] = false;
+                _instance._isLoaded[_instance._currentActiveUnitId] = false;
+                _instance.HandleLoadFailed(_instance._currentActiveUnitId, _instance._currentActiveWhere, EcpmFloor.All, error);
+            }
+        });
+
+        [AOT.MonoPInvokeCallback(typeof(Action_Void))]
+        private static void OnDisplayed_iOS() => MainThreadDispatcher.Enqueue(() => {
+            if (_instance != null) _instance.NotifyAdDisplayed(_instance._currentActiveWhere);
+        });
+
+        [AOT.MonoPInvokeCallback(typeof(Action_Void))]
+        private static void OnClosed_iOS() => MainThreadDispatcher.Enqueue(() => {
+            if (_instance != null) {
+                _instance._isLoaded[_instance._currentActiveUnitId] = false;
+                _instance.NotifyAdClosed(_instance._currentActiveWhere);
+                _instance.OnCollapsedNativeBanner?.Invoke(_instance._currentActiveWhere);
+                _instance.Load(_instance._currentActiveWhere);
+            }
+        });
+
+        [AOT.MonoPInvokeCallback(typeof(Action_Void))]
+        private static void OnClicked_iOS() => MainThreadDispatcher.Enqueue(() => { });
+
+        [AOT.MonoPInvokeCallback(typeof(Action_Double))]
+        private static void OnPaid_iOS(double value) => MainThreadDispatcher.Enqueue(() => {
+            if (_instance != null) _instance.TrackRevenue(_instance._currentActiveUnitId, _instance._currentActiveWhere, "NativeBanner_iOS", value);
+        });
+#endif
     }
 }
