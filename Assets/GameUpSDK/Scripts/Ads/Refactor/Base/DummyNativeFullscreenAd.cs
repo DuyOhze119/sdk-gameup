@@ -13,7 +13,7 @@ namespace GameUpSDK.Ads
             return false;
         }
 
-        protected override void RequestAdInternal(string unitId, string where)
+        protected override void RequestAdInternal(string unitId, string where, EcpmFloor floor)
         {
         }
 

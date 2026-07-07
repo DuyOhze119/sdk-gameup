@@ -11,78 +11,75 @@ namespace GameUpSDK.Ads
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
         private Dictionary<string, LevelPlayInterstitialAd> _ads = new Dictionary<string, LevelPlayInterstitialAd>();
 #endif
-        public IronSourceInterstitialAd(AdUnitConfig config) : base(config, AdUnitType.Interstitial, "LevelPlay")
-        {
-        }
+        public IronSourceInterstitialAd(AdUnitConfig config) : base(config, AdUnitType.Interstitial, "LevelPlay") { }
 
         public override bool IsAvailable(string where = null)
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
-            return _ads.TryGetValue(GetKey(where), out var ad) && ad != null && ad.IsAdReady();
+            foreach (EcpmFloor floor in Enum.GetValues(typeof(EcpmFloor)))
+            {
+                string unitId = _config.ResolveUnitId(_adType, where, floor);
+                if (!string.IsNullOrEmpty(unitId) && _ads.TryGetValue(unitId, out var ad) && ad != null && ad.IsAdReady())
+                    return true;
+            }
 #endif
             return false;
         }
 
-        protected override void RequestAdInternal(string unitId, string where)
+        protected override void RequestAdInternal(string unitId, string where, EcpmFloor floor)
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-            if (!_ads.ContainsKey(key))
+            if (!_ads.ContainsKey(unitId))
             {
                 var newAd = new LevelPlayInterstitialAd(unitId);
                 newAd.OnAdLoaded += (_) => HandleLoadSuccess(unitId, where);
-                newAd.OnAdLoadFailed += (err) => HandleLoadFailed(unitId, where, err.ErrorMessage);
-                _ads[key] = newAd;
+                newAd.OnAdLoadFailed += (err) => HandleLoadFailed(unitId, where, floor, err.ErrorMessage);
+                _ads[unitId] = newAd;
             }
-
-            _ads[key].LoadAd();
+            _ads[unitId].LoadAd();
 #endif
         }
 
         public void Show(string where, Action onSuccess, Action onFail)
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-            if (IsAvailable(where))
+            EcpmFloor[] orderCheck = { EcpmFloor.High, EcpmFloor.Medium, EcpmFloor.All };
+            foreach (var f in orderCheck)
             {
-                NotifyAdDisplayed(where);
-                var ad = _ads[key];
-                Action<LevelPlayAdInfo> onClosed = null;
-                Action<LevelPlayAdInfo, LevelPlayAdError> onFailed = null;
+                var currentFloor = f;
+                string unitId = _config.ResolveUnitId(_adType, where, currentFloor);
+                if (string.IsNullOrEmpty(unitId)) continue;
 
-                onClosed = (_) =>
+                if (_ads.TryGetValue(unitId, out var ad) && ad != null && ad.IsAdReady())
                 {
-                    ad.OnAdClosed -= onClosed;
-                    ad.OnAdDisplayFailed -= onFailed;
-                    NotifyAdClosed(where);
-                    MainThreadDispatcher.Enqueue(() =>
-                    {
-                        onSuccess?.Invoke();
-                        Load(where);
-                    });
-                };
-                onFailed = (_, err) =>
-                {
-                    ad.OnAdClosed -= onClosed;
-                    ad.OnAdDisplayFailed -= onFailed;
-                    NotifyAdDisplayFailed(where, err.ErrorMessage);
-                    MainThreadDispatcher.Enqueue(() =>
-                    {
-                        onFail?.Invoke();
-                        Load(where);
-                    });
-                };
+                    NotifyAdDisplayed(where);
+                    Action<LevelPlayAdInfo> onClosed = null;
+                    Action<LevelPlayAdInfo, LevelPlayAdError> onFailed = null;
 
-                ad.OnAdClosed += onClosed;
-                ad.OnAdDisplayFailed += onFailed;
-                ad.ShowAd(where);
+                    onClosed = (_) =>
+                    {
+                        ad.OnAdClosed -= onClosed;
+                        ad.OnAdDisplayFailed -= onFailed;
+                        NotifyAdClosed(where);
+                        MainThreadDispatcher.Enqueue(() => { onSuccess?.Invoke(); LoadByFloor(where, currentFloor); });
+                    };
+                    onFailed = (_, err) =>
+                    {
+                        ad.OnAdClosed -= onClosed;
+                        ad.OnAdDisplayFailed -= onFailed;
+                        NotifyAdDisplayFailed(where, err.ErrorMessage);
+                        MainThreadDispatcher.Enqueue(() => { onFail?.Invoke(); LoadByFloor(where, currentFloor); });
+                    };
+
+                    ad.OnAdClosed += onClosed;
+                    ad.OnAdDisplayFailed += onFailed;
+                    ad.ShowAd(where);
+                    return;
+                }
             }
-            else
-            {
-                NotifyAdDisplayFailed(where, "not_ready");
-                onFail?.Invoke();
-                Load(where);
-            }
+            NotifyAdDisplayFailed(where, "not_ready");
+            onFail?.Invoke();
+            Load(where);
 #endif
         }
     }
@@ -92,86 +89,81 @@ namespace GameUpSDK.Ads
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
         private Dictionary<string, LevelPlayRewardedAd> _ads = new Dictionary<string, LevelPlayRewardedAd>();
 #endif
-        public IronSourceRewardedAd(AdUnitConfig config) : base(config, AdUnitType.RewardedVideo, "LevelPlay")
-        {
-        }
+        public IronSourceRewardedAd(AdUnitConfig config) : base(config, AdUnitType.RewardedVideo, "LevelPlay") { }
 
         public override bool IsAvailable(string where = null)
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
-            return _ads.TryGetValue(GetKey(where), out var ad) && ad != null && ad.IsAdReady();
+            foreach (EcpmFloor floor in Enum.GetValues(typeof(EcpmFloor)))
+            {
+                string unitId = _config.ResolveUnitId(_adType, where, floor);
+                if (!string.IsNullOrEmpty(unitId) && _ads.TryGetValue(unitId, out var ad) && ad != null && ad.IsAdReady())
+                    return true;
+            }
 #endif
             return false;
         }
 
-        protected override void RequestAdInternal(string unitId, string where)
+        protected override void RequestAdInternal(string unitId, string where, EcpmFloor floor)
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-            if (!_ads.ContainsKey(key))
+            if (!_ads.ContainsKey(unitId))
             {
                 var newAd = new LevelPlayRewardedAd(unitId);
                 newAd.OnAdLoaded += (_) => HandleLoadSuccess(unitId, where);
-                newAd.OnAdLoadFailed += (err) => HandleLoadFailed(unitId, where, err.ErrorMessage);
-                _ads[key] = newAd;
+                newAd.OnAdLoadFailed += (err) => HandleLoadFailed(unitId, where, floor, err.ErrorMessage);
+                _ads[unitId] = newAd;
             }
-
-            _ads[key].LoadAd();
+            _ads[unitId].LoadAd();
 #endif
         }
 
         public void Show(string where, Action onSuccess, Action onFail)
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-            if (IsAvailable(where))
+            EcpmFloor[] orderCheck = { EcpmFloor.High, EcpmFloor.Medium, EcpmFloor.All };
+            foreach (var f in orderCheck)
             {
-                NotifyAdDisplayed(where);
-                var ad = _ads[key];
-                bool earned = false;
+                var currentFloor = f;
+                string unitId = _config.ResolveUnitId(_adType, where, currentFloor);
+                if (string.IsNullOrEmpty(unitId)) continue;
 
-                Action<LevelPlayAdInfo> onClosed = null;
-                Action<LevelPlayAdInfo, LevelPlayReward> onReward = null;
-                Action<LevelPlayAdInfo, LevelPlayAdError> onFailed = null;
-
-                onClosed = (_) =>
+                if (_ads.TryGetValue(unitId, out var ad) && ad != null && ad.IsAdReady())
                 {
-                    ad.OnAdClosed -= onClosed;
-                    ad.OnAdRewarded -= onReward;
-                    ad.OnAdDisplayFailed -= onFailed;
-                    NotifyAdClosed(where);
-                    MainThreadDispatcher.Enqueue(() =>
-                    {
-                        if (earned) onSuccess?.Invoke();
-                        else onFail?.Invoke();
-                        Load(where);
-                    });
-                };
-                onReward = (_, reward) => { earned = true; };
-                onFailed = (_, err) =>
-                {
-                    ad.OnAdClosed -= onClosed;
-                    ad.OnAdRewarded -= onReward;
-                    ad.OnAdDisplayFailed -= onFailed;
-                    NotifyAdDisplayFailed(where, err.ErrorMessage);
-                    MainThreadDispatcher.Enqueue(() =>
-                    {
-                        onFail?.Invoke();
-                        Load(where);
-                    });
-                };
+                    NotifyAdDisplayed(where);
+                    bool earned = false;
+                    Action<LevelPlayAdInfo> onClosed = null;
+                    Action<LevelPlayAdInfo, LevelPlayReward> onReward = null;
+                    Action<LevelPlayAdInfo, LevelPlayAdError> onFailed = null;
 
-                ad.OnAdClosed += onClosed;
-                ad.OnAdRewarded += onReward;
-                ad.OnAdDisplayFailed += onFailed;
-                ad.ShowAd(where);
+                    onClosed = (_) =>
+                    {
+                        ad.OnAdClosed -= onClosed;
+                        ad.OnAdRewarded -= onReward;
+                        ad.OnAdDisplayFailed -= onFailed;
+                        NotifyAdClosed(where);
+                        MainThreadDispatcher.Enqueue(() => { if (earned) onSuccess?.Invoke(); else onFail?.Invoke(); LoadByFloor(where, currentFloor); });
+                    };
+                    onReward = (_, reward) => { earned = true; };
+                    onFailed = (_, err) =>
+                    {
+                        ad.OnAdClosed -= onClosed;
+                        ad.OnAdRewarded -= onReward;
+                        ad.OnAdDisplayFailed -= onFailed;
+                        NotifyAdDisplayFailed(where, err.ErrorMessage);
+                        MainThreadDispatcher.Enqueue(() => { onFail?.Invoke(); LoadByFloor(where, currentFloor); });
+                    };
+
+                    ad.OnAdClosed += onClosed;
+                    ad.OnAdRewarded += onReward;
+                    ad.OnAdDisplayFailed += onFailed;
+                    ad.ShowAd(where);
+                    return;
+                }
             }
-            else
-            {
-                NotifyAdDisplayFailed(where, "not_ready");
-                onFail?.Invoke();
-                Load(where);
-            }
+            NotifyAdDisplayFailed(where, "not_ready");
+            onFail?.Invoke();
+            Load(where);
 #endif
         }
     }
@@ -183,69 +175,38 @@ namespace GameUpSDK.Ads
 #endif
         private readonly Dictionary<string, bool> _isLoaded = new Dictionary<string, bool>();
 
-        public IronSourceBannerAd(AdUnitConfig config) : base(config, AdUnitType.Banner, "LevelPlay")
-        {
-        }
+        public IronSourceBannerAd(AdUnitConfig config) : base(config, AdUnitType.Banner, "LevelPlay") { }
+
+        // Tắt Waterfall cho Banner
+        public override void Load(string where = null) => LoadByFloor(where, EcpmFloor.All);
 
         public override bool IsAvailable(string where = null)
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
-            return _isLoaded.TryGetValue(GetKey(where), out var ad) && ad;
+            string unitId = _config.ResolveUnitId(_adType, where, EcpmFloor.All);
+            return _isLoaded.TryGetValue(unitId, out var loaded) && loaded;
 #endif
             return false;
         }
 
-        protected override void RequestAdInternal(string unitId, string where)
+        protected override void RequestAdInternal(string unitId, string where, EcpmFloor floor)
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-
-            // Đọc trực tiếp cấu hình từ Editor Setup Window
-            var entry = _config.GetEntry(_adType, where);
-
+            var entry = _config.GetEntry(_adType, where, floor);
             MainThreadDispatcher.Enqueue(() =>
             {
-                // Hủy banner cũ nếu có để tạo cái mới chuẩn cấu hình
-                if (_ads.ContainsKey(key))
-                {
-                    _ads[key].DestroyAd();
-                    _ads.Remove(key);
-                }
+                if (_ads.ContainsKey(unitId)) { _ads[unitId].DestroyAd(); _ads.Remove(unitId); }
+                _isLoaded[unitId] = false;
 
-                _isLoaded[key] = false;
-
-                // Map config sang định dạng của IronSource LevelPlay
-                var pos = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top
-                    ? LevelPlayBannerPosition.TopCenter
-                    : LevelPlayBannerPosition.BottomCenter;
-
+                var pos = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top ? LevelPlayBannerPosition.TopCenter : LevelPlayBannerPosition.BottomCenter;
                 var bannerConfig = new LevelPlayBannerAd.Config.Builder()
-                    .SetSize(GetLevelPlayAdSize(entry.BannerSize))
-                    .SetPosition(pos)
-                    .SetDisplayOnLoad(false) // Để class này tự quản lý cờ _shouldShow
-                    .Build();
+                    .SetSize(GetLevelPlayAdSize(entry.BannerSize)).SetPosition(pos).SetDisplayOnLoad(false).Build();
 
                 var banner = new LevelPlayBannerAd(unitId, bannerConfig);
-
-                banner.OnAdLoaded += (_) =>
-                {
-                    MainThreadDispatcher.Enqueue(() =>
-                    {
-                        _isLoaded[key] = true;
-                        HandleLoadSuccess(unitId, where);
-                    });
-                };
-
-                banner.OnAdLoadFailed += (err) =>
-                {
-                    MainThreadDispatcher.Enqueue(() =>
-                    {
-                        _isLoaded[key] = false;
-                        HandleLoadFailed(unitId, where, err.ErrorMessage);
-                    });
-                };
-
-                _ads[key] = banner;
+                banner.OnAdLoaded += (_) => MainThreadDispatcher.Enqueue(() => { _isLoaded[unitId] = true; HandleLoadSuccess(unitId, where); });
+                banner.OnAdLoadFailed += (err) => MainThreadDispatcher.Enqueue(() => { _isLoaded[unitId] = false; HandleLoadFailed(unitId, where, floor, err.ErrorMessage); });
+                
+                _ads[unitId] = banner;
                 banner.LoadAd();
             });
 #endif
@@ -256,23 +217,15 @@ namespace GameUpSDK.Ads
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
             MainThreadDispatcher.Enqueue(() =>
             {
-                string key = GetKey(where);
-                string unitId = _config.ResolveUnitId(_adType, where);
-                if (string.IsNullOrEmpty(unitId))
-                {
-                    NotifyAdDisplayFailed(where, "empty_id");
-                    return;
-                }
+                string unitId = _config.ResolveUnitId(_adType, where, EcpmFloor.All);
+                if (string.IsNullOrEmpty(unitId)) return;
 
-                if (_isLoaded.TryGetValue(key, out bool loaded) && loaded)
+                if (_isLoaded.TryGetValue(unitId, out bool loaded) && loaded)
                 {
                     NotifyAdDisplayed(where);
-                    if (_ads.TryGetValue(key, out var ad) && ad != null) ad.ShowAd();
+                    if (_ads.TryGetValue(unitId, out var ad) && ad != null) ad.ShowAd();
                 }
-                else
-                {
-                    Load(where);
-                }
+                else Load(where);
             });
 #endif
         }
@@ -280,20 +233,16 @@ namespace GameUpSDK.Ads
         public void Hide(string where)
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
-            if (_ads.TryGetValue(GetKey(where), out var ad) && ad != null) ad.HideAd();
+            string unitId = _config.ResolveUnitId(_adType, where, EcpmFloor.All);
+            if (_ads.TryGetValue(unitId, out var ad) && ad != null) ad.HideAd();
 #endif
         }
-
-        public void Restore(string where)
-        {
-            Show(where);
-        }
+        public void Restore(string where) => Show(where);
 
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
         private static LevelPlayAdSize GetLevelPlayAdSize(BannerSize size)
         {
-            switch (size)
-            {
+            switch (size) {
                 case BannerSize.Banner: return LevelPlayAdSize.BANNER;
                 case BannerSize.Adaptive: return LevelPlayAdSize.CreateAdaptiveAdSize();
                 case BannerSize.MediumRectangle: return LevelPlayAdSize.MEDIUM_RECTANGLE;

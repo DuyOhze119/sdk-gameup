@@ -16,25 +16,34 @@ import com.google.android.gms.ads.nativead.MediaView;
 import com.google.android.gms.ads.nativead.NativeAd;
 import com.google.android.gms.ads.nativead.NativeAdView;
 
+import java.util.HashMap;
+
 public class UnityNativeFullScreen {
-    // THÊM SỰ KIỆN PAID VÀO INTERFACE
+
     public interface INativeAdCallback {
         void onAdLoaded();
         void onAdFailedToLoad(String error);
         void onAdClosed();
-        void onAdPaid(double value); // <--- MỚI
+        void onAdPaid(double value);
     }
 
     private static View mainContainer;
-    private static NativeAd loadedAd = null;
-    private static boolean isAdLoading = false; 
-    private static INativeAdCallback mCallback;
+    
+    // HashMaps lưu trữ đa luồng ID
+    private static HashMap<String, NativeAd> loadedAdsMap = new HashMap<>();
+    private static HashMap<String, Boolean> loadingStatesMap = new HashMap<>();
+    private static HashMap<String, INativeAdCallback> callbacksMap = new HashMap<>();
+    
+    // Trạng thái quảng cáo đang show
+    private static NativeAd currentShowingAd = null;
+    private static String currentShowingUnitId = null;
 
     public static void loadAd(final Activity activity, final String adUnitId, final INativeAdCallback callback) {
-        mCallback = callback; 
-        if (loadedAd != null || isAdLoading) return;
+        callbacksMap.put(adUnitId, callback);
+        
+        if (loadedAdsMap.containsKey(adUnitId) || Boolean.TRUE.equals(loadingStatesMap.get(adUnitId))) return;
 
-        isAdLoading = true;
+        loadingStatesMap.put(adUnitId, true);
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -47,30 +56,29 @@ public class UnityNativeFullScreen {
                     .forNativeAd(new NativeAd.OnNativeAdLoadedListener() {
                         @Override
                         public void onNativeAdLoaded(NativeAd nativeAd) {
-                            loadedAd = nativeAd;
-                            isAdLoading = false;
+                            loadedAdsMap.put(adUnitId, nativeAd);
+                            loadingStatesMap.put(adUnitId, false);
                             
-                            // ĐĂNG KÝ HỨNG DOANH THU TỪ GOOGLE TRẢ VỀ
-                            loadedAd.setOnPaidEventListener(new com.google.android.gms.ads.OnPaidEventListener() {
+                            nativeAd.setOnPaidEventListener(new com.google.android.gms.ads.OnPaidEventListener() {
                                 @Override
                                 public void onPaidEvent(com.google.android.gms.ads.AdValue adValue) {
-                                    if (mCallback != null) {
-                                        // Đổi từ Micros sang USD
-                                        mCallback.onAdPaid(adValue.getValueMicros() * 0.000001);
-                                    }
+                                    INativeAdCallback cb = callbacksMap.get(adUnitId);
+                                    if (cb != null) cb.onAdPaid(adValue.getValueMicros() * 0.000001);
                                 }
                             });
 
-                            if (mCallback != null) mCallback.onAdLoaded();
+                            INativeAdCallback cb = callbacksMap.get(adUnitId);
+                            if (cb != null) cb.onAdLoaded();
                         }
                     })
                     .withAdListener(new AdListener() {
                         @Override
                         public void onAdFailedToLoad(LoadAdError adError) {
                             super.onAdFailedToLoad(adError);
-                            isAdLoading = false;
-                            loadedAd = null;
-                            if (mCallback != null) mCallback.onAdFailedToLoad(adError.getMessage());
+                            loadingStatesMap.put(adUnitId, false);
+                            
+                            INativeAdCallback cb = callbacksMap.get(adUnitId);
+                            if (cb != null) cb.onAdFailedToLoad(adError.getMessage());
                         }
                     })
                     .withNativeAdOptions(adOptions)
@@ -80,22 +88,26 @@ public class UnityNativeFullScreen {
         });
     }
 
-    public static boolean isAdLoaded() {
-        return loadedAd != null;
+    public static boolean isAdLoaded(String adUnitId) {
+        return loadedAdsMap.containsKey(adUnitId);
     }
 
-    public static void showAd(final Activity activity) {
-        if (loadedAd == null) return; 
+    public static void showAd(final Activity activity, final String adUnitId) {
+        if (!loadedAdsMap.containsKey(adUnitId)) return; 
         
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                renderFullScreenAd(activity, loadedAd);
+                // Consume (gỡ khỏi map) để yêu cầu lượt Load mới sau khi tắt
+                currentShowingAd = loadedAdsMap.remove(adUnitId);
+                currentShowingUnitId = adUnitId;
+                renderFullScreenAd(activity, currentShowingAd);
             }
         });
     }
 
     private static void renderFullScreenAd(final Activity activity, final NativeAd nativeAd) {
+        // Logic giao diện UI không thay đổi so với bản gốc của bạn
         int layoutId = activity.getResources().getIdentifier("gameup_native_fullscreen", "layout", activity.getPackageName());
         mainContainer = LayoutInflater.from(activity).inflate(layoutId, null);
 
@@ -164,11 +176,15 @@ public class UnityNativeFullScreen {
                     ((ViewGroup) mainContainer.getParent()).removeView(mainContainer);
                     mainContainer = null;
                 }
-                if (loadedAd != null) {
-                    loadedAd.destroy();
-                    loadedAd = null; 
+                if (currentShowingAd != null) {
+                    currentShowingAd.destroy();
+                    currentShowingAd = null; 
                 }
-                if (mCallback != null) mCallback.onAdClosed();
+                if (currentShowingUnitId != null) {
+                    INativeAdCallback cb = callbacksMap.get(currentShowingUnitId);
+                    if (cb != null) cb.onAdClosed();
+                    currentShowingUnitId = null;
+                }
             }
         });
     }

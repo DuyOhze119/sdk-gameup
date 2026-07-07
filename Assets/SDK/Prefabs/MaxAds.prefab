@@ -48,8 +48,12 @@ MonoBehaviour:
   showMediationDebugger: 0
   rewardedConfig:
     useMultiAdUnitIds: 0
-    defaultIdAndroid: 
-    defaultIdIOS: 
+    defaultIdAndroid_High: 
+    defaultIdAndroid_Medium: 
+    defaultIdAndroid_All: 
+    defaultIdIOS_High: 
+    defaultIdIOS_Medium: 
+    defaultIdIOS_All: 
     defaultBannerSize: 2
     defaultBannerFormat: 0
     defaultCollapsible: 0
@@ -57,8 +61,12 @@ MonoBehaviour:
     multiIdsIOS: []
   interstitialConfig:
     useMultiAdUnitIds: 0
-    defaultIdAndroid: 
-    defaultIdIOS: 
+    defaultIdAndroid_High: 
+    defaultIdAndroid_Medium: 
+    defaultIdAndroid_All: 
+    defaultIdIOS_High: 
+    defaultIdIOS_Medium: 
+    defaultIdIOS_All: 
     defaultBannerSize: 2
     defaultBannerFormat: 0
     defaultCollapsible: 0
@@ -66,8 +74,12 @@ MonoBehaviour:
     multiIdsIOS: []
   bannerConfig:
     useMultiAdUnitIds: 0
-    defaultIdAndroid: 
-    defaultIdIOS: 
+    defaultIdAndroid_High: 
+    defaultIdAndroid_Medium: 
+    defaultIdAndroid_All: 
+    defaultIdIOS_High: 
+    defaultIdIOS_Medium: 
+    defaultIdIOS_All: 
     defaultBannerSize: 2
     defaultBannerFormat: 0
     defaultCollapsible: 0
@@ -75,8 +87,12 @@ MonoBehaviour:
     multiIdsIOS: []
   appOpenAdConfig:
     useMultiAdUnitIds: 0
-    defaultIdAndroid: 
-    defaultIdIOS: 
+    defaultIdAndroid_High: 
+    defaultIdAndroid_Medium: 
+    defaultIdAndroid_All: 
+    defaultIdIOS_High: 
+    defaultIdIOS_Medium: 
+    defaultIdIOS_All: 
     defaultBannerSize: 2
     defaultBannerFormat: 0
     defaultCollapsible: 0
@@ -84,8 +100,12 @@ MonoBehaviour:
     multiIdsIOS: []
   nativeAdConfig:
     useMultiAdUnitIds: 0
-    defaultIdAndroid: 
-    defaultIdIOS: 
+    defaultIdAndroid_High: 
+    defaultIdAndroid_Medium: 
+    defaultIdAndroid_All: 
+    defaultIdIOS_High: 
+    defaultIdIOS_Medium: 
+    defaultIdIOS_All: 
     defaultBannerSize: 2
     defaultBannerFormat: 0
     defaultCollapsible: 0

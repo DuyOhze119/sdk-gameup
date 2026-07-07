@@ -1,50 +1,49 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 #if ADMOB_DEPENDENCIES_INSTALLED
 using GoogleMobileAds.Api;
 using UnityEngine;
 #endif
+using System;
+using System.Collections.Generic;
 
 namespace GameUpSDK.Ads
 {
+    // ==========================================
+    // INTERSTITIAL AD
+    // ==========================================
     public class AdmobInterstitialAd : BaseAdFormat, IInterstitialAd
     {
 #if ADMOB_DEPENDENCIES_INSTALLED
         private readonly Dictionary<string, InterstitialAd> _ads = new Dictionary<string, InterstitialAd>();
 #endif
-        public AdmobInterstitialAd(AdUnitConfig config) : base(config, AdUnitType.Interstitial, "Admob")
-        {
-        }
+        public AdmobInterstitialAd(AdUnitConfig config) : base(config, AdUnitType.Interstitial, "Admob") { }
 
         public override bool IsAvailable(string where = null)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            return _ads.TryGetValue(GetKey(where), out var ad) && ad != null && ad.CanShowAd();
+            foreach (EcpmFloor floor in Enum.GetValues(typeof(EcpmFloor)))
+            {
+                string unitId = _config.ResolveUnitId(_adType, where, floor);
+                if (!string.IsNullOrEmpty(unitId) && _ads.TryGetValue(unitId, out var ad) && ad != null && ad.CanShowAd())
+                    return true;
+            }
 #endif
             return false;
         }
 
-        protected override void RequestAdInternal(string unitId, string where)
+        protected override void RequestAdInternal(string unitId, string where, EcpmFloor floor)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            var key = GetKey(where);
-            if (_ads.TryGetValue(key, out var oldAd) && oldAd != null) oldAd.Destroy();
+            if (_ads.TryGetValue(unitId, out var oldAd) && oldAd != null) oldAd.Destroy();
 
             InterstitialAd.Load(unitId, new AdRequest(), (ad, error) =>
             {
                 if (error != null || ad == null)
                 {
-                    HandleLoadFailed(unitId, where, error?.GetMessage());
+                    HandleLoadFailed(unitId, where, floor, error?.GetMessage());
                     return;
                 }
-
-                ad.OnAdPaid += (adValue) =>
-                {
-                    if (adValue != null) TrackRevenue(unitId, key, "Interstitial", adValue.Value * 0.000001f);
-                };
-                _ads[key] = ad;
+                ad.OnAdPaid += (adValue) => { if (adValue != null) TrackRevenue(unitId, where, $"Interstitial_{floor}", adValue.Value * 0.000001f); };
+                _ads[unitId] = ad;
                 HandleLoadSuccess(unitId, where);
             });
 #endif
@@ -53,73 +52,78 @@ namespace GameUpSDK.Ads
         public void Show(string where, Action onSuccess, Action onFail)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            var key = GetKey(where);
-            if (IsAvailable(where))
+            EcpmFloor[] orderCheck = { EcpmFloor.High, EcpmFloor.Medium, EcpmFloor.All };
+            foreach (var f in orderCheck)
             {
-                NotifyAdDisplayed(where);
-                var ad = _ads[key];
-                _ads.Remove(key);
-                ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
+                var currentFloor = f; 
+                string unitId = _config.ResolveUnitId(_adType, where, currentFloor);
+                if (string.IsNullOrEmpty(unitId)) continue;
+
+                if (_ads.TryGetValue(unitId, out var ad) && ad != null && ad.CanShowAd())
                 {
-                    Debug.LogError("Interstitial ad dismissed");
-                    NotifyAdClosed(where);
-                    onSuccess?.Invoke();
-                    Load(where);
-                });
-                ad.OnAdFullScreenContentFailed += (err) => MainThreadDispatcher.Enqueue(() =>
-                {
-                    NotifyAdDisplayFailed(where, err.GetMessage());
-                    onFail?.Invoke();
-                    Load(where);
-                });
-                ad.Show();
+                    NotifyAdDisplayed(where);
+                    _ads.Remove(unitId);
+
+                    ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
+                    {
+                        NotifyAdClosed(where);
+                        onSuccess?.Invoke();
+                        LoadByFloor(where, currentFloor);
+                    });
+                    ad.OnAdFullScreenContentFailed += (err) => MainThreadDispatcher.Enqueue(() =>
+                    {
+                        NotifyAdDisplayFailed(where, err.GetMessage());
+                        onFail?.Invoke();
+                        LoadByFloor(where, currentFloor);
+                    });
+                    ad.Show();
+                    return;
+                }
             }
-            else
-            {
-                NotifyAdDisplayFailed(where, "not_ready");
-                onFail?.Invoke();
-                Load(where);
-            }
+            NotifyAdDisplayFailed(where, "not_ready_all_floors");
+            onFail?.Invoke();
+            Load(where);
 #endif
         }
     }
 
+    // ==========================================
+    // REWARDED AD
+    // ==========================================
     public class AdmobRewardedAd : BaseAdFormat, IRewardedAd
     {
 #if ADMOB_DEPENDENCIES_INSTALLED
         private readonly Dictionary<string, RewardedAd> _ads = new Dictionary<string, RewardedAd>();
 #endif
-        public AdmobRewardedAd(AdUnitConfig config) : base(config, AdUnitType.RewardedVideo, "Admob")
-        {
-        }
+        public AdmobRewardedAd(AdUnitConfig config) : base(config, AdUnitType.RewardedVideo, "Admob") { }
 
         public override bool IsAvailable(string where = null)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            return _ads.TryGetValue(GetKey(where), out var ad) && ad != null && ad.CanShowAd();
+            foreach (EcpmFloor floor in Enum.GetValues(typeof(EcpmFloor)))
+            {
+                string unitId = _config.ResolveUnitId(_adType, where, floor);
+                if (!string.IsNullOrEmpty(unitId) && _ads.TryGetValue(unitId, out var ad) && ad != null && ad.CanShowAd())
+                    return true;
+            }
 #endif
             return false;
         }
 
-        protected override void RequestAdInternal(string unitId, string where)
+        protected override void RequestAdInternal(string unitId, string where , EcpmFloor floor)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            var key = GetKey(where);
-            if (_ads.TryGetValue(key, out var oldAd) && oldAd != null) oldAd.Destroy();
+            if (_ads.TryGetValue(unitId, out var oldAd) && oldAd != null) oldAd.Destroy();
 
             RewardedAd.Load(unitId, new AdRequest(), (ad, error) =>
             {
                 if (error != null || ad == null)
                 {
-                    HandleLoadFailed(unitId, where, error?.GetMessage());
+                    HandleLoadFailed(unitId, where, floor, error?.GetMessage());
                     return;
                 }
-
-                ad.OnAdPaid += (adValue) =>
-                {
-                    if (adValue != null) TrackRevenue(unitId, key, "Rewarded", adValue.Value * 0.000001f);
-                };
-                _ads[key] = ad;
+                ad.OnAdPaid += (adValue) => { if (adValue != null) TrackRevenue(unitId, where, $"Rewarded_{floor}", adValue.Value * 0.000001f); };
+                _ads[unitId] = ad;
                 HandleLoadSuccess(unitId, where);
             });
 #endif
@@ -128,42 +132,49 @@ namespace GameUpSDK.Ads
         public void Show(string where, Action onSuccess, Action onFail)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-            if (IsAvailable(where))
+            EcpmFloor[] orderCheck = { EcpmFloor.High, EcpmFloor.Medium, EcpmFloor.All };
+            foreach (var f in orderCheck)
             {
-                NotifyAdDisplayed(where);
-                var ad = _ads[key];
-                _ads.Remove(key);
-                bool earned = false;
+                var currentFloor = f;
+                string unitId = _config.ResolveUnitId(_adType, where, currentFloor);
+                if (string.IsNullOrEmpty(unitId)) continue;
 
-                ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
+                if (_ads.TryGetValue(unitId, out var ad) && ad != null && ad.CanShowAd())
                 {
-                    NotifyAdClosed(where);
-                    if (!earned) onFail?.Invoke();
-                    Load(where);
-                });
-                ad.OnAdFullScreenContentFailed += (err) => MainThreadDispatcher.Enqueue(() =>
-                {
-                    NotifyAdDisplayFailed(where, err.GetMessage());
-                    onFail?.Invoke();
-                    Load(where);
-                });
-                ad.Show((reward) =>
-                {
-                    earned = true;
-                    MainThreadDispatcher.Enqueue(() => onSuccess?.Invoke());
-                });
+                    NotifyAdDisplayed(where);
+                    _ads.Remove(unitId);
+                    bool earned = false;
+
+                    ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
+                    {
+                        NotifyAdClosed(where);
+                        if (!earned) onFail?.Invoke();
+                        LoadByFloor(where, currentFloor);
+                    });
+                    ad.OnAdFullScreenContentFailed += (err) => MainThreadDispatcher.Enqueue(() =>
+                    {
+                        NotifyAdDisplayFailed(where, err.GetMessage());
+                        onFail?.Invoke();
+                        LoadByFloor(where, currentFloor);
+                    });
+                    ad.Show((reward) =>
+                    {
+                        earned = true;
+                        MainThreadDispatcher.Enqueue(() => onSuccess?.Invoke());
+                    });
+                    return;
+                }
             }
-            else
-            {
-                NotifyAdDisplayFailed(where, "not_ready");
-                onFail?.Invoke();
-                Load(where);
-            }
+            NotifyAdDisplayFailed(where, "not_ready_all_floors");
+            onFail?.Invoke();
+            Load(where);
 #endif
         }
     }
 
+    // ==========================================
+    // APP OPEN AD
+    // ==========================================
     public class AdmobAppOpenAd : BaseAdFormat, IAppOpenAd
     {
 #if ADMOB_DEPENDENCIES_INSTALLED
@@ -171,40 +182,37 @@ namespace GameUpSDK.Ads
 #endif
         private readonly Dictionary<string, DateTime> _expireTimes = new Dictionary<string, DateTime>();
 
-        public AdmobAppOpenAd(AdUnitConfig config) : base(config, AdUnitType.AppOpen, "Admob")
-        {
-        }
+        public AdmobAppOpenAd(AdUnitConfig config) : base(config, AdUnitType.AppOpen, "Admob") { }
 
         public override bool IsAvailable(string where = null)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-            return _ads.TryGetValue(key, out var ad) && ad != null && ad.CanShowAd() &&
-                   _expireTimes.TryGetValue(key, out var exp) && DateTime.Now < exp;
+            foreach (EcpmFloor floor in Enum.GetValues(typeof(EcpmFloor)))
+            {
+                string unitId = _config.ResolveUnitId(_adType, where, floor);
+                if (!string.IsNullOrEmpty(unitId) && _ads.TryGetValue(unitId, out var ad) && ad != null && ad.CanShowAd() &&
+                    _expireTimes.TryGetValue(unitId, out var exp) && DateTime.Now < exp)
+                    return true;
+            }
 #endif
             return false;
         }
 
-        protected override void RequestAdInternal(string unitId, string where)
+        protected override void RequestAdInternal(string unitId, string where, EcpmFloor floor)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-            if (_ads.TryGetValue(key, out var oldAd) && oldAd != null) oldAd.Destroy();
+            if (_ads.TryGetValue(unitId, out var oldAd) && oldAd != null) oldAd.Destroy();
 
             AppOpenAd.Load(unitId, new AdRequest(), (ad, error) =>
             {
                 if (error != null || ad == null)
                 {
-                    HandleLoadFailed(unitId, where, error?.GetMessage());
+                    HandleLoadFailed(unitId, where, floor, error?.GetMessage());
                     return;
                 }
-
-                ad.OnAdPaid += (adValue) =>
-                {
-                    if (adValue != null) TrackRevenue(unitId, key, "AppOpen", adValue.Value * 0.000001f);
-                };
-                _ads[key] = ad;
-                _expireTimes[key] = DateTime.Now.AddHours(4);
+                ad.OnAdPaid += (adValue) => { if (adValue != null) TrackRevenue(unitId, where, $"AppOpen_{floor}", adValue.Value * 0.000001f); };
+                _ads[unitId] = ad;
+                _expireTimes[unitId] = DateTime.Now.AddHours(4);
                 HandleLoadSuccess(unitId, where);
             });
 #endif
@@ -213,36 +221,46 @@ namespace GameUpSDK.Ads
         public void Show(string where, Action onSuccess, Action onFail)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-            if (IsAvailable(where))
+            EcpmFloor[] orderCheck = { EcpmFloor.High, EcpmFloor.Medium, EcpmFloor.All };
+            foreach (var f in orderCheck)
             {
-                NotifyAdDisplayed(where);
-                var ad = _ads[key];
-                _ads.Remove(key);
-                ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
+                var currentFloor = f;
+                string unitId = _config.ResolveUnitId(_adType, where, currentFloor);
+                if (string.IsNullOrEmpty(unitId)) continue;
+
+                if (_ads.TryGetValue(unitId, out var ad) && ad != null && ad.CanShowAd() &&
+                    _expireTimes.TryGetValue(unitId, out var exp) && DateTime.Now < exp)
                 {
-                    NotifyAdClosed(where);
-                    onSuccess?.Invoke();
-                    Load(where);
-                });
-                ad.OnAdFullScreenContentFailed += (err) => MainThreadDispatcher.Enqueue(() =>
-                {
-                    NotifyAdDisplayFailed(where, err.GetMessage());
-                    onFail?.Invoke();
-                    Load(where);
-                });
-                ad.Show();
+                    NotifyAdDisplayed(where);
+                    _ads.Remove(unitId);
+                    _expireTimes.Remove(unitId);
+
+                    ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
+                    {
+                        NotifyAdClosed(where);
+                        onSuccess?.Invoke();
+                        LoadByFloor(where, currentFloor);
+                    });
+                    ad.OnAdFullScreenContentFailed += (err) => MainThreadDispatcher.Enqueue(() =>
+                    {
+                        NotifyAdDisplayFailed(where, err.GetMessage());
+                        onFail?.Invoke();
+                        LoadByFloor(where, currentFloor);
+                    });
+                    ad.Show();
+                    return;
+                }
             }
-            else
-            {
-                NotifyAdDisplayFailed(where, "not_ready_or_expired");
-                onFail?.Invoke();
-                Load(where);
-            }
+            NotifyAdDisplayFailed(where, "not_ready_or_expired");
+            onFail?.Invoke();
+            Load(where);
 #endif
         }
     }
 
+    // ==========================================
+    // BANNER AD & DISPATCHER (Chỉ load 1 tầng)
+    // ==========================================
     public class AdmobBannerAd : BaseAdFormat, IBannerAd
     {
 #if ADMOB_DEPENDENCIES_INSTALLED
@@ -250,81 +268,53 @@ namespace GameUpSDK.Ads
 #endif
         private readonly Dictionary<string, bool> _isLoaded = new Dictionary<string, bool>();
 
+        public AdmobBannerAd(AdUnitConfig config) : base(config, AdUnitType.Banner, "Admob") { }
 
-        public AdmobBannerAd(AdUnitConfig config) : base(config, AdUnitType.Banner, "Admob")
-        {
-        }
+        // OVERRIDE Tắt Waterfall: Banner chỉ Load duy nhất tầng All
+        public override void Load(string where = null) => LoadByFloor(where, EcpmFloor.All);
 
         public override bool IsAvailable(string where = null)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-            var available = _isLoaded.TryGetValue(key, out var isLoaded) && isLoaded;
-            return available;
+            string unitId = _config.ResolveUnitId(_adType, where, EcpmFloor.All);
+            return _isLoaded.TryGetValue(unitId, out var isLoaded) && isLoaded;
 #endif
             return false;
         }
 
-        protected override void RequestAdInternal(string unitId, string where)
+        protected override void RequestAdInternal(string unitId, string where, EcpmFloor floor)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-
-            // Lấy thẳng Config Entry từ Setup Window
-            var entry = _config.GetEntry(_adType, where);
-
+            var entry = _config.GetEntry(_adType, where, floor);
             MainThreadDispatcher.Enqueue(() =>
             {
-                if (_banners.TryGetValue(key, out var oldBanner) && oldBanner != null) oldBanner.Destroy();
-                _isLoaded[key] = false;
+                if (_banners.TryGetValue(unitId, out var oldBanner) && oldBanner != null) oldBanner.Destroy();
+                _isLoaded[unitId] = false;
 
-                var pos = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top
-                    ? AdPosition.Top
-                    : AdPosition.Bottom;
-                var size = GetAdMobBannerSize(entry.BannerSize);
+                var pos = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top ? AdPosition.Top : AdPosition.Bottom;
+                var banner = new BannerView(unitId, GetAdMobBannerSize(entry.BannerSize), pos);
+                _banners[unitId] = banner;
 
-                var banner = new BannerView(unitId, size, pos);
-                _banners[key] = banner;
-
-                banner.OnBannerAdLoaded += () =>
+                banner.OnBannerAdLoaded += () => MainThreadDispatcher.Enqueue(() =>
                 {
-                    MainThreadDispatcher.Enqueue(() =>
-                    {
-                        _isLoaded[key] = true;
-                        HandleLoadSuccess(unitId, where);
-                        //banner.Hide();
-                    });
-                };
-
-                banner.OnBannerAdLoadFailed += (err) =>
+                    _isLoaded[unitId] = true;
+                    HandleLoadSuccess(unitId, where);
+                });
+                banner.OnBannerAdLoadFailed += (err) => MainThreadDispatcher.Enqueue(() =>
                 {
-                    MainThreadDispatcher.Enqueue(() =>
-                    {
-                        _isLoaded[key] = false;
-                        banner.Destroy();
-                        _banners.Remove(key);
-                        HandleLoadFailed(unitId, where, err?.GetMessage());
-                    });
-                };
-
-                banner.OnAdPaid += (adValue) =>
-                {
-                    if (adValue != null) TrackRevenue(unitId, key, "Banner", adValue.Value * 0.000001f);
-                };
+                    _isLoaded[unitId] = false;
+                    banner.Destroy();
+                    _banners.Remove(unitId);
+                    HandleLoadFailed(unitId, where, floor, err?.GetMessage());
+                });
+                banner.OnAdPaid += (adValue) => { if (adValue != null) TrackRevenue(unitId, where, "Banner", adValue.Value * 0.000001f); };
 
                 var request = new AdRequest();
-                switch (entry.CollapsiblePlacement)
+                if (entry.CollapsiblePlacement != CollapsibleBannerPlacement.None)
                 {
-                    case CollapsibleBannerPlacement.Top:
-                        request.Extras.Add("collapsible", "top");
-                        request.Extras.Add("collapsible_request_id", System.Guid.NewGuid().ToString());
-                        break;
-                    case CollapsibleBannerPlacement.Bottom:
-                        request.Extras.Add("collapsible", "bottom");
-                        request.Extras.Add("collapsible_request_id", System.Guid.NewGuid().ToString());
-                        break;
+                    request.Extras.Add("collapsible", entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top ? "top" : "bottom");
+                    request.Extras.Add("collapsible_request_id", System.Guid.NewGuid().ToString());
                 }
-
                 banner.LoadAd(request);
             });
 #endif
@@ -335,27 +325,19 @@ namespace GameUpSDK.Ads
 #if ADMOB_DEPENDENCIES_INSTALLED
             MainThreadDispatcher.Enqueue(() =>
             {
-                string key = GetKey(where);
-                string unitId = _config.ResolveUnitId(_adType, where);
-                var entry = _config.GetEntry(_adType, where);
+                string unitId = _config.ResolveUnitId(_adType, where, EcpmFloor.All);
+                var entry = _config.GetEntry(_adType, where, EcpmFloor.All);
 
                 if (entry.CollapsiblePlacement != CollapsibleBannerPlacement.None)
                 {
-                    Load(where);
+                    Load(where); // Collapsible luôn load mới
                 }
                 else
                 {
-                    if (string.IsNullOrEmpty(unitId))
-                    {
-                        NotifyAdDisplayFailed(where, "empty_id");
-                        return;
-                    }
-
-                    if (_isLoaded.TryGetValue(key, out bool loaded) && loaded)
+                    if (_isLoaded.TryGetValue(unitId, out bool loaded) && loaded)
                     {
                         NotifyAdDisplayed(where);
-                        _banners[key].Show();
-                        UnityEngine.Debug.Log($"[GameUp] Banner available: {loaded}");
+                        _banners[unitId].Show();
                     }
                     else Load(where);
                 }
@@ -366,18 +348,12 @@ namespace GameUpSDK.Ads
         public void Hide(string where)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            string key = GetKey(where);
-            MainThreadDispatcher.Enqueue(() =>
-            {
-                if (_banners.TryGetValue(key, out var banner) && banner != null) banner.Hide();
-            });
+            string unitId = _config.ResolveUnitId(_adType, where, EcpmFloor.All);
+            MainThreadDispatcher.Enqueue(() => { if (_banners.TryGetValue(unitId, out var banner) && banner != null) banner.Hide(); });
 #endif
         }
 
-        public void Restore(string where)
-        {
-            Show(where);
-        }
+        public void Restore(string where) => Show(where);
 
 #if ADMOB_DEPENDENCIES_INSTALLED
         private AdSize GetAdMobBannerSize(BannerSize size)
@@ -385,79 +361,13 @@ namespace GameUpSDK.Ads
             switch (size)
             {
                 case BannerSize.Banner: return AdSize.Banner;
-                case BannerSize.Adaptive:
-                    return AdSize.GetCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(AdSize.FullWidth);
+                case BannerSize.Adaptive: return AdSize.GetCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(AdSize.FullWidth);
                 case BannerSize.MediumRectangle: return AdSize.MediumRectangle;
                 case BannerSize.Leaderboard: return AdSize.Leaderboard;
-                case BannerSize.Large:
                 default: return new AdSize(320, 100);
             }
         }
 #endif
-    }
-
-    public class AdmobNativeFullscreenAd : BaseAdFormat, INativeFullScreenAd
-    {
-        private string _bannerId;
-        private string _where;
-
-        public AdmobNativeFullscreenAd(AdUnitConfig config) : base(config, AdUnitType.NativeAd, "Admob")
-        {
-            FullScreenNativeAdManager.Instance.OnAdDisplayedEvent += OnNativeAdDisplayed;
-            FullScreenNativeAdManager.Instance.OnAdClosedEvent += OnNativeAdClosed;
-            FullScreenNativeAdManager.Instance.OnAdLoadedEvent += OnNativeAdLoaded;
-            FullScreenNativeAdManager.Instance.OnAdLoadFailedEvent += OnNativeAdLoadFailed;
-            FullScreenNativeAdManager.Instance.OnAdPaidEvent += OnNativeAdPaid;
-        }
-
-        public override bool IsAvailable(string where = null)
-        {
-            return FullScreenNativeAdManager.Instance.IsAdReady();
-        }
-
-        protected override void RequestAdInternal(string unitId, string where)
-        {
-            _where = where;
-            _bannerId = unitId;
-            FullScreenNativeAdManager.Instance.RequestAd(unitId);
-        }
-
-        public void Show(string where, Action onSuccess, Action onFail)
-        {
-            _where = where;
-            FullScreenNativeAdManager.Instance.ShowFullScreenAd();
-        }
-
-        public void Hide()
-        {
-            FullScreenNativeAdManager.Instance.ForceCloseAd();
-        }
-        
-        private void OnNativeAdPaid(double value)
-        {
-            TrackRevenue(_bannerId, _where, "NativeFullscreen", value);
-        }
-
-        private void OnNativeAdClosed()
-        {
-            NotifyAdClosed(_where);
-            Load(_where);
-        }
-
-        private void OnNativeAdLoaded()
-        {
-            HandleLoadSuccess(_bannerId, _where);
-        }
-
-        private void OnNativeAdLoadFailed(string error)
-        {
-            HandleLoadFailed(_bannerId, _where, error);
-        }
-
-        private void OnNativeAdDisplayed()
-        {
-            NotifyAdDisplayed(_where);
-        }
     }
 
     public class AdmobBannerDispatcher : IBannerAd
@@ -473,7 +383,6 @@ namespace GameUpSDK.Ads
             _nativeExpandBanner = new AdmobNativeBannerBridge(config);
             WireUpEvents(_standardBanner);
             WireUpEvents(_nativeExpandBanner);
-
             _nativeExpandBanner.OnCollapsedNativeBanner += OnCollapsedNativeBanner;
         }
 
@@ -484,66 +393,135 @@ namespace GameUpSDK.Ads
             {
                 if (_standardBanner.IsAvailable(w))
                 {
-                    Debug.Log($"OnCollapsedNativeBanner: {where} - show banner {w}");
                     _standardBanner.Show(w);
                     AdsEvent.RaiseBannerSwap(where, w);
                     return;
                 }
             }
-
             AdsEvent.RaiseBannerSwap(where, string.Empty);
         }
 
         public bool IsAvailable(string where = null) => GetTarget(where).IsAvailable(where);
-
         public event Action<string> OnAdLoaded;
         public event Action<string, string> OnAdLoadFailed;
         public event Action<string> OnAdDisplayed;
         public event Action<string, string> OnAdDisplayFailed;
         public event Action<string> OnAdClosed;
-
         private void WireUpEvents(IAdFormat adFormat)
         {
             if (adFormat == null) return;
-
             adFormat.OnAdLoaded += (where) => OnAdLoaded?.Invoke(where);
             adFormat.OnAdLoadFailed += (where, err) => OnAdLoadFailed?.Invoke(where, err);
-
             adFormat.OnAdDisplayed += (where) => OnAdDisplayed?.Invoke(where);
             adFormat.OnAdDisplayFailed += (where, err) => OnAdDisplayFailed?.Invoke(where, err);
-
             adFormat.OnAdClosed += (where) => OnAdClosed?.Invoke(where);
         }
 
         public void Load(string where = "default") => GetTarget(where).Load(where);
-
-        public void LoadAll()
-        {
-            var placements = _config.GetAllPlacements();
-            foreach (var p in placements)
-            {
-                GetTarget(p).Load(p);
-            }
-        }
-
+        public void LoadAll() { foreach (var p in _config.GetAllPlacements()) GetTarget(p).Load(p); }
         public void Show(string where = "default") => GetTarget(where).Show(where);
-
         public void Hide(string where = "default") => GetTarget(where).Hide(where);
-
-        public void Restore(string where)
-        {
-            GetTarget(where).Restore(where);
-        }
+        public void Restore(string where) => GetTarget(where).Restore(where);
 
         private IBannerAd GetTarget(string where)
         {
-            var entry = _config.GetEntry(AdUnitType.Banner, where);
-            if (entry != null && entry.BannerFormat == BannerFormatType.NativeOverlay)
+            var entry = _config.GetEntry(AdUnitType.Banner, where, EcpmFloor.All);
+            return entry != null && entry.BannerFormat == BannerFormatType.NativeOverlay ? (IBannerAd)_nativeExpandBanner : _standardBanner;
+        }
+    }
+    
+   public class AdmobNativeFullscreenAd : BaseAdFormat, INativeFullScreenAd
+    {
+        // Dictionary để lưu lại ánh xạ unitId -> where khi gọi RequestAd
+        private readonly Dictionary<string, string> _unitIdToWhere = new Dictionary<string, string>();
+
+        public AdmobNativeFullscreenAd(AdUnitConfig config) : base(config, AdUnitType.NativeAd, "Admob")
+        {
+            // Đăng ký các sự kiện từ Manager
+            FullScreenNativeAdManager.Instance.OnAdLoadedEvent += OnNativeAdLoaded;
+            FullScreenNativeAdManager.Instance.OnAdLoadFailedEvent += OnNativeAdLoadFailed;
+            FullScreenNativeAdManager.Instance.OnAdDisplayedEvent += OnNativeAdDisplayed;
+            FullScreenNativeAdManager.Instance.OnAdClosedEvent += OnNativeAdClosed;
+            FullScreenNativeAdManager.Instance.OnAdPaidEvent += OnNativeAdPaid;
+        }
+
+        public override bool IsAvailable(string where = null)
+        {
+            foreach (EcpmFloor floor in Enum.GetValues(typeof(EcpmFloor)))
             {
-                return _nativeExpandBanner;
+                string unitId = _config.ResolveUnitId(_adType, where, floor);
+                if (!string.IsNullOrEmpty(unitId) && FullScreenNativeAdManager.Instance.IsAdReady(unitId))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        protected override void RequestAdInternal(string unitId, string where, EcpmFloor floor)
+        {
+            // Lưu lại vết "where" của "unitId" này trước khi đẩy cho Manager tải
+            _unitIdToWhere[unitId] = where;
+            FullScreenNativeAdManager.Instance.RequestAd(unitId);
+        }
+
+        public void Show(string where, Action onSuccess, Action onFail)
+        {
+            EcpmFloor[] orderCheck = { EcpmFloor.High, EcpmFloor.Medium, EcpmFloor.All };
+
+            foreach (var floor in orderCheck)
+            {
+                string unitId = _config.ResolveUnitId(_adType, where, floor);
+                if (string.IsNullOrEmpty(unitId)) continue;
+
+                if (FullScreenNativeAdManager.Instance.IsAdReady(unitId))
+                {
+                    FullScreenNativeAdManager.Instance.ShowFullScreenAd(unitId, where);
+                    return; 
+                }
             }
 
-            return _standardBanner;
+            onFail?.Invoke();
+            Load(where);
+        }
+
+        public void Hide()
+        {
+            FullScreenNativeAdManager.Instance.ForceCloseAd();
+        }
+        
+        // =========================================================================
+        // CALLBACKS TỪ MANAGER
+        // =========================================================================
+
+        private void OnNativeAdPaid(string unitId, string where, double value)
+        {
+            TrackRevenue(unitId, where, "NativeFullscreen", value);
+        }
+
+        private void OnNativeAdClosed(string unitId, string where)
+        {
+            NotifyAdClosed(where);
+            Load(where); 
+        }
+
+        private void OnNativeAdLoaded(string unitId)
+        {
+            // Lấy lại vị trí "where" từ Dictionary đã lưu
+            _unitIdToWhere.TryGetValue(unitId, out string where);
+            HandleLoadSuccess(unitId, where ?? "default");
+        }
+
+        private void OnNativeAdLoadFailed(string unitId, string error)
+        {
+            // Lấy lại vị trí "where" từ Dictionary đã lưu
+            _unitIdToWhere.TryGetValue(unitId, out string where);
+            HandleLoadFailed(unitId, where ?? "default", EcpmFloor.All, error);
+        }
+
+        private void OnNativeAdDisplayed(string unitId, string where)
+        {
+            NotifyAdDisplayed(where);
         }
     }
 }

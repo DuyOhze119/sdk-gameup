@@ -9,66 +9,70 @@ namespace GameUpSDK
         private AndroidJavaClass bridgeClass;
         private AndroidJavaObject currentActivity;
         private bool _initialized;
-        private string _adUnitId;
 
-        private NativeAdCallbackProxy _callbackProxy;
+        // Lưu vết vị trí và ID đang hiển thị trên màn hình
+        private string _currentShowingUnitId;
+        private string _currentShowingWhere;
 
-        public event Action OnAdLoadedEvent;
-        public event Action<string> OnAdLoadFailedEvent;
-        public event Action OnAdClosedEvent;
-        public event Action OnAdDisplayedEvent;
-        public event Action<double> OnAdPaidEvent; // <--- MỚI
+        // Các event giờ đây mang theo tham số unitId (và where) để phân biệt quảng cáo
+        public event Action<string> OnAdLoadedEvent;
+        public event Action<string, string> OnAdLoadFailedEvent;
+        public event Action<string, string> OnAdClosedEvent;
+        public event Action<string, string> OnAdDisplayedEvent;
+        public event Action<string, string, double> OnAdPaidEvent; 
 
 #if UNITY_IOS && !UNITY_EDITOR
-        public delegate void NativeAdLoadedDelegate();
-        public delegate void NativeAdFailedDelegate(string error);
-        public delegate void NativeAdClosedDelegate();
-        public delegate void NativeAdPaidDelegate(double value); // <--- MỚI
+        public delegate void NativeAdLoadedDelegate(string unitId);
+        public delegate void NativeAdFailedDelegate(string unitId, string error);
+        public delegate void NativeAdClosedDelegate(string unitId);
+        public delegate void NativeAdPaidDelegate(string unitId, double value);
 
         [DllImport("__Internal")]
         private static extern void _iosLoadNativeAd(string adUnitId, NativeAdLoadedDelegate onLoaded, NativeAdFailedDelegate onFailed, NativeAdClosedDelegate onClosed, NativeAdPaidDelegate onPaid);
 
         [DllImport("__Internal")]
-        private static extern bool _iosIsNativeAdReady();
+        private static extern bool _iosIsNativeAdReady(string adUnitId);
 
         [DllImport("__Internal")]
-        private static extern void _iosShowNativeAd();
+        private static extern void _iosShowNativeAd(string adUnitId);
 
         [DllImport("__Internal")]
         private static extern void _iosHideNativeAd();
 
         [AOT.MonoPInvokeCallback(typeof(NativeAdLoadedDelegate))]
-        private static void OnIosAdLoaded() { if (Instance != null) Instance.HandleAdLoaded(); }
+        private static void OnIosAdLoaded(string unitId) { if (Instance != null) Instance.HandleAdLoaded(unitId); }
 
         [AOT.MonoPInvokeCallback(typeof(NativeAdFailedDelegate))]
-        private static void OnIosAdFailed(string error) { if (Instance != null) Instance.HandleAdFailedToLoad(error); }
+        private static void OnIosAdFailed(string unitId, string error) { if (Instance != null) Instance.HandleAdFailedToLoad(unitId, error); }
 
         [AOT.MonoPInvokeCallback(typeof(NativeAdClosedDelegate))]
-        private static void OnIosAdClosed() { if (Instance != null) Instance.HandleAdClosed(); }
+        private static void OnIosAdClosed(string unitId) { if (Instance != null) Instance.HandleAdClosed(unitId); }
 
         [AOT.MonoPInvokeCallback(typeof(NativeAdPaidDelegate))]
-        private static void OnIosAdPaid(double value) { if (Instance != null) Instance.HandleAdPaid(value); } // <--- MỚI
+        private static void OnIosAdPaid(string unitId, double value) { if (Instance != null) Instance.HandleAdPaid(unitId, value); }
 #endif
 
         private class NativeAdCallbackProxy : AndroidJavaProxy
         {
             private readonly FullScreenNativeAdManager _manager;
+            private readonly string _unitId;
 
-            public NativeAdCallbackProxy(FullScreenNativeAdManager manager) 
+            // Proxy nay lưu trữ UnitId để gọi ngược về đúng ID
+            public NativeAdCallbackProxy(FullScreenNativeAdManager manager, string unitId) 
                 : base("com.plugins.nativebridge.UnityNativeFullScreen$INativeAdCallback")
             {
                 _manager = manager;
+                _unitId = unitId;
             }
 
-            public void onAdLoaded() => _manager.HandleAdLoaded();
-            public void onAdFailedToLoad(string error) => _manager.HandleAdFailedToLoad(error);
-            public void onAdClosed() => _manager.HandleAdClosed();
-            public void onAdPaid(double value) => _manager.HandleAdPaid(value); // <--- MỚI
+            public void onAdLoaded() => _manager.HandleAdLoaded(_unitId);
+            public void onAdFailedToLoad(string error) => _manager.HandleAdFailedToLoad(_unitId, error);
+            public void onAdClosed() => _manager.HandleAdClosed(_unitId);
+            public void onAdPaid(double value) => _manager.HandleAdPaid(_unitId, value);
         }
 
         protected void Awake()
         {
-            _callbackProxy = new NativeAdCallbackProxy(this);
             DontDestroyOnLoad(gameObject);
         }
 
@@ -83,41 +87,43 @@ namespace GameUpSDK
 #endif
                 _initialized = true;
             }
-            _adUnitId = adUnit;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (bridgeClass != null && currentActivity != null)
             {
-                bridgeClass.CallStatic("loadAd", currentActivity, _adUnitId, _callbackProxy);
+                var proxy = new NativeAdCallbackProxy(this, adUnit);
+                bridgeClass.CallStatic("loadAd", currentActivity, adUnit, proxy);
             }
 #elif UNITY_IOS && !UNITY_EDITOR
-            // Thêm Delegate Paid vào hàm Load iOS
-            _iosLoadNativeAd(_adUnitId, OnIosAdLoaded, OnIosAdFailed, OnIosAdClosed, OnIosAdPaid);
+            _iosLoadNativeAd(adUnit, OnIosAdLoaded, OnIosAdFailed, OnIosAdClosed, OnIosAdPaid);
 #endif
         }
 
-        public bool IsAdReady()
+        public bool IsAdReady(string adUnit)
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            if (bridgeClass != null) return bridgeClass.CallStatic<bool>("isAdLoaded");
+            if (bridgeClass != null) return bridgeClass.CallStatic<bool>("isAdLoaded", adUnit);
 #elif UNITY_IOS && !UNITY_EDITOR
-            return _iosIsNativeAdReady();
+            return _iosIsNativeAdReady(adUnit);
 #endif
             return false;
         }
 
-        public void ShowFullScreenAd()
+        public void ShowFullScreenAd(string adUnit, string where)
         {
-            if (IsAdReady())
+            if (IsAdReady(adUnit))
             {
-                HandleAdDisplayed();
+                _currentShowingUnitId = adUnit;
+                _currentShowingWhere = where;
+                HandleAdDisplayed(adUnit, where);
+
 #if UNITY_ANDROID && !UNITY_EDITOR
-                bridgeClass.CallStatic("showAd", currentActivity);
+                bridgeClass.CallStatic("showAd", currentActivity, adUnit);
 #elif UNITY_IOS && !UNITY_EDITOR
-                _iosShowNativeAd();
+                _iosShowNativeAd(adUnit);
 #endif
             }
-            else RequestAd(_adUnitId);
+            else RequestAd(adUnit);
         }
 
         public void ForceCloseAd()
@@ -129,15 +135,10 @@ namespace GameUpSDK
 #endif
         }
 
-        internal void HandleAdLoaded() => MainThreadDispatcher.Enqueue(() => OnAdLoadedEvent?.Invoke());
-        internal void HandleAdFailedToLoad(string error) => MainThreadDispatcher.Enqueue(() => OnAdLoadFailedEvent?.Invoke(error));
-        internal void HandleAdClosed() => MainThreadDispatcher.Enqueue(() => OnAdClosedEvent?.Invoke());
-        internal void HandleAdDisplayed() => MainThreadDispatcher.Enqueue(() => OnAdDisplayedEvent?.Invoke());
-        
-        // HÀM HỨNG VÀ BẮN EVENT SANG CHO FILE ADMOB FORMAT
-        internal void HandleAdPaid(double value)
-        {
-            MainThreadDispatcher.Enqueue(() => OnAdPaidEvent?.Invoke(value));
-        }
+        internal void HandleAdLoaded(string unitId) => MainThreadDispatcher.Enqueue(() => OnAdLoadedEvent?.Invoke(unitId));
+        internal void HandleAdFailedToLoad(string unitId, string error) => MainThreadDispatcher.Enqueue(() => OnAdLoadFailedEvent?.Invoke(unitId, error));
+        internal void HandleAdDisplayed(string unitId, string where) => MainThreadDispatcher.Enqueue(() => OnAdDisplayedEvent?.Invoke(unitId, where));
+        internal void HandleAdClosed(string unitId) => MainThreadDispatcher.Enqueue(() => OnAdClosedEvent?.Invoke(unitId, _currentShowingWhere));
+        internal void HandleAdPaid(string unitId, double value) => MainThreadDispatcher.Enqueue(() => OnAdPaidEvent?.Invoke(unitId, _currentShowingWhere, value));
     }
 }

@@ -20,16 +20,13 @@ namespace GameUpSDK.Ads
         protected void NotifyAdDisplayFailed(string where, string error) => OnAdDisplayFailed?.Invoke(where, error);
         protected void NotifyAdClosed(string where) => OnAdClosed?.Invoke(where);
         
-        // Quản lý trạng thái Loading và Retry độc lập theo Placement (where)
-        private readonly Dictionary<string, bool> _isLoadingByWhere = new Dictionary<string, bool>();
-        private readonly Dictionary<string, int> _retryAttemptsByWhere = new Dictionary<string, int>();
+        // THAY ĐỔI: Quản lý trạng thái độc lập theo UnitId thay vì theo Vị trí (where)
+        private readonly Dictionary<string, bool> _isLoadingByUnitId = new Dictionary<string, bool>();
+        private readonly Dictionary<string, int> _retryAttemptsByUnitId = new Dictionary<string, int>();
 
-        protected const int LoadRetryExponentCap = 6; // Tối đa delay 2^6 = 64s
+        protected const int LoadRetryExponentCap = 6;
 
-        protected BaseAdFormat()
-        {
-            
-        }
+        protected BaseAdFormat() { }
         
         protected BaseAdFormat(AdUnitConfig config, AdUnitType adType, string networkName)
         {
@@ -38,32 +35,35 @@ namespace GameUpSDK.Ads
             _networkName = networkName;
         }
 
-        protected string GetKey(string where) => _config.ResolveUnitId(_adType, where);
-
-        protected string WhereByKey(string key) => _config.WhereByKey(_adType, key);
-
+        // Kích hoạt nạp toàn bộ các tầng eCPM của một vị trí hiển thị
         public virtual void Load(string where = null)
         {
-            string unitId = _config.ResolveUnitId(_adType, where);
+            foreach (EcpmFloor floor in Enum.GetValues(typeof(EcpmFloor)))
+            {
+                LoadByFloor(where, floor);
+            }
+        }
+
+        // Nạp riêng biệt cho một tầng cụ thể
+        public void LoadByFloor(string where, EcpmFloor floor)
+        {
+            string unitId = _config.ResolveUnitId(_adType, where, floor);
             if (string.IsNullOrEmpty(unitId)) return;
 
-            string key = GetKey(where);
-
-            if (IsLoading(key))
+            if (_isLoadingByUnitId.TryGetValue(unitId, out bool loading) && loading)
             {
-                LogTrace("request_skipped", unitId, where, "reason=already_loading");
                 return;
             }
 
-            SetLoadingState(key, true);
-            LogTrace("request", unitId, where);
+            _isLoadingByUnitId[unitId] = true;
+            LogTrace($"request_{floor}", unitId, where);
             
-            RequestAdInternal(unitId, where);
+            RequestAdInternal(unitId, where, floor);
         }
 
         public void LoadAll()
         {
-            if(_config == null) return;
+            if (_config == null) return;
             var placements = _config.GetAllPlacements();
             foreach (var placement in placements)
             {
@@ -73,41 +73,31 @@ namespace GameUpSDK.Ads
 
         public abstract bool IsAvailable(string where = null);
 
-        protected abstract void RequestAdInternal(string unitId, string where);
+        // THAY ĐỔI: Hàm abstract nhận thêm tham số floor để lớp con biết đang xử lý tầng nào
+        protected abstract void RequestAdInternal(string unitId, string where, EcpmFloor floor);
 
-        private bool IsLoading(string key)
+        protected void HandleLoadFailed(string unitId, string where, EcpmFloor floor, string error)
         {
-            return _isLoadingByWhere.TryGetValue(key, out bool loading) && loading;
-        }
+            _isLoadingByUnitId[unitId] = false;
 
-        private void SetLoadingState(string key, bool isLoading)
-        {
-            _isLoadingByWhere[key] = isLoading;
-        }
-        
-        protected void HandleLoadFailed(string unitId, string where, string error)
-        {
-            string key = GetKey(where);
-            SetLoadingState(key, false);
-
-            int currentRetry = _retryAttemptsByWhere.TryGetValue(key, out int attempts) ? attempts : 0;
+            int currentRetry = _retryAttemptsByUnitId.TryGetValue(unitId, out int attempts) ? attempts : 0;
             currentRetry++;
-            _retryAttemptsByWhere[key] = currentRetry;
+            _retryAttemptsByUnitId[unitId] = currentRetry;
 
             float retryDelay = (float)Math.Pow(2, Math.Min(LoadRetryExponentCap, currentRetry));
             OnAdLoadFailed?.Invoke(unitId, where);
-            LogTrace("load_failed_retry", unitId, where, $"delay={retryDelay}s, attempt={currentRetry}, error={error}");
+            
+            LogTrace($"load_failed_retry_{floor}", unitId, where, $"delay={retryDelay}s, error={error}");
             MainThreadDispatcher.Enqueue(() =>
             {
-                TimerHelper.Schedule(retryDelay, () => Load(where)); 
+                TimerHelper.Schedule(retryDelay, () => LoadByFloor(where, floor)); 
             });
         }
 
         protected void HandleLoadSuccess(string unitId, string where)
         {
-            string key = GetKey(where);
-            SetLoadingState(key, false);
-            _retryAttemptsByWhere[key] = 0;
+            _isLoadingByUnitId[unitId] = false;
+            _retryAttemptsByUnitId[unitId] = 0;
             OnAdLoaded?.Invoke(where);
             LogTrace("load_success", unitId, where);
         }

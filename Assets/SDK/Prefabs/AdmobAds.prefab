@@ -47,8 +47,12 @@ MonoBehaviour:
   testDevices: []
   interstitialConfig:
     useMultiAdUnitIds: 0
-    defaultIdAndroid: ca-app-pub-3940256099942544/1033173712
-    defaultIdIOS: 
+    defaultIdAndroid_High: ca-app-pub-3940256099942544/1033173713
+    defaultIdAndroid_Medium: ca-app-pub-3940256099942544/1033173714
+    defaultIdAndroid_All: ca-app-pub-3940256099942544/1033173712
+    defaultIdIOS_High: 
+    defaultIdIOS_Medium: 
+    defaultIdIOS_All: 
     defaultBannerSize: 2
     defaultBannerFormat: 0
     defaultCollapsible: 0
@@ -56,8 +60,12 @@ MonoBehaviour:
     multiIdsIOS: []
   rewardedConfig:
     useMultiAdUnitIds: 0
-    defaultIdAndroid: ca-app-pub-3940256099942544/5224354917
-    defaultIdIOS: 
+    defaultIdAndroid_High: 
+    defaultIdAndroid_Medium: 
+    defaultIdAndroid_All: ca-app-pub-3940256099942544/5224354917
+    defaultIdIOS_High: 
+    defaultIdIOS_Medium: 
+    defaultIdIOS_All: 
     defaultBannerSize: 2
     defaultBannerFormat: 0
     defaultCollapsible: 0
@@ -65,8 +73,12 @@ MonoBehaviour:
     multiIdsIOS: []
   appOpenConfig:
     useMultiAdUnitIds: 0
-    defaultIdAndroid: ca-app-pub-3940256099942544/9257395921
-    defaultIdIOS: 
+    defaultIdAndroid_High: 
+    defaultIdAndroid_Medium: 
+    defaultIdAndroid_All: ca-app-pub-3940256099942544/9257395921
+    defaultIdIOS_High: 
+    defaultIdIOS_Medium: 
+    defaultIdIOS_All: 
     defaultBannerSize: 2
     defaultBannerFormat: 0
     defaultCollapsible: 0
@@ -74,17 +86,33 @@ MonoBehaviour:
     multiIdsIOS: []
   bannerConfig:
     useMultiAdUnitIds: 0
-    defaultIdAndroid: ca-app-pub-3940256099942544/6300978111
-    defaultIdIOS: 
+    defaultIdAndroid_High: 
+    defaultIdAndroid_Medium: 
+    defaultIdAndroid_All: ca-app-pub-3940256099942544/6300978111
+    defaultIdIOS_High: 
+    defaultIdIOS_Medium: 
+    defaultIdIOS_All: 
     defaultBannerSize: 2
     defaultBannerFormat: 1
     defaultCollapsible: 2
-    multiIdsAndroid: []
+    multiIdsAndroid:
+    - AdType: 0
+      NameId: new_placement
+      Id: 
+      intId: 1
+      BannerFormat: 0
+      BannerSize: 2
+      CollapsiblePlacement: 0
+      Floor: 2
     multiIdsIOS: []
   nativeAdConfig:
     useMultiAdUnitIds: 0
-    defaultIdAndroid: ca-app-pub-3940256099942544/2247696110
-    defaultIdIOS: 
+    defaultIdAndroid_High: 
+    defaultIdAndroid_Medium: 
+    defaultIdAndroid_All: ca-app-pub-3940256099942544/2247696110
+    defaultIdIOS_High: 
+    defaultIdIOS_Medium: 
+    defaultIdIOS_All: 
     defaultBannerSize: 2
     defaultBannerFormat: 0
     defaultCollapsible: 0

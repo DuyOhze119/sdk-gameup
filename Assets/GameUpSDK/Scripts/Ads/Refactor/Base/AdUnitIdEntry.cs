@@ -11,6 +11,13 @@ namespace GameUpSDK.Ads
         NativeAd
     }
 
+    public enum EcpmFloor
+    {
+        High,
+        Medium,
+        All
+    }
+    
     public enum CollapsibleBannerPlacement
     {
         None,
@@ -28,6 +35,9 @@ namespace GameUpSDK.Ads
         public BannerFormatType BannerFormat = BannerFormatType.StandardBanner;
         public BannerSize BannerSize = BannerSize.Adaptive;
         public CollapsibleBannerPlacement CollapsiblePlacement = CollapsibleBannerPlacement.None;
+        
+        // BỔ SUNG: Xác định tầng eCPM floor cho ID này
+        public EcpmFloor Floor = EcpmFloor.All; 
 
         public bool IsValid() => !string.IsNullOrEmpty(Id);
     }
