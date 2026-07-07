@@ -25,7 +25,7 @@ namespace GameUpSDK.Ads
 
         private Dictionary<string, bool> _isLoaded = new Dictionary<string, bool>();
         private Dictionary<string, bool> _isLoading = new Dictionary<string, bool>();
-#if UNITY_IOS && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
+#if UNITY_ANDROID && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
         private Dictionary<string, NativeAdCallbackProxy> _proxies = new Dictionary<string, NativeAdCallbackProxy>();
 #endif 
         private static AdmobNativeBannerBridge _instance;
