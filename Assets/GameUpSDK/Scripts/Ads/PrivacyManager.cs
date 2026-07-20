@@ -58,14 +58,7 @@ namespace GameUpSDK
             yield return RequestUmpCoroutine();
 
             _completed = true;
-
-            // QUAN TRỌNG: Gọi hàm này để update trạng thái cho các Ad Network
-            // Giả sử AdsManager của bạn là Singleton
-            if (AdsManager.Instance != null)
-            {
-                AdsManager.Instance.SetConsent(_consentGranted);
-            }
-
+            
             _onCompleted?.Invoke(_consentGranted);
             _onCompleted = null;
         }

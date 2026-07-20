@@ -26,7 +26,7 @@ namespace GameUpSDK.Ads
         /// <summary>728 × 90 – chỉ phù hợp trên iPad / tablet.</summary>
         Leaderboard,
     }
-    
+
     public enum BannerFormatType
     {
         StandardBanner,
@@ -43,6 +43,7 @@ namespace GameUpSDK.Ads
             { MediationProvider.Max, MediationProvider.Admob, MediationProvider.IronSource };
 
         private readonly HashSet<string> _activeBanners = new HashSet<string>();
+
         private readonly Dictionary<MediationProvider, IAdNetwork> _networkDict =
             new Dictionary<MediationProvider, IAdNetwork>();
 
@@ -51,11 +52,11 @@ namespace GameUpSDK.Ads
         private readonly List<IAdCondition> _showConditions = new List<IAdCondition>();
 
         public static Action<string> OnBannerLoadedEvent = delegate { };
-        
+
         public bool IsInitialized { get; private set; }
-        
+
         public Dictionary<MediationProvider, IAdNetwork> Networks => _networkDict;
-        
+
         protected void Awake()
         {
             DontDestroyOnLoad(gameObject);
@@ -73,8 +74,11 @@ namespace GameUpSDK.Ads
 
         private void Start()
         {
-            PrivacyManager.Instance.BeginPrivacyFlow(SetConsent);
-            InitializeAll();
+            PrivacyManager.Instance.BeginPrivacyFlow(grantConsent =>
+            {
+                SetConsent(grantConsent);
+                MainThreadDispatcher.Enqueue(InitializeAll);
+            });
         }
 
         private void OnDestroy()
@@ -92,7 +96,7 @@ namespace GameUpSDK.Ads
         {
             AdsEvent.OnImpressionDataReady -= GameUpAnalytics.LogAdImpression;
             AdsEvent.OnImpressionDataReady += GameUpAnalytics.LogAdImpression;
-            
+
             AdsEvent.OnBannerSwap -= OnBannerSwapped;
             AdsEvent.OnBannerSwap += OnBannerSwapped;
 
@@ -118,6 +122,7 @@ namespace GameUpSDK.Ads
             {
                 network.BannerAd.OnAdLoaded += OnBannerLoaded;
             }
+
             IsInitialized = true;
         }
 
@@ -129,7 +134,7 @@ namespace GameUpSDK.Ads
                 _activeBanners.Add(current);
             }
         }
-        
+
         private void OnBannerLoaded(string where)
         {
             Debug.Log($"OnBannerLoaded: {where}");
@@ -137,10 +142,10 @@ namespace GameUpSDK.Ads
             {
                 HideBanner(where);
             }
-            
+
             OnBannerLoadedEvent.Invoke(where);
         }
-        
+
         private void TemporarilyHideBanners()
         {
             foreach (var provider in mediationPriority)
@@ -156,7 +161,7 @@ namespace GameUpSDK.Ads
                 }
             }
         }
-        
+
         private void RestoreBanners()
         {
             foreach (var provider in mediationPriority)
@@ -311,8 +316,8 @@ namespace GameUpSDK.Ads
         public void ShowInterstitial(string where, int currentLevel, Action onSuccess = null,
             Action onFail = null)
         {
-            if(AdCappingManager.Instance.IsAnyAdShowing) return;
-            
+            if (AdCappingManager.Instance.IsAnyAdShowing) return;
+
             if (!EvaluateConditions(AdUnitType.Interstitial, where, out var blockReason))
             {
                 Debug.Log($"[GameUpSDK] Interstitial block rules: {blockReason}");

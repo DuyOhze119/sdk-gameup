@@ -70,13 +70,10 @@ namespace GameUpSDK.Ads
                     RewardedAd.LoadAll();
                     
                     OnInitialized?.Invoke(this);
-
+                    
                     if (showMediationInspector)
                     {
-                        MobileAds.OpenAdInspector(error =>
-                        {
-                            Debug.LogError($"[Admob Network] Show Ad inspector Error: {error.GetMessage()}");
-                        });
+                        Invoke(nameof(ShowMediationInspector), 5f);
                     }
                 });
             });
@@ -84,5 +81,14 @@ namespace GameUpSDK.Ads
         }
         
         public void SetConsent(bool isConsent) { }
+        
+        private void ShowMediationInspector()
+        {
+            MobileAds.OpenAdInspector(error =>
+            {
+                Debug.LogError($"[Admob Network] Show Ad inspector Error: {error.GetMessage()}");
+            });
+        }
+        
     }
 }
