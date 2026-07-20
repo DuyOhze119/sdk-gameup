@@ -20,7 +20,6 @@ namespace GameUpSDK.Ads
         protected void NotifyAdDisplayFailed(string where, string error) => OnAdDisplayFailed?.Invoke(where, error);
         protected void NotifyAdClosed(string where) => OnAdClosed?.Invoke(where);
         
-        // THAY ĐỔI: Quản lý trạng thái độc lập theo UnitId thay vì theo Vị trí (where)
         private readonly Dictionary<string, bool> _isLoadingByUnitId = new Dictionary<string, bool>();
         private readonly Dictionary<string, int> _retryAttemptsByUnitId = new Dictionary<string, int>();
 
@@ -35,16 +34,14 @@ namespace GameUpSDK.Ads
             _networkName = networkName;
         }
 
-        // Kích hoạt nạp toàn bộ các tầng eCPM của một vị trí hiển thị
         public virtual void Load(string where = null)
         {
-            foreach (EcpmFloor floor in Enum.GetValues(typeof(EcpmFloor)))
+            foreach (EcpmFloor floor in _config.GetActiveFloors())
             {
                 LoadByFloor(where, floor);
             }
         }
 
-        // Nạp riêng biệt cho một tầng cụ thể
         public void LoadByFloor(string where, EcpmFloor floor)
         {
             string unitId = _config.ResolveUnitId(_adType, where, floor);
@@ -73,7 +70,6 @@ namespace GameUpSDK.Ads
 
         public abstract bool IsAvailable(string where = null);
 
-        // THAY ĐỔI: Hàm abstract nhận thêm tham số floor để lớp con biết đang xử lý tầng nào
         protected abstract void RequestAdInternal(string unitId, string where, EcpmFloor floor);
 
         protected void HandleLoadFailed(string unitId, string where, EcpmFloor floor, string error)
@@ -121,5 +117,7 @@ namespace GameUpSDK.Ads
             };
             MainThreadDispatcher.Enqueue(() => AdsEvent.RaiseImpressionDataReady(data));
         }
+
+        protected string WhereByKey(string key) => _config.WhereByKey(_adType, key);
     }
 }

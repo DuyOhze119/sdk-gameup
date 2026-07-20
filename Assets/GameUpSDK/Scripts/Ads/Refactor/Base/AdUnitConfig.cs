@@ -9,43 +9,52 @@ namespace GameUpSDK.Ads
     [Serializable]
     public class AdUnitConfig
     {
+        [Tooltip("Bật nếu muốn sử dụng Waterfall 3 tầng (High -> Medium -> All). Tắt để dùng 1 ID tiêu chuẩn.")]
+        public bool enableWaterfallFloor = false;
+
         [Tooltip("Bật nếu muốn cấu hình ID riêng cho từng vị trí (where). Tắt nếu muốn dùng chung ID mặc định.")]
         public bool useMultiAdUnitIds;
 
-        [Header("Default IDs (Android) - Dùng khi tắt Multi IDs")]
+        [Header("Default IDs (Android)")]
         public string defaultIdAndroid_High;
         public string defaultIdAndroid_Medium;
         [FormerlySerializedAs("defaultIdAndroid")] 
-        public string defaultIdAndroid_All; // Giữ lại data cũ trên Inspector
+        public string defaultIdAndroid_All;
 
-        [Header("Default IDs (iOS) - Dùng khi tắt Multi IDs")]
+        [Header("Default IDs (iOS)")]
         public string defaultIdIOS_High;
         public string defaultIdIOS_Medium;
         [FormerlySerializedAs("defaultIdIOS")] 
-        public string defaultIdIOS_All; // Giữ lại data cũ trên Inspector
+        public string defaultIdIOS_All;
 
         [Header("Default Banner Settings")]
         public BannerSize defaultBannerSize = BannerSize.Adaptive;
         public BannerFormatType defaultBannerFormat = BannerFormatType.StandardBanner;
         public CollapsibleBannerPlacement defaultCollapsible = CollapsibleBannerPlacement.None;
 
-        [Header("Multi IDs (Cấu hình riêng cho từng Placement)")] 
+        [Header("Multi IDs")] 
         public List<AdUnitIdEntry> multiIdsAndroid = new List<AdUnitIdEntry>();
         public List<AdUnitIdEntry> multiIdsIOS = new List<AdUnitIdEntry>();
 
-        // Overload cho các request không truyền Floor (Mặc định sẽ lấy tầng ALL)
+        public EcpmFloor[] GetActiveFloors()
+        {
+            return enableWaterfallFloor 
+                ? new[] { EcpmFloor.High, EcpmFloor.Medium, EcpmFloor.All } 
+                : new[] { EcpmFloor.All };
+        }
+
         public AdUnitIdEntry GetEntry(AdUnitType type, string where)
         {
             return GetEntry(type, where, EcpmFloor.All);
         }
 
-        // Lấy cấu hình ID dựa theo Loại, Vị trí và Tầng eCPM
         public AdUnitIdEntry GetEntry(AdUnitType type, string where, EcpmFloor floor)
         {
+            if (!enableWaterfallFloor) floor = EcpmFloor.All;
+
             bool isAndroid = GetRuntimeAdPlatform() == RuntimeAdPlatform.Android;
             var multiIds = isAndroid ? multiIdsAndroid : multiIdsIOS;
 
-            // 1. Chế độ Multi ID
             if (useMultiAdUnitIds && !string.IsNullOrWhiteSpace(where))
             {
                 foreach (var entry in multiIds)
@@ -59,12 +68,9 @@ namespace GameUpSDK.Ads
                 }
             }
 
-            // 2. Chế độ Single ID hoặc Fallback
-            string defaultId = GetDefaultId(isAndroid, floor);
-
             return new AdUnitIdEntry
             {
-                Id = defaultId,
+                Id = GetDefaultId(isAndroid, floor),
                 AdType = type,
                 NameId = where,
                 BannerSize = defaultBannerSize,
@@ -112,14 +118,12 @@ namespace GameUpSDK.Ads
                     }
                 }
             }
-
             return "default";
         }
 
         public List<string> GetAllPlacements()
         {
             var placements = new List<string>();
-
             if (!useMultiAdUnitIds)
             {
                 placements.Add("default");
@@ -134,13 +138,9 @@ namespace GameUpSDK.Ads
                 if (entry != null && entry.IsValid() && !string.IsNullOrWhiteSpace(entry.NameId))
                 {
                     string cleanName = entry.NameId.Trim();
-                    if (!placements.Contains(cleanName))
-                    {
-                        placements.Add(cleanName);
-                    }
+                    if (!placements.Contains(cleanName)) placements.Add(cleanName);
                 }
             }
-
             return placements;
         }
 
@@ -148,27 +148,16 @@ namespace GameUpSDK.Ads
         {
             bool isAndroid = GetRuntimeAdPlatform() == RuntimeAdPlatform.Android;
             var multiIds = isAndroid ? multiIdsAndroid : multiIdsIOS;
-            if (useMultiAdUnitIds)
-            {
-                return multiIds.Select(s => s.NameId).ToList();
-            }
-            else
-            {
-                return new List<string> { "default" };
-            }
+            if (useMultiAdUnitIds) return multiIds.Select(s => s.NameId).ToList();
+            return new List<string> { "default" };
         }
 
-        // Giải quyết chuỗi ID cụ thể (Mặc định là All nếu không truyền floor)
         public string ResolveUnitId(AdUnitType type, string where, EcpmFloor floor = EcpmFloor.All) 
         {
             return GetEntry(type, where, floor).Id;
         }
 
-        private enum RuntimeAdPlatform
-        {
-            Android,
-            IOS
-        }
+        private enum RuntimeAdPlatform { Android, IOS }
 
         private RuntimeAdPlatform GetRuntimeAdPlatform()
         {
@@ -177,9 +166,7 @@ namespace GameUpSDK.Ads
 #elif UNITY_IOS || UNITY_IPHONE
             return RuntimeAdPlatform.IOS;
 #elif UNITY_EDITOR
-            return UnityEditor.EditorUserBuildSettings.activeBuildTarget == UnityEditor.BuildTarget.iOS
-                ? RuntimeAdPlatform.IOS
-                : RuntimeAdPlatform.Android;
+            return UnityEditor.EditorUserBuildSettings.activeBuildTarget == UnityEditor.BuildTarget.iOS ? RuntimeAdPlatform.IOS : RuntimeAdPlatform.Android;
 #else
             return RuntimeAdPlatform.Android;
 #endif

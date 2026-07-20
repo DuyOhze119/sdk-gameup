@@ -16,7 +16,7 @@ namespace GameUpSDK.Ads
         public override bool IsAvailable(string where = null)
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
-            foreach (EcpmFloor floor in Enum.GetValues(typeof(EcpmFloor)))
+            foreach (EcpmFloor floor in _config.GetActiveFloors())
             {
                 string unitId = _config.ResolveUnitId(_adType, where, floor);
                 if (!string.IsNullOrEmpty(unitId) && _ads.TryGetValue(unitId, out var ad) && ad != null && ad.IsAdReady())
@@ -43,10 +43,8 @@ namespace GameUpSDK.Ads
         public void Show(string where, Action onSuccess, Action onFail)
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
-            EcpmFloor[] orderCheck = { EcpmFloor.High, EcpmFloor.Medium, EcpmFloor.All };
-            foreach (var f in orderCheck)
+            foreach (var currentFloor in _config.GetActiveFloors())
             {
-                var currentFloor = f;
                 string unitId = _config.ResolveUnitId(_adType, where, currentFloor);
                 if (string.IsNullOrEmpty(unitId)) continue;
 
@@ -94,7 +92,7 @@ namespace GameUpSDK.Ads
         public override bool IsAvailable(string where = null)
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
-            foreach (EcpmFloor floor in Enum.GetValues(typeof(EcpmFloor)))
+            foreach (EcpmFloor floor in _config.GetActiveFloors())
             {
                 string unitId = _config.ResolveUnitId(_adType, where, floor);
                 if (!string.IsNullOrEmpty(unitId) && _ads.TryGetValue(unitId, out var ad) && ad != null && ad.IsAdReady())
@@ -121,10 +119,8 @@ namespace GameUpSDK.Ads
         public void Show(string where, Action onSuccess, Action onFail)
         {
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
-            EcpmFloor[] orderCheck = { EcpmFloor.High, EcpmFloor.Medium, EcpmFloor.All };
-            foreach (var f in orderCheck)
+            foreach (var currentFloor in _config.GetActiveFloors())
             {
-                var currentFloor = f;
                 string unitId = _config.ResolveUnitId(_adType, where, currentFloor);
                 if (string.IsNullOrEmpty(unitId)) continue;
 

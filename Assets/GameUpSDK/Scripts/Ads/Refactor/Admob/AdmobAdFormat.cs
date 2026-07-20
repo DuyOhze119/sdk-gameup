@@ -20,7 +20,7 @@ namespace GameUpSDK.Ads
         public override bool IsAvailable(string where = null)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            foreach (EcpmFloor floor in Enum.GetValues(typeof(EcpmFloor)))
+            foreach (EcpmFloor floor in _config.GetActiveFloors())
             {
                 string unitId = _config.ResolveUnitId(_adType, where, floor);
                 if (!string.IsNullOrEmpty(unitId) && _ads.TryGetValue(unitId, out var ad) && ad != null && ad.CanShowAd())
@@ -52,10 +52,8 @@ namespace GameUpSDK.Ads
         public void Show(string where, Action onSuccess, Action onFail)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            EcpmFloor[] orderCheck = { EcpmFloor.High, EcpmFloor.Medium, EcpmFloor.All };
-            foreach (var f in orderCheck)
+            foreach (var currentFloor in _config.GetActiveFloors())
             {
-                var currentFloor = f; 
                 string unitId = _config.ResolveUnitId(_adType, where, currentFloor);
                 if (string.IsNullOrEmpty(unitId)) continue;
 
@@ -100,7 +98,7 @@ namespace GameUpSDK.Ads
         public override bool IsAvailable(string where = null)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            foreach (EcpmFloor floor in Enum.GetValues(typeof(EcpmFloor)))
+            foreach (EcpmFloor floor in _config.GetActiveFloors())
             {
                 string unitId = _config.ResolveUnitId(_adType, where, floor);
                 if (!string.IsNullOrEmpty(unitId) && _ads.TryGetValue(unitId, out var ad) && ad != null && ad.CanShowAd())
@@ -132,10 +130,8 @@ namespace GameUpSDK.Ads
         public void Show(string where, Action onSuccess, Action onFail)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            EcpmFloor[] orderCheck = { EcpmFloor.High, EcpmFloor.Medium, EcpmFloor.All };
-            foreach (var f in orderCheck)
+            foreach (var currentFloor in _config.GetActiveFloors())
             {
-                var currentFloor = f;
                 string unitId = _config.ResolveUnitId(_adType, where, currentFloor);
                 if (string.IsNullOrEmpty(unitId)) continue;
 
@@ -187,7 +183,7 @@ namespace GameUpSDK.Ads
         public override bool IsAvailable(string where = null)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            foreach (EcpmFloor floor in Enum.GetValues(typeof(EcpmFloor)))
+            foreach (EcpmFloor floor in _config.GetActiveFloors())
             {
                 string unitId = _config.ResolveUnitId(_adType, where, floor);
                 if (!string.IsNullOrEmpty(unitId) && _ads.TryGetValue(unitId, out var ad) && ad != null && ad.CanShowAd() &&
@@ -221,10 +217,8 @@ namespace GameUpSDK.Ads
         public void Show(string where, Action onSuccess, Action onFail)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
-            EcpmFloor[] orderCheck = { EcpmFloor.High, EcpmFloor.Medium, EcpmFloor.All };
-            foreach (var f in orderCheck)
+            foreach (var currentFloor in _config.GetActiveFloors())
             {
-                var currentFloor = f;
                 string unitId = _config.ResolveUnitId(_adType, where, currentFloor);
                 if (string.IsNullOrEmpty(unitId)) continue;
 
@@ -430,7 +424,7 @@ namespace GameUpSDK.Ads
         }
     }
     
-   public class AdmobNativeFullscreenAd : BaseAdFormat, INativeFullScreenAd
+    public class AdmobNativeFullscreenAd : BaseAdFormat, INativeFullScreenAd
     {
         // Dictionary để lưu lại ánh xạ unitId -> where khi gọi RequestAd
         private readonly Dictionary<string, string> _unitIdToWhere = new Dictionary<string, string>();
@@ -447,7 +441,7 @@ namespace GameUpSDK.Ads
 
         public override bool IsAvailable(string where = null)
         {
-            foreach (EcpmFloor floor in Enum.GetValues(typeof(EcpmFloor)))
+            foreach (EcpmFloor floor in _config.GetActiveFloors())
             {
                 string unitId = _config.ResolveUnitId(_adType, where, floor);
                 if (!string.IsNullOrEmpty(unitId) && FullScreenNativeAdManager.Instance.IsAdReady(unitId))
@@ -467,11 +461,9 @@ namespace GameUpSDK.Ads
 
         public void Show(string where, Action onSuccess, Action onFail)
         {
-            EcpmFloor[] orderCheck = { EcpmFloor.High, EcpmFloor.Medium, EcpmFloor.All };
-
-            foreach (var floor in orderCheck)
+            foreach (var currentFloor in _config.GetActiveFloors())
             {
-                string unitId = _config.ResolveUnitId(_adType, where, floor);
+                string unitId = _config.ResolveUnitId(_adType, where, currentFloor);
                 if (string.IsNullOrEmpty(unitId)) continue;
 
                 if (FullScreenNativeAdManager.Instance.IsAdReady(unitId))

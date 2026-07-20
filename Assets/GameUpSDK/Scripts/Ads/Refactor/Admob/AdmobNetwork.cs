@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GoogleMobileAds.Api;
 using UnityEngine;
 
 namespace GameUpSDK.Ads
@@ -7,6 +8,7 @@ namespace GameUpSDK.Ads
     public class AdmobNetwork : MonoBehaviour, IAdNetwork
     {
         [SerializeField] private List<string> testDevices;
+        [SerializeField] private bool showMediationInspector;
 
         [Header("Ad Unit Configs")]
         public AdUnitConfig interstitialConfig;
@@ -68,6 +70,14 @@ namespace GameUpSDK.Ads
                     RewardedAd.LoadAll();
                     
                     OnInitialized?.Invoke(this);
+
+                    if (showMediationInspector)
+                    {
+                        MobileAds.OpenAdInspector(error =>
+                        {
+                            Debug.LogError($"[Admob Network] Show Ad inspector Error: {error.GetMessage()}");
+                        });
+                    }
                 });
             });
 #endif
