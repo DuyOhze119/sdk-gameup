@@ -33,14 +33,12 @@ namespace GameUpSDK.Ads
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
             if (IsInitialized) return;
-            var timeInit = Time.realtimeSinceStartup;
-            Debug.LogError($"Initializing Admob Network: {Time.realtimeSinceStartup}");
+            
             GoogleMobileAds.Api.RequestConfiguration config = new GoogleMobileAds.Api.RequestConfiguration { TestDeviceIds = testDevices };
             GoogleMobileAds.Api.MobileAds.SetRequestConfiguration(config);
             
             GoogleMobileAds.Api.MobileAds.Initialize(initStatus =>
             {
-                Debug.LogError($"Initialized Admob Network: {Time.realtimeSinceStartup} - Total time initialized: {Time.realtimeSinceStartup - timeInit}");
                 var adapterStatusMap = initStatus.getAdapterStatusMap();
                 foreach (var adapter in adapterStatusMap)
                 {
