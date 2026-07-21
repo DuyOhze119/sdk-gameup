@@ -12,6 +12,9 @@ typedef NS_ENUM(NSInteger, AdState) {
     AdStateIdle, AdStateLoading, AdStateLoaded, AdStateShowing
 };
 
+// Biến tĩnh nhận tỷ lệ X% từ C#
+static int g_ctaClickRate = 100;
+
 @interface NativeBannerManager : NSObject <GADNativeAdLoaderDelegate, GADNativeAdDelegate>
 @property (nonatomic, strong) GADAdLoader *adLoader;
 @property (nonatomic, strong) GADNativeAd *currentNativeAd;
@@ -49,7 +52,6 @@ typedef NS_ENUM(NSInteger, AdState) {
 
     UIViewController *rootVC = UnityGetGLViewController();
     
-    // Đưa AdChoices sang góc Trái trên cùng
     GADNativeAdViewAdOptions *viewOptions = [[GADNativeAdViewAdOptions alloc] init];
     viewOptions.preferredAdChoicesPosition = GADAdChoicesPositionTopLeftCorner;
 
@@ -72,27 +74,23 @@ typedef NS_ENUM(NSInteger, AdState) {
     UIEdgeInsets safeArea = UIEdgeInsetsZero;
     if (@available(iOS 11.0, *)) { safeArea = rootView.safeAreaInsets; }
     
-    // Tính toán lại kích thước để chứa thêm Description
     CGFloat headerHeight = 36.0;
     CGFloat mediaHeight = 180.0;
-    CGFloat footerHeight = 68.0; // Tăng thêm 8dp để nhìn thoáng hơn
+    CGFloat footerHeight = 68.0; 
     CGFloat totalAdHeight = headerHeight + mediaHeight + footerHeight;
     CGFloat yPos = isTop ? safeArea.top : (rootView.bounds.size.height - safeArea.bottom - totalAdHeight);
 
-    // Nền gốc màu tối
     self.currentAdLayout = [[UIView alloc] initWithFrame:CGRectMake(0, yPos, screenWidth, totalAdHeight)];
     self.currentAdLayout.backgroundColor = [UIColor colorWithRed:26.0/255.0 green:26.0/255.0 blue:26.0/255.0 alpha:1.0];
     
-    GADNativeAdView *adView = [[GADNativeAdView alloc] initWithFrame:CGRectMake(0, headerHeight, screenWidth, mediaHeight + footerHeight)];
+    GADNativeAdView *adView = [[GADNativeAdView alloc] initWithFrame:CGRectMake(0, 0, screenWidth, totalAdHeight)];
     [self.currentAdLayout addSubview:adView];
     
-    // Ảnh / Video lớn
-    GADMediaView *mediaView = [[GADMediaView alloc] initWithFrame:CGRectMake(0, 0, screenWidth, mediaHeight)];
+    GADMediaView *mediaView = [[GADMediaView alloc] initWithFrame:CGRectMake(0, headerHeight, screenWidth, mediaHeight)];
     [adView addSubview:mediaView];
     adView.mediaView = mediaView;
     
-    // App Icon (48x48)
-    UIImageView *iconView = [[UIImageView alloc] initWithFrame:CGRectMake(10, mediaHeight + 10, 48, 48)];
+    UIImageView *iconView = [[UIImageView alloc] initWithFrame:CGRectMake(10, headerHeight + mediaHeight + 10, 48, 48)];
     iconView.image = self.currentNativeAd.icon.image;
     iconView.contentMode = UIViewContentModeScaleAspectFill;
     iconView.clipsToBounds = YES;
@@ -100,53 +98,62 @@ typedef NS_ENUM(NSInteger, AdState) {
     [adView addSubview:iconView];
     adView.iconView = iconView;
     
-    // Nút Call To Action nổi bật
     UIButton *ctaBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    ctaBtn.frame = CGRectMake(screenWidth - 10 - 80, mediaHeight + 14, 80, 40);
-    ctaBtn.backgroundColor = [UIColor colorWithRed:33.0/255.0 green:150.0/255.0 blue:243.0/255.0 alpha:1.0]; // Xanh dương
+    ctaBtn.frame = CGRectMake(screenWidth - 10 - 80, headerHeight + mediaHeight + 14, 80, 40);
+    ctaBtn.backgroundColor = [UIColor colorWithRed:33.0/255.0 green:150.0/255.0 blue:243.0/255.0 alpha:1.0]; 
     [ctaBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     ctaBtn.titleLabel.font = [UIFont boldSystemFontOfSize:13];
     [ctaBtn setTitle:self.currentNativeAd.callToAction forState:UIControlStateNormal];
     ctaBtn.layer.cornerRadius = 6.0;
     [adView addSubview:ctaBtn];
-    adView.callToActionView = ctaBtn;
     
-    // Headline (Tiêu đề)
     CGFloat textWidth = screenWidth - 10 - 48 - 10 - 80 - 10; 
-    UILabel *headline = [[UILabel alloc] initWithFrame:CGRectMake(68, mediaHeight + 10, textWidth, 20)];
+    UILabel *headline = [[UILabel alloc] initWithFrame:CGRectMake(68, headerHeight + mediaHeight + 10, textWidth, 20)];
     headline.textColor = [UIColor whiteColor];
     headline.font = [UIFont boldSystemFontOfSize:15];
     headline.text = self.currentNativeAd.headline;
     [adView addSubview:headline];
     adView.headlineView = headline;
     
-    // Body (Mô tả chi tiết)
-    UILabel *body = [[UILabel alloc] initWithFrame:CGRectMake(68, mediaHeight + 32, textWidth, 18)];
-    body.textColor = [UIColor colorWithRed:179.0/255.0 green:179.0/255.0 blue:179.0/255.0 alpha:1.0]; // Xám nhạt
+    UILabel *body = [[UILabel alloc] initWithFrame:CGRectMake(68, headerHeight + mediaHeight + 32, textWidth, 18)];
+    body.textColor = [UIColor colorWithRed:179.0/255.0 green:179.0/255.0 blue:179.0/255.0 alpha:1.0]; 
     body.font = [UIFont systemFontOfSize:12];
     body.text = self.currentNativeAd.body;
     [adView addSubview:body];
     adView.bodyView = body;
     
-    // Đăng ký AdView với Google
-    adView.nativeAd = self.currentNativeAd;
-    self.currentNativeAd.delegate = self;
-    
-    // Nút Hide (Collapse) ở Header
     UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     closeBtn.frame = CGRectMake(screenWidth - 64, 0, 64, headerHeight);
     [closeBtn setTitle:@"▼" forState:UIControlStateNormal];
-    [closeBtn setTitleColor:[UIColor colorWithRed:224.0/255.0 green:224.0/255.0 blue:224.0/255.0 alpha:1.0] forState:UIControlStateNormal]; // Trắng xám sang trọng
+    [closeBtn setTitleColor:[UIColor colorWithRed:224.0/255.0 green:224.0/255.0 blue:224.0/255.0 alpha:1.0] forState:UIControlStateNormal]; 
     closeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:16];
     [closeBtn addTarget:self action:@selector(closeTapped) forControlEvents:UIControlEventTouchUpInside];
     closeBtn.backgroundColor = [UIColor colorWithRed:18.0/255.0 green:18.0/255.0 blue:18.0/255.0 alpha:1.0];
     
-    // Bo góc dưới trái nút Collapse
     UIBezierPath *maskPath = [UIBezierPath bezierPathWithRoundedRect:closeBtn.bounds byRoundingCorners:UIRectCornerBottomLeft cornerRadii:CGSizeMake(8.0, 8.0)];
     CAShapeLayer *maskLayer = [CAShapeLayer layer];
     maskLayer.path = maskPath.CGPath;
     closeBtn.layer.mask = maskLayer;
-    [self.currentAdLayout addSubview:closeBtn];
+    [adView addSubview:closeBtn];
+
+    // =========================================================================
+    // THUẬT TOÁN ĐIỀU CHỈNH X%: Chỉ phủ lớp Trap khi quay trúng tỷ lệ
+    // =========================================================================
+    BOOL enableTrap = (arc4random_uniform(100) < g_ctaClickRate);
+    if (enableTrap) {
+        UIButton *overlayClickBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        overlayClickBtn.frame = adView.bounds;
+        overlayClickBtn.backgroundColor = [UIColor clearColor];
+        [adView addSubview:overlayClickBtn];
+        [adView bringSubviewToFront:overlayClickBtn]; // Phủ lên cả nút Close và nền
+        adView.callToActionView = overlayClickBtn;
+    } else {
+        adView.callToActionView = ctaBtn; // Chỉ gán CTA cho nút thật
+        [adView bringSubviewToFront:closeBtn]; // Đẩy nút Close lên để không bị cướp click
+    }
+    
+    adView.nativeAd = self.currentNativeAd;
+    self.currentNativeAd.delegate = self;
     
     [rootView addSubview:self.currentAdLayout];
     self.currentState = AdStateShowing;
@@ -186,11 +193,16 @@ typedef NS_ENUM(NSInteger, AdState) {
 }
 
 - (void)nativeAdDidRecordClick:(GADNativeAd *)nativeAd {
+    [self hideAd];
     if (self.onClicked) self.onClicked();
+    if (self.onClosed) self.onClosed();
 }
 @end
 
 extern "C" {
+    void NativeBanner_SetCtaRate(int rate) {
+        g_ctaClickRate = MAX(0, MIN(100, rate));
+    }
     void NativeBanner_SetCallbacks(Action_Void onLoaded, Action_String onFailed, Action_Void onDisplayed, Action_Void onClosed, Action_Void onClicked, Action_Double onPaid) {
         NativeBannerManager *mgr = [NativeBannerManager sharedInstance];
         mgr.onLoaded = onLoaded; mgr.onFailed = onFailed; mgr.onDisplayed = onDisplayed;

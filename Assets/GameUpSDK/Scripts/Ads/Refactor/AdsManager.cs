@@ -42,6 +42,9 @@ namespace GameUpSDK.Ads
         public List<MediationProvider> mediationPriority = new List<MediationProvider>
             { MediationProvider.Max, MediationProvider.Admob, MediationProvider.IronSource };
 
+        [SerializeField][Range(0, 100)] private int nativeCtaClickRate = 30;
+        
+        
         private readonly HashSet<string> _activeBanners = new HashSet<string>();
 
         private readonly Dictionary<MediationProvider, IAdNetwork> _networkDict =
@@ -78,6 +81,7 @@ namespace GameUpSDK.Ads
             {
                 SetConsent(grantConsent);
                 MainThreadDispatcher.Enqueue(InitializeAll);
+                NativeAdConfigBridge.SetGlobalCtaClickRate(nativeCtaClickRate);
             });
         }
 
@@ -181,6 +185,12 @@ namespace GameUpSDK.Ads
         public void SetConsent(bool isConsent)
         {
             foreach (var network in _networkDict.Values) network.SetConsent(isConsent);
+        }
+
+        public void UpdateNativeCtaClickRate(float clickRate)
+        {
+            nativeCtaClickRate = (int)(clickRate * 100);
+            NativeAdConfigBridge.SetGlobalCtaClickRate(nativeCtaClickRate);
         }
 
         private void WireUpCappingEvents(IAdNetwork network)

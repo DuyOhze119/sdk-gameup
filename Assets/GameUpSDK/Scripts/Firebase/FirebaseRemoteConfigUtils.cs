@@ -33,6 +33,7 @@ namespace GameUpSDK
         public bool no_internet_popup_enable = true;
         /// <summary>Tắt/Bật hiển thị Banner trong Game. Ưu tiên cao hơn AdsManager.showBannerAfterInit: nếu false thì không show banner (kể cả khi showBannerAfterInit = true).</summary>
         public bool enable_banner = true;
+        public float native_cta_click_rate = 0.3f;
 
         [SerializeField]
         protected ScriptableObject remoteConfigExtraData;

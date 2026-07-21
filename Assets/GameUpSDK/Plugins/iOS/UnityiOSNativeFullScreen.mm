@@ -9,6 +9,9 @@ typedef void (*Action_Failed)(const char* unitId, const char* error);
 typedef void (*Action_Closed)(const char* unitId);
 typedef void (*Action_Paid)(const char* unitId, double value);
 
+// Sử dụng chung biến tỷ lệ với Banner để đồng bộ cấu hình
+extern int g_ctaClickRate;
+
 @interface NativeFullScreenManager : NSObject <GADNativeAdLoaderDelegate, GADNativeAdDelegate>
 
 @property (nonatomic, strong) NSMutableDictionary<NSString*, GADAdLoader*> *adLoaders;
@@ -69,7 +72,7 @@ typedef void (*Action_Paid)(const char* unitId, double value);
                                                   adTypes:@[GADAdLoaderAdTypeNative]
                                                   options:@[viewOptions]];
     adLoader.delegate = self;
-    self.adLoaders[adUnitId] = adLoader; // Lưu vết loader để lookup
+    self.adLoaders[adUnitId] = adLoader;
     [adLoader loadRequest:[GADRequest request]];
 }
 
@@ -77,7 +80,6 @@ typedef void (*Action_Paid)(const char* unitId, double value);
     return self.loadedAds[adUnitId] != nil;
 }
 
-// Hàm hỗ trợ tìm UnitId thông qua AdLoader Reference
 - (NSString *)getUnitIdForLoader:(GADAdLoader *)loader {
     for (NSString *key in self.adLoaders) {
         if (self.adLoaders[key] == loader) {
@@ -90,9 +92,8 @@ typedef void (*Action_Paid)(const char* unitId, double value);
 - (void)showAd:(NSString *)adUnitId {
     if (!self.loadedAds[adUnitId]) return;
     
-    [self hideAd]; // Đóng quảng cáo hiện tại (nếu có)
+    [self hideAd];
     
-    // Consume ad
     self.currentNativeAd = self.loadedAds[adUnitId];
     self.currentShowingUnitId = adUnitId;
     [self.loadedAds removeObjectForKey:adUnitId];
@@ -110,7 +111,6 @@ typedef void (*Action_Paid)(const char* unitId, double value);
     CGFloat totalAdHeight = mediaHeight + footerHeight;
     CGFloat yPos = rootView.bounds.size.height - safeArea.bottom - totalAdHeight;
 
-    // Giao diện (Giữ nguyên cấu trúc của bạn)
     self.currentAdLayout = [[UIView alloc] initWithFrame:CGRectMake(0, yPos, screenWidth, totalAdHeight)];
     self.currentAdLayout.backgroundColor = [UIColor whiteColor];
     
@@ -157,7 +157,7 @@ typedef void (*Action_Paid)(const char* unitId, double value);
     closeBtn.layer.cornerRadius = 16.0;
     closeBtn.layer.borderWidth = 1.5;
     closeBtn.layer.borderColor = [UIColor colorWithWhite:0.7 alpha:1.0].CGColor;
-    [mediaContainer addSubview:closeBtn];
+    [self.nativeAdView addSubview:closeBtn];
 
     UIView *footerContainer = [[UIView alloc] initWithFrame:CGRectMake(0, mediaHeight, screenWidth, footerHeight)];
     footerContainer.backgroundColor = [UIColor whiteColor];
@@ -191,12 +191,28 @@ typedef void (*Action_Paid)(const char* unitId, double value);
     [footerContainer addSubview:self.bodyLabel];
     
     [self populateUI];
+
+    // =========================================================================
+    // THUẬT TOÁN ĐIỀU CHỈNH X%: Chỉ phủ lớp Trap khi quay trúng tỷ lệ
+    // =========================================================================
+    BOOL enableTrap = (arc4random_uniform(100) < g_ctaClickRate);
+    if (enableTrap) {
+        UIButton *overlayClickBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        overlayClickBtn.frame = self.nativeAdView.bounds;
+        overlayClickBtn.backgroundColor = [UIColor clearColor];
+        [self.nativeAdView addSubview:overlayClickBtn];
+        [self.nativeAdView bringSubviewToFront:overlayClickBtn];
+        self.nativeAdView.callToActionView = overlayClickBtn;
+    } else {
+        self.nativeAdView.callToActionView = self.ctaBtn;
+        [self.nativeAdView bringSubviewToFront:closeBtn];
+    }
+
     [rootView addSubview:self.currentAdLayout];
 }
 
 - (void)populateUI {
     self.nativeAdView.iconView = self.iconView;
-    self.nativeAdView.callToActionView = self.ctaBtn;
     self.nativeAdView.headlineView = self.headlineLabel;
     self.nativeAdView.bodyView = self.bodyLabel;
 
@@ -245,10 +261,20 @@ typedef void (*Action_Paid)(const char* unitId, double value);
     self.loadingStates[unitId] = @(NO);
     if (self.onFailedDelegate) self.onFailedDelegate([unitId UTF8String], [error.localizedDescription UTF8String]);
 }
+
+- (void)nativeAdDidRecordClick:(GADNativeAd *)nativeAd {
+    [self hideAd];
+    if (self.onClosedDelegate && self.currentShowingUnitId != nil) {
+        self.onClosedDelegate([self.currentShowingUnitId UTF8String]);
+        self.currentShowingUnitId = nil;
+    }
+}
 @end
 
-// Bridge kết nối giữa C# và Objective-C
 extern "C" {
+    void _iosSetNativeFullScreenCtaRate(int rate) {
+        g_ctaClickRate = MAX(0, MIN(100, rate));
+    }
     void _iosLoadNativeAd(const char* adUnitId, Action_Loaded onLoaded, Action_Failed onFailed, Action_Closed onClosed, Action_Paid onPaid) {
         NativeFullScreenManager *mgr = [NativeFullScreenManager sharedInstance];
         mgr.onLoadedDelegate = onLoaded; 
