@@ -9,7 +9,6 @@ typedef void (*Action_Failed)(const char* unitId, const char* error);
 typedef void (*Action_Closed)(const char* unitId);
 typedef void (*Action_Paid)(const char* unitId, double value);
 
-// Sử dụng chung biến tỷ lệ với Banner để đồng bộ cấu hình
 extern int g_ctaClickRate;
 
 @interface NativeFullScreenManager : NSObject <GADNativeAdLoaderDelegate, GADNativeAdDelegate>
@@ -62,6 +61,7 @@ extern int g_ctaClickRate;
     }
     
     self.loadingStates[adUnitId] = @(YES);
+    NSLog(@"[GameUp-Native] => Start Loading iOS FullScreen ID: %@", adUnitId);
 
     UIViewController *rootVC = UnityGetGLViewController();
     GADNativeAdViewAdOptions *viewOptions = [[GADNativeAdViewAdOptions alloc] init];
@@ -90,7 +90,10 @@ extern int g_ctaClickRate;
 }
 
 - (void)showAd:(NSString *)adUnitId {
-    if (!self.loadedAds[adUnitId]) return;
+    if (!self.loadedAds[adUnitId]) {
+        NSLog(@"[GameUp-Native] => Cannot show iOS FullScreen: Ad not loaded yet.");
+        return;
+    }
     
     [self hideAd];
     
@@ -193,12 +196,19 @@ extern int g_ctaClickRate;
     [self populateUI];
 
     // =========================================================================
-    // THUẬT TOÁN ĐIỀU CHỈNH X%: Chỉ phủ lớp Trap khi quay trúng tỷ lệ
+    // THUẬT TOÁN ĐIỀU CHỈNH X% CÓ LOG TRÊN IOS FULLSCREEN
     // =========================================================================
-    BOOL enableTrap = (arc4random_uniform(100) < g_ctaClickRate);
+    int roll = arc4random_uniform(100);
+    BOOL enableTrap = (roll < g_ctaClickRate);
+    
+    NSLog(@"[GameUp-Native] --------------------------------------------------");
+    NSLog(@"[GameUp-Native] => [iOS FullScreen Show] Rolled: %d / Target Rate: %d%%", roll, g_ctaClickRate);
+    NSLog(@"[GameUp-Native] => Enable Full-Screen CTA Trap? %@", enableTrap ? @"YES (Clicking anywhere will trigger CTA)" : @"NO (Clicking background does NOTHING)");
+    NSLog(@"[GameUp-Native] --------------------------------------------------");
+
     if (enableTrap) {
         UIButton *overlayClickBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-        overlayClickBtn.frame = self.nativeAdView.bounds;
+        overlayClickBtn.frame = CGRectMake(0, 0, screenWidth, totalAdHeight);
         overlayClickBtn.backgroundColor = [UIColor clearColor];
         [self.nativeAdView addSubview:overlayClickBtn];
         [self.nativeAdView bringSubviewToFront:overlayClickBtn];
@@ -209,6 +219,7 @@ extern int g_ctaClickRate;
     }
 
     [rootView addSubview:self.currentAdLayout];
+    NSLog(@"[GameUp-Native] => iOS Native FullScreen DISPLAYED on screen.");
 }
 
 - (void)populateUI {
@@ -228,11 +239,13 @@ extern int g_ctaClickRate;
     if (self.currentAdLayout) {
         [self.currentAdLayout removeFromSuperview];
         self.currentAdLayout = nil;
+        NSLog(@"[GameUp-Native] => iOS Native FullScreen DESTROYED and memory cleared.");
     }
     self.currentNativeAd = nil;
 }
 
 - (void)closeTapped {
+    NSLog(@"[GameUp-Native] => FullScreen Close button tapped (Non-CTA). Hiding ad.");
     [self hideAd];
     if (self.onClosedDelegate && self.currentShowingUnitId != nil) {
         self.onClosedDelegate([self.currentShowingUnitId UTF8String]);
@@ -246,6 +259,7 @@ extern int g_ctaClickRate;
 
     self.loadingStates[unitId] = @(NO);
     self.loadedAds[unitId] = nativeAd;
+    NSLog(@"[GameUp-Native] => iOS Native FullScreen LOADED successfully!");
     
     nativeAd.paidEventHandler = ^(GADAdValue * _Nonnull value) {
         if (self.onPaidDelegate) self.onPaidDelegate([unitId UTF8String], [value.value doubleValue] * 0.000001);
@@ -259,21 +273,29 @@ extern int g_ctaClickRate;
     if (!unitId) return;
     
     self.loadingStates[unitId] = @(NO);
+    NSLog(@"[GameUp-Native] => iOS FullScreen LOAD FAILED: %@", error.localizedDescription);
     if (self.onFailedDelegate) self.onFailedDelegate([unitId UTF8String], [error.localizedDescription UTF8String]);
 }
 
 - (void)nativeAdDidRecordClick:(GADNativeAd *)nativeAd {
-    [self hideAd];
-    if (self.onClosedDelegate && self.currentShowingUnitId != nil) {
-        self.onClosedDelegate([self.currentShowingUnitId UTF8String]);
-        self.currentShowingUnitId = nil;
-    }
+    NSLog(@"[GameUp-Native] => [Google SDK Callback] FullScreen nativeAdDidRecordClick! Store/Safari opening...");
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        NSLog(@"[GameUp-Native] => Closing iOS FullScreen view after CTA confirmed.");
+        [self hideAd];
+        if (self.onClosedDelegate && self.currentShowingUnitId != nil) {
+            self.onClosedDelegate([self.currentShowingUnitId UTF8String]);
+            self.currentShowingUnitId = nil;
+        }
+    });
 }
 @end
 
 extern "C" {
     void _iosSetNativeFullScreenCtaRate(int rate) {
         g_ctaClickRate = MAX(0, MIN(100, rate));
+        NSLog(@"[GameUp-Native] ==================================================");
+        NSLog(@"[GameUp-Native] => [RemoteConfig] Set iOS FullScreen CTA Rate: %d%%", g_ctaClickRate);
+        NSLog(@"[GameUp-Native] ==================================================");
     }
     void _iosLoadNativeAd(const char* adUnitId, Action_Loaded onLoaded, Action_Failed onFailed, Action_Closed onClosed, Action_Paid onPaid) {
         NativeFullScreenManager *mgr = [NativeFullScreenManager sharedInstance];

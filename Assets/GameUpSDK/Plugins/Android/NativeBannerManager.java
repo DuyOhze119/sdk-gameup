@@ -20,6 +20,8 @@ import com.google.android.gms.ads.nativead.MediaView;
 
 public class NativeBannerManager {
 
+    private static final String TAG = "GameUp-Native";
+
     public interface AdCallback {
         void onLoaded(); void onFailed(String error); void onDisplayed(); 
         void onClosed(); void onClicked(); void onPaid(double value);
@@ -32,11 +34,13 @@ public class NativeBannerManager {
     private NativeAd currentNativeAd;
     private AdState currentState = AdState.IDLE;
 
-    // Biến nhận tỷ lệ X% từ C# (Mặc định 100%)
     private static int ctaClickRate = 100;
 
     public static void setCtaClickRate(int rate) {
         ctaClickRate = Math.max(0, Math.min(100, rate));
+        Log.d(TAG, "==================================================");
+        Log.d(TAG, "=> [RemoteConfig] Set Banner CTA Click Rate: " + ctaClickRate + "%");
+        Log.d(TAG, "==================================================");
     }
 
     public static NativeBannerManager getInstance() {
@@ -51,6 +55,7 @@ public class NativeBannerManager {
             @Override
             public void run() {
                 currentState = AdState.LOADING;
+                Log.d(TAG, "=> Start Loading Native Banner ID: " + adUnitId);
 
                 com.google.android.gms.ads.nativead.NativeAdOptions adOptions = 
                     new com.google.android.gms.ads.nativead.NativeAdOptions.Builder()
@@ -67,6 +72,7 @@ public class NativeBannerManager {
                                 if (currentNativeAd != null) currentNativeAd.destroy();
                                 currentNativeAd = nativeAd;
                                 currentState = AdState.LOADED;
+                                Log.d(TAG, "=> Native Banner LOADED successfully!");
                                 if (callback != null) callback.onLoaded();
                             }
                         })
@@ -74,14 +80,24 @@ public class NativeBannerManager {
                             @Override
                             public void onAdFailedToLoad(LoadAdError adError) {
                                 currentState = AdState.IDLE;
+                                Log.e(TAG, "=> Native Banner LOAD FAILED: " + adError.getMessage());
                                 if (callback != null) callback.onFailed(adError.getMessage());
                             }
                             @Override
                             public void onAdClicked() {
-                                hideAd(activity);
-                                if (callback != null) {
-                                    callback.onClicked();
-                                    callback.onClosed();
+                                Log.d(TAG, "=> [Google SDK Callback] onAdClicked() fired! Store/Link opening...");
+                                if (currentAdLayout != null) {
+                                    currentAdLayout.postDelayed(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            Log.d(TAG, "=> Closing ad layout after CTA click confirmed.");
+                                            hideAd(activity);
+                                            if (callback != null) {
+                                                callback.onClicked();
+                                                callback.onClosed();
+                                            }
+                                        }
+                                    }, 300);
                                 }
                             }
                         })
@@ -97,7 +113,10 @@ public class NativeBannerManager {
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                if (currentState != AdState.LOADED || currentNativeAd == null) return;
+                if (currentState != AdState.LOADED || currentNativeAd == null) {
+                    Log.w(TAG, "=> Cannot show Banner: State is not LOADED.");
+                    return;
+                }
                 removeCurrentView(activity);
 
                 int layoutId = activity.getResources().getIdentifier("gameup_native_collapsible", "layout", activity.getPackageName());
@@ -160,27 +179,75 @@ public class NativeBannerManager {
                     } catch (Exception ignored) { }
                 }
 
-                // ==========================================================
-                // THUẬT TOÁN KIỂM SOÁT TỈ LỆ CTA CLICK (X%)
-                // ==========================================================
-                View.OnClickListener conditionalCtaTrigger = new View.OnClickListener() {
+                // =========================================================================
+                // QUY TẮC 1: CLICK VÙNG NỀN / NATIVE VIEW -> TRƯỢT X% THÌ KHÔNG LÀM GÌ CẢ
+                // =========================================================================
+                View.OnClickListener backgroundTouchTrigger = new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        // Quay số ngẫu nhiên từ 0 đến 99
-                        boolean triggerCta = (new java.util.Random().nextInt(100) < ctaClickRate);
+                        int roll = new java.util.Random().nextInt(100);
+                        boolean triggerCta = (roll < ctaClickRate);
+                        
+                        Log.d(TAG, "--------------------------------------------------");
+                        Log.d(TAG, "=> [Background Touch] Rolled: " + roll + " / Target Rate: " + ctaClickRate + "%");
+                        Log.d(TAG, "=> Trigger CTA Click? " + (triggerCta ? "YES (Executing performClick)" : "NO (DOING NOTHING - Ad stays open)"));
+                        Log.d(TAG, "--------------------------------------------------");
+
                         if (triggerCta && ctaView != null) {
-                            ctaView.performClick(); // Kích hoạt CTA click của Google SDK
+                            ctaView.performClick();
+                            v.postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    if (currentState == AdState.SHOWING) {
+                                        Log.w(TAG, "=> [Fallback] Closing ad after 500ms timeout.");
+                                        hideAd(activity);
+                                        if (callback != null) callback.onClosed();
+                                    }
+                                }
+                            }, 500);
                         }
-                        hideAd(activity);
-                        if (callback != null) callback.onClosed();
+                        // TRƯỢT X%: KHÔNG GỌI hideAd() -> QUẢNG CÁO KHÔNG BỊ TẮT!
+                    }
+                };
+
+                // =========================================================================
+                // QUY TẮC 2: CLICK NÚT CLOSE -> TRƯỢT X% THÌ ĐÓNG QUẢNG CÁO NGAY
+                // =========================================================================
+                View.OnClickListener closeButtonTouchTrigger = new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        int roll = new java.util.Random().nextInt(100);
+                        boolean triggerCta = (roll < ctaClickRate);
+                        
+                        Log.d(TAG, "--------------------------------------------------");
+                        Log.d(TAG, "=> [Close Button Touch] Rolled: " + roll + " / Target Rate: " + ctaClickRate + "%");
+                        Log.d(TAG, "=> Trigger CTA Click? " + (triggerCta ? "YES (Executing performClick)" : "NO (Closing Ad normally without CTA)"));
+                        Log.d(TAG, "--------------------------------------------------");
+
+                        if (triggerCta && ctaView != null) {
+                            ctaView.performClick();
+                            v.postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    if (currentState == AdState.SHOWING) {
+                                        Log.w(TAG, "=> [Fallback] Closing ad after 500ms timeout.");
+                                        hideAd(activity);
+                                        if (callback != null) callback.onClosed();
+                                    }
+                                }
+                            }, 500);
+                        } else {
+                            hideAd(activity);
+                            if (callback != null) callback.onClosed();
+                        }
                     }
                 };
 
                 View btnClose = currentAdLayout.findViewById(activity.getResources().getIdentifier("btn_close_ad", "id", activity.getPackageName()));
-                if (btnClose != null) btnClose.setOnClickListener(conditionalCtaTrigger);
-                if (blurBg != null) blurBg.setOnClickListener(conditionalCtaTrigger);
-                currentAdLayout.setOnClickListener(conditionalCtaTrigger);
-                adView.setOnClickListener(conditionalCtaTrigger);
+                if (btnClose != null) btnClose.setOnClickListener(closeButtonTouchTrigger);
+                if (blurBg != null) blurBg.setOnClickListener(backgroundTouchTrigger);
+                currentAdLayout.setOnClickListener(backgroundTouchTrigger);
+                adView.setOnClickListener(backgroundTouchTrigger);
 
                 FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
                 params.gravity = isTop ? Gravity.TOP : Gravity.BOTTOM;
@@ -189,6 +256,7 @@ public class NativeBannerManager {
                 rootView.addView(currentAdLayout, params);
 
                 currentState = AdState.SHOWING;
+                Log.d(TAG, "=> Native Banner DISPLAYED on screen.");
                 if (callback != null) callback.onDisplayed();
             }
         });
@@ -202,6 +270,7 @@ public class NativeBannerManager {
                 if (currentNativeAd != null) { 
                     currentNativeAd.destroy(); 
                     currentNativeAd = null; 
+                    Log.d(TAG, "=> Native Banner DESTROYED and memory cleared.");
                 }
                 currentState = AdState.IDLE;
             }
