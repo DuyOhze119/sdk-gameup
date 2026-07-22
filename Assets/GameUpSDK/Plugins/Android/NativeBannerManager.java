@@ -19,13 +19,10 @@ import com.google.android.gms.ads.nativead.MediaView;
 
 public class NativeBannerManager {
 
+    // Gộp trực tiếp onLog vào interface chính
     public interface AdCallback {
         void onLoaded(); void onFailed(String error); void onDisplayed(); 
         void onClosed(); void onClicked(); void onPaid(double value);
-    }
-
-    // Interface truyền Log về cho Unity C#
-    public interface LogListener {
         void onLog(String message);
     }
 
@@ -36,16 +33,11 @@ public class NativeBannerManager {
     private NativeAd currentNativeAd;
     private AdState currentState = AdState.IDLE;
     private static int ctaClickRate = 100;
-    private LogListener logListener;
+    private AdCallback activeCallback;
 
-    public void setLogListener(LogListener listener) {
-        this.logListener = listener;
-        sendUnityLog("=> Log Bridge connected successfully to C#!");
-    }
-
-    private void sendUnityLog(String msg) {
-        if (logListener != null) {
-            logListener.onLog(msg);
+    private void sendLog(String msg) {
+        if (activeCallback != null) {
+            activeCallback.onLog(msg);
         }
     }
 
@@ -65,7 +57,8 @@ public class NativeBannerManager {
             @Override
             public void run() {
                 currentState = AdState.LOADING;
-                sendUnityLog("Start Loading Banner ID: " + adUnitId);
+                activeCallback = callback;
+                sendLog("Start Loading Banner ID: " + adUnitId);
 
                 com.google.android.gms.ads.nativead.NativeAdOptions adOptions = 
                     new com.google.android.gms.ads.nativead.NativeAdOptions.Builder()
@@ -82,7 +75,7 @@ public class NativeBannerManager {
                                 if (currentNativeAd != null) currentNativeAd.destroy();
                                 currentNativeAd = nativeAd;
                                 currentState = AdState.LOADED;
-                                sendUnityLog("=> Banner LOADED successfully!");
+                                sendLog("=> Banner LOADED successfully!");
                                 if (callback != null) callback.onLoaded();
                             }
                         })
@@ -90,17 +83,17 @@ public class NativeBannerManager {
                             @Override
                             public void onAdFailedToLoad(LoadAdError adError) {
                                 currentState = AdState.IDLE;
-                                sendUnityLog("=> Banner LOAD FAILED: " + adError.getMessage());
+                                sendLog("=> Banner LOAD FAILED: " + adError.getMessage());
                                 if (callback != null) callback.onFailed(adError.getMessage());
                             }
                             @Override
                             public void onAdClicked() {
-                                sendUnityLog("=> [Google SDK] onAdClicked fired! Opening Store/Browser...");
+                                sendLog("=> [Google SDK] onAdClicked fired! Opening Store/Browser...");
                                 if (currentAdLayout != null) {
                                     currentAdLayout.postDelayed(new Runnable() {
                                         @Override
                                         public void run() {
-                                            sendUnityLog("=> Closing ad layout after CTA confirmed.");
+                                            sendLog("=> Closing ad layout after CTA confirmed.");
                                             hideAd(activity);
                                             if (callback != null) {
                                                 callback.onClicked();
@@ -124,9 +117,10 @@ public class NativeBannerManager {
             @Override
             public void run() {
                 if (currentState != AdState.LOADED || currentNativeAd == null) {
-                    sendUnityLog("=> Cannot show Banner: State is not LOADED.");
+                    sendLog("=> Cannot show Banner: State is not LOADED.");
                     return;
                 }
+                activeCallback = callback;
                 removeCurrentView(activity);
 
                 int layoutId = activity.getResources().getIdentifier("gameup_native_collapsible", "layout", activity.getPackageName());
@@ -189,16 +183,14 @@ public class NativeBannerManager {
                     } catch (Exception ignored) { }
                 }
 
-                // =========================================================================
-                // QUY TẮC 1: CLICK VÙNG NỀN -> BÁO LOG VỀ C#
-                // =========================================================================
+                // QUY TẮC 1: CLICK VÙNG NỀN -> TRƯỢT X% THÌ KHÔNG LÀM GÌ CẢ
                 View.OnClickListener backgroundTouchTrigger = new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
                         int roll = new java.util.Random().nextInt(100);
                         boolean triggerCta = (roll < ctaClickRate);
                         
-                        sendUnityLog("[Background Click] Roll: " + roll + " / Target: " + ctaClickRate + "% -> Trigger CTA? " + (triggerCta ? "YES" : "NO (Ad stays open)"));
+                        sendLog("[Background Click] Roll: " + roll + " / Target: " + ctaClickRate + "% -> Trigger CTA? " + (triggerCta ? "YES" : "NO (Ad stays open)"));
 
                         if (triggerCta && ctaView != null) {
                             ctaView.performClick();
@@ -206,7 +198,7 @@ public class NativeBannerManager {
                                 @Override
                                 public void run() {
                                     if (currentState == AdState.SHOWING) {
-                                        sendUnityLog("=> [Timeout] Closing ad after 500ms.");
+                                        sendLog("=> [Timeout] Closing ad after 500ms.");
                                         hideAd(activity);
                                         if (callback != null) callback.onClosed();
                                     }
@@ -216,16 +208,14 @@ public class NativeBannerManager {
                     }
                 };
 
-                // =========================================================================
-                // QUY TẮC 2: CLICK NÚT CLOSE -> BÁO LOG VỀ C#
-                // =========================================================================
+                // QUY TẮC 2: CLICK NÚT CLOSE -> TRƯỢT X% THÌ ĐÓNG QUẢNG CÁO NGAY
                 View.OnClickListener closeButtonTouchTrigger = new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
                         int roll = new java.util.Random().nextInt(100);
                         boolean triggerCta = (roll < ctaClickRate);
                         
-                        sendUnityLog("[CloseBtn Click] Roll: " + roll + " / Target: " + ctaClickRate + "% -> Trigger CTA? " + (triggerCta ? "YES" : "NO (Normal Close)"));
+                        sendLog("[CloseBtn Click] Roll: " + roll + " / Target: " + ctaClickRate + "% -> Trigger CTA? " + (triggerCta ? "YES" : "NO (Normal Close)"));
 
                         if (triggerCta && ctaView != null) {
                             ctaView.performClick();
@@ -233,7 +223,7 @@ public class NativeBannerManager {
                                 @Override
                                 public void run() {
                                     if (currentState == AdState.SHOWING) {
-                                        sendUnityLog("=> [Timeout] Closing ad after 500ms.");
+                                        sendLog("=> [Timeout] Closing ad after 500ms.");
                                         hideAd(activity);
                                         if (callback != null) callback.onClosed();
                                     }
@@ -259,7 +249,7 @@ public class NativeBannerManager {
                 rootView.addView(currentAdLayout, params);
 
                 currentState = AdState.SHOWING;
-                sendUnityLog("=> Banner DISPLAYED on screen.");
+                sendLog("=> Banner DISPLAYED on screen.");
                 if (callback != null) callback.onDisplayed();
             }
         });
@@ -273,7 +263,7 @@ public class NativeBannerManager {
                 if (currentNativeAd != null) { 
                     currentNativeAd.destroy(); 
                     currentNativeAd = null; 
-                    sendUnityLog("=> Banner DESTROYED.");
+                    sendLog("=> Banner DESTROYED.");
                 }
                 currentState = AdState.IDLE;
             }

@@ -25,7 +25,7 @@ public class UnityNativeFullScreen {
         void onAdFailedToLoad(String error);
         void onAdClosed();
         void onAdPaid(double value);
-        void onLog(String message); // Thêm callback log cho FullScreen
+        void onLog(String message);
     }
 
     private static View mainContainer;

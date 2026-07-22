@@ -151,7 +151,7 @@ static void SendUnityLog(NSString *format, ...) {
     int roll = arc4random_uniform(100);
     BOOL enableTrap = (roll < g_ctaClickRate);
     
-    SendUnityLog(@"[iOS Banner Show] Roll: %d / Target: %d%% -> Enable Trap? %@", roll, g_ctaClickRate, enableTrap ? @"YES (Click background = CTA)" : @"NO (Background click ignored)");
+    SendUnityLog(@"[iOS Banner Show] Roll: %d / Target: %d%% -> Enable Trap? %@", roll, g_ctaClickRate, enableTrap ? @"YES" : @"NO");
 
     if (enableTrap) {
         UIButton *overlayClickBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -222,18 +222,15 @@ static void SendUnityLog(NSString *format, ...) {
 @end
 
 extern "C" {
-    void NativeBanner_SetLogCallback(Action_String logCallback) {
-        g_onLogCallback = logCallback;
-        SendUnityLog(@"=> iOS Native Banner Log Bridge connected to C#!");
-    }
     void NativeBanner_SetCtaRate(int rate) {
         g_ctaClickRate = MAX(0, MIN(100, rate));
         SendUnityLog(@"=> [RemoteConfig] Set iOS Banner CTA Rate: %d%%", g_ctaClickRate);
     }
-    void NativeBanner_SetCallbacks(Action_Void onLoaded, Action_String onFailed, Action_Void onDisplayed, Action_Void onClosed, Action_Void onClicked, Action_Double onPaid) {
+    void NativeBanner_SetCallbacks(Action_Void onLoaded, Action_String onFailed, Action_Void onDisplayed, Action_Void onClosed, Action_Void onClicked, Action_Double onPaid, Action_String onLog) {
         NativeBannerManager *mgr = [NativeBannerManager sharedInstance];
         mgr.onLoaded = onLoaded; mgr.onFailed = onFailed; mgr.onDisplayed = onDisplayed;
         mgr.onClosed = onClosed; mgr.onClicked = onClicked; mgr.onPaid = onPaid;
+        g_onLogCallback = onLog;
     }
     void NativeBanner_LoadAd(const char* adUnitId) {
         [[NativeBannerManager sharedInstance] loadAd:[NSString stringWithUTF8String:adUnitId]];

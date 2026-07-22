@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.Scripting; // Bắt buộc cho [Preserve]
 
 namespace GameUpSDK.Ads
 {
@@ -19,7 +20,7 @@ namespace GameUpSDK.Ads
         [DllImport("__Internal")] private static extern void NativeBanner_ShowAd(bool isTop);
         [DllImport("__Internal")] private static extern void NativeBanner_HideAd();
         [DllImport("__Internal")] private static extern void NativeBanner_SetCallbacks(
-            Action_Void onLoaded, Action_String onFailed, Action_Void onDisplayed, Action_Void onClosed, Action_Void onClicked, Action_Double onPaid);
+            Action_Void onLoaded, Action_String onFailed, Action_Void onDisplayed, Action_Void onClosed, Action_Void onClicked, Action_Double onPaid, Action_String onLog);
         delegate void Action_Void(); delegate void Action_String(string error); delegate void Action_Double(double value);
 #endif
 
@@ -30,7 +31,7 @@ namespace GameUpSDK.Ads
 #endif 
         private static AdmobNativeBannerBridge _instance;
         private string _currentActiveWhere;
-        private string _currentActiveUnitId; // Lưu lại ID đang xử lý cho iOS callback
+        private string _currentActiveUnitId;
 
         public AdmobNativeBannerBridge(AdUnitConfig config) : base(config, AdUnitType.Banner, "Admob_NativeBridge")
         {
@@ -41,11 +42,11 @@ namespace GameUpSDK.Ads
             using (AndroidJavaClass managerClass = new AndroidJavaClass("com.gameup.ads.NativeBannerManager"))
                 _nativeManager = managerClass.CallStatic<AndroidJavaObject>("getInstance");
 #elif UNITY_IOS && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
-            NativeBanner_SetCallbacks(OnLoaded_iOS, OnFailed_iOS, OnDisplayed_iOS, OnClosed_iOS, OnClicked_iOS, OnPaid_iOS);
+            // Truyền thêm callback OnLog_iOS vào cổng liên kết
+            NativeBanner_SetCallbacks(OnLoaded_iOS, OnFailed_iOS, OnDisplayed_iOS, OnClosed_iOS, OnClicked_iOS, OnPaid_iOS, OnLog_iOS);
 #endif
         }
 
-        // Tắt Waterfall cho Native Banner Bridge (Chỉ dùng tầng All)
         public override void Load(string where = null) => LoadByFloor(where, EcpmFloor.All);
 
         public override bool IsAvailable(string where = null)
@@ -70,7 +71,8 @@ namespace GameUpSDK.Ads
                 onDisplayed: () => { MainThreadDispatcher.Enqueue(() => NotifyAdDisplayed(where)); },
                 onClosed: () => { MainThreadDispatcher.Enqueue(() => { _isLoaded[unitId] = false; NotifyAdClosed(where); OnCollapsedNativeBanner?.Invoke(where); Load(where);}); },
                 onClicked: () => { MainThreadDispatcher.Enqueue(() => { }); },
-                onPaid: (val) => { MainThreadDispatcher.Enqueue(() => TrackRevenue(unitId, where, "NativeBanner_Android", val)); }
+                onPaid: (val) => { MainThreadDispatcher.Enqueue(() => TrackRevenue(unitId, where, "NativeBanner_Android", val)); },
+                onLog: (msg) => { MainThreadDispatcher.Enqueue(() => Debug.Log($"<color=#00FF00>[GameUp-NativeBanner]</color> {msg}")); }
             );
             _proxies[unitId] = proxy;
             _nativeManager.Call("loadAd", _currentActivity, unitId, proxy);
@@ -118,9 +120,7 @@ namespace GameUpSDK.Ads
         public void Restore(string where) => Show(where);
         
 #if UNITY_ANDROID && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
-        // ==========================================
-        // PROXY CLASS CHO ANDROID
-        // ==========================================
+        [Preserve]
         public class NativeAdCallbackProxy : AndroidJavaProxy
         {
             private readonly Action _onLoaded;
@@ -129,8 +129,9 @@ namespace GameUpSDK.Ads
             private readonly Action _onClosed;
             private readonly Action _onClicked;
             private readonly Action<double> _onPaid;
+            private readonly Action<string> _onLog;
 
-            public NativeAdCallbackProxy(Action onLoaded, Action<string> onFailed, Action onDisplayed, Action onClosed, Action onClicked, Action<double> onPaid) 
+            public NativeAdCallbackProxy(Action onLoaded, Action<string> onFailed, Action onDisplayed, Action onClosed, Action onClicked, Action<double> onPaid, Action<string> onLog) 
                 : base("com.gameup.ads.NativeBannerManager$AdCallback")
             {
                 _onLoaded = onLoaded; 
@@ -139,21 +140,20 @@ namespace GameUpSDK.Ads
                 _onClosed = onClosed; 
                 _onClicked = onClicked; 
                 _onPaid = onPaid;
+                _onLog = onLog;
             }
 
-            public void onLoaded() => _onLoaded?.Invoke();
-            public void onFailed(string error) => _onFailed?.Invoke(error);
-            public void onDisplayed() => _onDisplayed?.Invoke();
-            public void onClosed() => _onClosed?.Invoke();
-            public void onClicked() => _onClicked?.Invoke();
-            public void onPaid(double value) => _onPaid?.Invoke(value);
+            [Preserve] public void onLoaded() => _onLoaded?.Invoke();
+            [Preserve] public void onFailed(string error) => _onFailed?.Invoke(error);
+            [Preserve] public void onDisplayed() => _onDisplayed?.Invoke();
+            [Preserve] public void onClosed() => _onClosed?.Invoke();
+            [Preserve] public void onClicked() => _onClicked?.Invoke();
+            [Preserve] public void onPaid(double value) => _onPaid?.Invoke(value);
+            [Preserve] public void onLog(string message) => _onLog?.Invoke(message);
         }
 #endif
 
 #if UNITY_IOS && !UNITY_EDITOR && ADMOB_DEPENDENCIES_INSTALLED
-        // ==========================================
-        // STATIC CALLBACKS CHO IOS
-        // ==========================================
         [AOT.MonoPInvokeCallback(typeof(Action_Void))]
         private static void OnLoaded_iOS() => MainThreadDispatcher.Enqueue(() => { 
             if (_instance != null) {
@@ -193,6 +193,11 @@ namespace GameUpSDK.Ads
         [AOT.MonoPInvokeCallback(typeof(Action_Double))]
         private static void OnPaid_iOS(double value) => MainThreadDispatcher.Enqueue(() => {
             if (_instance != null) _instance.TrackRevenue(_instance._currentActiveUnitId, _instance._currentActiveWhere, "NativeBanner_iOS", value);
+        });
+
+        [AOT.MonoPInvokeCallback(typeof(Action_String))]
+        private static void OnLog_iOS(string message) => MainThreadDispatcher.Enqueue(() => {
+            Debug.Log($"<color=#00FF00>[GameUp-NativeBanner iOS]</color> {message}");
         });
 #endif
     }
