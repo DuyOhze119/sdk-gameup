@@ -13,6 +13,16 @@ typedef NS_ENUM(NSInteger, AdState) {
 };
 
 static int g_ctaClickRate = 100;
+static Action_String g_onLogCallback = NULL;
+
+static void SendUnityLog(NSString *format, ...) {
+    if (g_onLogCallback == NULL) return;
+    va_list args;
+    va_start(args, format);
+    NSString *message = [[NSString alloc] initWithFormat:format arguments:args];
+    va_end(args);
+    g_onLogCallback([message UTF8String]);
+}
 
 @interface NativeBannerManager : NSObject <GADNativeAdLoaderDelegate, GADNativeAdDelegate>
 @property (nonatomic, strong) GADAdLoader *adLoader;
@@ -48,10 +58,9 @@ static int g_ctaClickRate = 100;
 - (void)loadAd:(NSString *)adUnitId {
     if (self.currentState == AdStateLoading) return;
     self.currentState = AdStateLoading;
-    NSLog(@"[GameUp-Native] => Start Loading iOS Native Banner ID: %@", adUnitId);
+    SendUnityLog(@"Start Loading iOS Banner ID: %@", adUnitId);
 
     UIViewController *rootVC = UnityGetGLViewController();
-    
     GADNativeAdViewAdOptions *viewOptions = [[GADNativeAdViewAdOptions alloc] init];
     viewOptions.preferredAdChoicesPosition = GADAdChoicesPositionTopLeftCorner;
 
@@ -65,7 +74,7 @@ static int g_ctaClickRate = 100;
 
 - (void)showAd:(BOOL)isTop {
     if (self.currentState != AdStateLoaded || !self.currentNativeAd) {
-        NSLog(@"[GameUp-Native] => Cannot show iOS Banner: Ad not loaded yet.");
+        SendUnityLog(@"=> Cannot show iOS Banner: Ad not loaded yet.");
         return;
     }
     [self hideAd]; 
@@ -139,16 +148,10 @@ static int g_ctaClickRate = 100;
     closeBtn.layer.mask = maskLayer;
     [adView addSubview:closeBtn];
 
-    // =========================================================================
-    // THUẬT TOÁN ĐIỀU CHỈNH X% CÓ LOG TRÊN IOS
-    // =========================================================================
     int roll = arc4random_uniform(100);
     BOOL enableTrap = (roll < g_ctaClickRate);
     
-    NSLog(@"[GameUp-Native] --------------------------------------------------");
-    NSLog(@"[GameUp-Native] => [iOS Banner Show] Rolled: %d / Target Rate: %d%%", roll, g_ctaClickRate);
-    NSLog(@"[GameUp-Native] => Enable Full-Screen CTA Trap? %@", enableTrap ? @"YES (Clicking anywhere will trigger CTA)" : @"NO (Clicking background does NOTHING)");
-    NSLog(@"[GameUp-Native] --------------------------------------------------");
+    SendUnityLog(@"[iOS Banner Show] Roll: %d / Target: %d%% -> Enable Trap? %@", roll, g_ctaClickRate, enableTrap ? @"YES (Click background = CTA)" : @"NO (Background click ignored)");
 
     if (enableTrap) {
         UIButton *overlayClickBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -167,7 +170,7 @@ static int g_ctaClickRate = 100;
     
     [rootView addSubview:self.currentAdLayout];
     self.currentState = AdStateShowing;
-    NSLog(@"[GameUp-Native] => iOS Native Banner DISPLAYED on screen.");
+    SendUnityLog(@"=> iOS Banner DISPLAYED on screen.");
     if (self.onDisplayed) self.onDisplayed();
 }
 
@@ -175,14 +178,14 @@ static int g_ctaClickRate = 100;
     if (self.currentAdLayout) {
         [self.currentAdLayout removeFromSuperview];
         self.currentAdLayout = nil;
-        NSLog(@"[GameUp-Native] => iOS Native Banner DESTROYED and memory cleared.");
+        SendUnityLog(@"=> iOS Banner DESTROYED.");
     }
     self.currentNativeAd = nil;
     self.currentState = AdStateIdle;
 }
 
 - (void)closeTapped {
-    NSLog(@"[GameUp-Native] => Close button tapped (Non-CTA). Hiding ad.");
+    SendUnityLog(@"=> Close button tapped (Non-CTA). Hiding ad.");
     [self hideAd];
     if (self.onClosed) self.onClosed();
 }
@@ -192,7 +195,7 @@ static int g_ctaClickRate = 100;
     
     self.currentNativeAd = nativeAd;
     self.currentState = AdStateLoaded;
-    NSLog(@"[GameUp-Native] => iOS Native Banner LOADED successfully!");
+    SendUnityLog(@"=> iOS Banner LOADED successfully!");
     
     __weak typeof(self) weakSelf = self;
     nativeAd.paidEventHandler = ^(GADAdValue * _Nonnull value) {
@@ -203,14 +206,14 @@ static int g_ctaClickRate = 100;
 
 - (void)adLoader:(GADAdLoader *)adLoader didFailToReceiveAdWithError:(NSError *)error {
     self.currentState = AdStateIdle;
-    NSLog(@"[GameUp-Native] => iOS Banner LOAD FAILED: %@", error.localizedDescription);
+    SendUnityLog(@"=> iOS Banner LOAD FAILED: %@", error.localizedDescription);
     if (self.onFailed) self.onFailed([error.localizedDescription UTF8String]);
 }
 
 - (void)nativeAdDidRecordClick:(GADNativeAd *)nativeAd {
-    NSLog(@"[GameUp-Native] => [Google SDK Callback] nativeAdDidRecordClick! Store/Safari opening...");
+    SendUnityLog(@"=> [Google SDK Callback] nativeAdDidRecordClick! Store/Safari opening...");
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        NSLog(@"[GameUp-Native] => Closing iOS ad view after CTA confirmed.");
+        SendUnityLog(@"=> Closing iOS ad view after CTA confirmed.");
         [self hideAd];
         if (self.onClicked) self.onClicked();
         if (self.onClosed) self.onClosed();
@@ -219,11 +222,13 @@ static int g_ctaClickRate = 100;
 @end
 
 extern "C" {
+    void NativeBanner_SetLogCallback(Action_String logCallback) {
+        g_onLogCallback = logCallback;
+        SendUnityLog(@"=> iOS Native Banner Log Bridge connected to C#!");
+    }
     void NativeBanner_SetCtaRate(int rate) {
         g_ctaClickRate = MAX(0, MIN(100, rate));
-        NSLog(@"[GameUp-Native] ==================================================");
-        NSLog(@"[GameUp-Native] => [RemoteConfig] Set iOS Banner CTA Rate: %d%%", g_ctaClickRate);
-        NSLog(@"[GameUp-Native] ==================================================");
+        SendUnityLog(@"=> [RemoteConfig] Set iOS Banner CTA Rate: %d%%", g_ctaClickRate);
     }
     void NativeBanner_SetCallbacks(Action_Void onLoaded, Action_String onFailed, Action_Void onDisplayed, Action_Void onClosed, Action_Void onClicked, Action_Double onPaid) {
         NativeBannerManager *mgr = [NativeBannerManager sharedInstance];

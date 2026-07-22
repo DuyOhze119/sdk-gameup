@@ -1,7 +1,6 @@
 package com.plugins.nativebridge;
 
 import android.app.Activity;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,13 +20,12 @@ import java.util.HashMap;
 
 public class UnityNativeFullScreen {
 
-    private static final String TAG = "GameUp-Native";
-
     public interface INativeAdCallback {
         void onAdLoaded();
         void onAdFailedToLoad(String error);
         void onAdClosed();
         void onAdPaid(double value);
+        void onLog(String message); // Thêm callback log cho FullScreen
     }
 
     private static View mainContainer;
@@ -36,14 +34,17 @@ public class UnityNativeFullScreen {
     private static HashMap<String, INativeAdCallback> callbacksMap = new HashMap<>();
     private static NativeAd currentShowingAd = null;
     private static String currentShowingUnitId = null;
-
     private static int ctaClickRate = 100;
+
+    private static void sendLog(String unitId, String msg) {
+        INativeAdCallback cb = callbacksMap.get(unitId != null ? unitId : currentShowingUnitId);
+        if (cb != null) {
+            cb.onLog(msg);
+        }
+    }
 
     public static void setCtaClickRate(int rate) {
         ctaClickRate = Math.max(0, Math.min(100, rate));
-        Log.d(TAG, "==================================================");
-        Log.d(TAG, "=> [RemoteConfig] Set FullScreen CTA Click Rate: " + ctaClickRate + "%");
-        Log.d(TAG, "==================================================");
     }
 
     public static void loadAd(final Activity activity, final String adUnitId, final INativeAdCallback callback) {
@@ -55,7 +56,7 @@ public class UnityNativeFullScreen {
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                Log.d(TAG, "=> Start Loading Native FullScreen ID: " + adUnitId);
+                sendLog(adUnitId, "Start Loading FullScreen ID: " + adUnitId);
                 com.google.android.gms.ads.nativead.NativeAdOptions adOptions = 
                     new com.google.android.gms.ads.nativead.NativeAdOptions.Builder()
                         .setAdChoicesPlacement(com.google.android.gms.ads.nativead.NativeAdOptions.ADCHOICES_TOP_LEFT)
@@ -67,7 +68,7 @@ public class UnityNativeFullScreen {
                         public void onNativeAdLoaded(NativeAd nativeAd) {
                             loadedAdsMap.put(adUnitId, nativeAd);
                             loadingStatesMap.put(adUnitId, false);
-                            Log.d(TAG, "=> Native FullScreen LOADED successfully: " + adUnitId);
+                            sendLog(adUnitId, "=> FullScreen LOADED successfully!");
                             
                             nativeAd.setOnPaidEventListener(new com.google.android.gms.ads.OnPaidEventListener() {
                                 @Override
@@ -86,7 +87,7 @@ public class UnityNativeFullScreen {
                         public void onAdFailedToLoad(LoadAdError adError) {
                             super.onAdFailedToLoad(adError);
                             loadingStatesMap.put(adUnitId, false);
-                            Log.e(TAG, "=> Native FullScreen LOAD FAILED: " + adError.getMessage());
+                            sendLog(adUnitId, "=> FullScreen LOAD FAILED: " + adError.getMessage());
                             
                             INativeAdCallback cb = callbacksMap.get(adUnitId);
                             if (cb != null) cb.onAdFailedToLoad(adError.getMessage());
@@ -94,12 +95,12 @@ public class UnityNativeFullScreen {
                         @Override
                         public void onAdClicked() {
                             super.onAdClicked();
-                            Log.d(TAG, "=> [Google SDK Callback] FullScreen onAdClicked() fired! Store/Link opening...");
+                            sendLog(adUnitId, "=> [Google SDK] FullScreen onAdClicked fired! Opening Store/Browser...");
                             if (mainContainer != null) {
                                 mainContainer.postDelayed(new Runnable() {
                                     @Override
                                     public void run() {
-                                        Log.d(TAG, "=> Closing FullScreen layout after CTA confirmed.");
+                                        sendLog(adUnitId, "=> Closing FullScreen layout after CTA confirmed.");
                                         hideAd(activity);
                                     }
                                 }, 300);
@@ -119,7 +120,7 @@ public class UnityNativeFullScreen {
 
     public static void showAd(final Activity activity, final String adUnitId) {
         if (!loadedAdsMap.containsKey(adUnitId)) {
-            Log.w(TAG, "=> Cannot show FullScreen: Ad not loaded yet for ID: " + adUnitId);
+            sendLog(adUnitId, "=> Cannot show FullScreen: Ad not loaded yet.");
             return; 
         }
         
@@ -182,19 +183,13 @@ public class UnityNativeFullScreen {
             } catch (Exception ignored) { }
         }
 
-        // =========================================================================
-        // QUY TẮC 1: CLICK VÙNG NỀN / NATIVE VIEW -> TRƯỢT X% THÌ KHÔNG LÀM GÌ CẢ
-        // =========================================================================
         View.OnClickListener backgroundTouchTrigger = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 int roll = new java.util.Random().nextInt(100);
                 boolean triggerCta = (roll < ctaClickRate);
                 
-                Log.d(TAG, "--------------------------------------------------");
-                Log.d(TAG, "=> [FullScreen Background Touch] Rolled: " + roll + " / Target Rate: " + ctaClickRate + "%");
-                Log.d(TAG, "=> Trigger CTA Click? " + (triggerCta ? "YES (Executing performClick)" : "NO (DOING NOTHING - Ad stays open)"));
-                Log.d(TAG, "--------------------------------------------------");
+                sendLog(null, "[FullScreen Background] Roll: " + roll + " / Target: " + ctaClickRate + "% -> Trigger CTA? " + (triggerCta ? "YES" : "NO (Ad stays open)"));
 
                 if (triggerCta && ctaView != null) {
                     ctaView.performClick();
@@ -202,29 +197,22 @@ public class UnityNativeFullScreen {
                         @Override
                         public void run() {
                             if (mainContainer != null) {
-                                Log.w(TAG, "=> [Fallback] Closing FullScreen after 500ms timeout.");
+                                sendLog(null, "=> [Timeout] Closing FullScreen after 500ms.");
                                 hideAd(activity);
                             }
                         }
                     }, 500);
                 }
-                // TRƯỢT X%: KHÔNG GỌI hideAd() -> QUẢNG CÁO KHÔNG BỊ TẮT!
             }
         };
 
-        // =========================================================================
-        // QUY TẮC 2: CLICK NÚT CLOSE -> TRƯỢT X% THÌ ĐÓNG QUẢNG CÁO NGAY
-        // =========================================================================
         View.OnClickListener closeButtonTouchTrigger = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 int roll = new java.util.Random().nextInt(100);
                 boolean triggerCta = (roll < ctaClickRate);
                 
-                Log.d(TAG, "--------------------------------------------------");
-                Log.d(TAG, "=> [FullScreen Close Button Touch] Rolled: " + roll + " / Target Rate: " + ctaClickRate + "%");
-                Log.d(TAG, "=> Trigger CTA Click? " + (triggerCta ? "YES (Executing performClick)" : "NO (Closing Ad normally without CTA)"));
-                Log.d(TAG, "--------------------------------------------------");
+                sendLog(null, "[FullScreen CloseBtn] Roll: " + roll + " / Target: " + ctaClickRate + "% -> Trigger CTA? " + (triggerCta ? "YES" : "NO (Normal Close)"));
 
                 if (triggerCta && ctaView != null) {
                     ctaView.performClick();
@@ -232,7 +220,7 @@ public class UnityNativeFullScreen {
                         @Override
                         public void run() {
                             if (mainContainer != null) {
-                                Log.w(TAG, "=> [Fallback] Closing FullScreen after 500ms timeout.");
+                                sendLog(null, "=> [Timeout] Closing FullScreen after 500ms.");
                                 hideAd(activity);
                             }
                         }
@@ -251,7 +239,7 @@ public class UnityNativeFullScreen {
 
         FrameLayout.LayoutParams rootParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         activity.addContentView(mainContainer, rootParams);
-        Log.d(TAG, "=> Native FullScreen DISPLAYED on screen.");
+        sendLog(null, "=> FullScreen DISPLAYED on screen.");
     }
 
     public static void hideAd(final Activity activity) {
@@ -265,7 +253,7 @@ public class UnityNativeFullScreen {
                 if (currentShowingAd != null) {
                     currentShowingAd.destroy();
                     currentShowingAd = null; 
-                    Log.d(TAG, "=> Native FullScreen DESTROYED and memory cleared.");
+                    sendLog(null, "=> FullScreen DESTROYED.");
                 }
                 if (currentShowingUnitId != null) {
                     INativeAdCallback cb = callbacksMap.get(currentShowingUnitId);
