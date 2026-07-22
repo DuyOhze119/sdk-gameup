@@ -19,7 +19,6 @@ import com.google.android.gms.ads.nativead.MediaView;
 
 public class NativeBannerManager {
 
-    // Gộp trực tiếp onLog vào interface chính
     public interface AdCallback {
         void onLoaded(); void onFailed(String error); void onDisplayed(); 
         void onClosed(); void onClicked(); void onPaid(double value);
@@ -88,12 +87,13 @@ public class NativeBannerManager {
                             }
                             @Override
                             public void onAdClicked() {
-                                sendLog("=> [Google SDK] onAdClicked fired! Opening Store/Browser...");
+                                // Google SDK xử lý Click thành công, tự động tắt quảng cáo
+                                sendLog("=> [Google SDK] onAdClicked fired! Store/Browser is opening...");
                                 if (currentAdLayout != null) {
                                     currentAdLayout.postDelayed(new Runnable() {
                                         @Override
                                         public void run() {
-                                            sendLog("=> Closing ad layout after CTA confirmed.");
+                                            sendLog("=> Closing Banner layout after CTA confirmed.");
                                             hideAd(activity);
                                             if (callback != null) {
                                                 callback.onClicked();
@@ -129,14 +129,13 @@ public class NativeBannerManager {
                 NativeAdView adView = currentAdLayout.findViewById(activity.getResources().getIdentifier("native_ad_view", "id", activity.getPackageName()));
                 MediaView mediaView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_media", "id", activity.getPackageName()));
                 TextView headlineView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_headline", "id", activity.getPackageName()));
-                final android.widget.Button ctaView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_call_to_action", "id", activity.getPackageName()));
+                android.widget.Button ctaView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_call_to_action", "id", activity.getPackageName()));
                 TextView bodyView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_body", "id", activity.getPackageName()));
                 ImageView iconView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_app_icon", "id", activity.getPackageName()));
                 com.google.android.gms.ads.nativead.AdChoicesView adChoicesView = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_choices", "id", activity.getPackageName()));
 
                 adView.setMediaView(mediaView);
                 adView.setHeadlineView(headlineView);
-                adView.setCallToActionView(ctaView);
                 adView.setBodyView(bodyView);
                 adView.setIconView(iconView);
                 adView.setAdChoicesView(adChoicesView);
@@ -164,8 +163,6 @@ public class NativeBannerManager {
                     iconView.setImageDrawable(currentNativeAd.getIcon().getDrawable()); 
                 }
 
-                adView.setNativeAd(currentNativeAd);
-
                 ImageView blurBg = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_blur_bg", "id", activity.getPackageName()));
                 if (blurBg != null && currentNativeAd.getImages() != null && currentNativeAd.getImages().size() > 0) {
                     try {
@@ -183,64 +180,67 @@ public class NativeBannerManager {
                     } catch (Exception ignored) { }
                 }
 
-                // QUY TẮC 1: CLICK VÙNG NỀN -> TRƯỢT X% THÌ KHÔNG LÀM GÌ CẢ
-                View.OnClickListener backgroundTouchTrigger = new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        int roll = new java.util.Random().nextInt(100);
-                        boolean triggerCta = (roll < ctaClickRate);
-                        
-                        sendLog("[Background Click] Roll: " + roll + " / Target: " + ctaClickRate + "% -> Trigger CTA? " + (triggerCta ? "YES" : "NO (Ad stays open)"));
+                // =========================================================================
+                // THUẬT TOÁN "LỚP PHỦ VÔ HÌNH" (TRAP OVERLAY) - Giải quyết dứt điểm lỗi CTA
+                // =========================================================================
+                int roll = new java.util.Random().nextInt(100);
+                boolean enableTrap = (roll < ctaClickRate);
+                
+                sendLog("[Banner Show] Roll: " + roll + " / Target: " + ctaClickRate + "% -> Enable Trap? " + (enableTrap ? "YES (Whole Ad is CTA)" : "NO (Normal Setup)"));
 
-                        if (triggerCta && ctaView != null) {
-                            ctaView.performClick();
-                            v.postDelayed(new Runnable() {
-                                @Override
-                                public void run() {
-                                    if (currentState == AdState.SHOWING) {
-                                        sendLog("=> [Timeout] Closing ad after 500ms.");
-                                        hideAd(activity);
-                                        if (callback != null) callback.onClosed();
-                                    }
-                                }
-                            }, 500);
-                        }
+                View btnClose = currentAdLayout.findViewById(activity.getResources().getIdentifier("btn_close_ad", "id", activity.getPackageName()));
+
+                if (enableTrap) {
+                    // Tạo một lớp view trong suốt
+                    View overlayTrap = new View(activity);
+                    overlayTrap.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                    
+                    // Phủ lớp view này lên toàn bộ AdView (che khuất toàn bộ Nền và nút Close)
+                    ((ViewGroup) adView).addView(overlayTrap, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                    overlayTrap.bringToFront();
+                    
+                    // Giao cho AdMob quản lý lớp phủ này như là nút CallToAction thật!
+                    adView.setCallToActionView(overlayTrap);
+
+                    // Tắt hết các listener cũ để chạm rơi thẳng vào overlayTrap
+                    if (btnClose != null) {
+                        btnClose.setOnClickListener(null);
+                        btnClose.setClickable(false);
                     }
-                };
+                    if (blurBg != null) {
+                        blurBg.setOnClickListener(null);
+                        blurBg.setClickable(false);
+                    }
+                    currentAdLayout.setOnClickListener(null);
+                    adView.setOnClickListener(null);
+                    
+                } else {
+                    // Trượt tỉ lệ -> Gán CallToAction vào đúng cái nút Button thật
+                    adView.setCallToActionView(ctaView);
 
-                // QUY TẮC 2: CLICK NÚT CLOSE -> TRƯỢT X% THÌ ĐÓNG QUẢNG CÁO NGAY
-                View.OnClickListener closeButtonTouchTrigger = new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        int roll = new java.util.Random().nextInt(100);
-                        boolean triggerCta = (roll < ctaClickRate);
-                        
-                        sendLog("[CloseBtn Click] Roll: " + roll + " / Target: " + ctaClickRate + "% -> Trigger CTA? " + (triggerCta ? "YES" : "NO (Normal Close)"));
-
-                        if (triggerCta && ctaView != null) {
-                            ctaView.performClick();
-                            v.postDelayed(new Runnable() {
-                                @Override
-                                public void run() {
-                                    if (currentState == AdState.SHOWING) {
-                                        sendLog("=> [Timeout] Closing ad after 500ms.");
-                                        hideAd(activity);
-                                        if (callback != null) callback.onClosed();
-                                    }
-                                }
-                            }, 500);
-                        } else {
+                    // Các nút khác chỉ làm nhiệm vụ Close
+                    View.OnClickListener normalCloseTrigger = new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            sendLog("=> [Normal Touch] Closing Banner without CTA.");
                             hideAd(activity);
                             if (callback != null) callback.onClosed();
                         }
-                    }
-                };
+                    };
 
-                View btnClose = currentAdLayout.findViewById(activity.getResources().getIdentifier("btn_close_ad", "id", activity.getPackageName()));
-                if (btnClose != null) btnClose.setOnClickListener(closeButtonTouchTrigger);
-                if (blurBg != null) blurBg.setOnClickListener(backgroundTouchTrigger);
-                currentAdLayout.setOnClickListener(backgroundTouchTrigger);
-                adView.setOnClickListener(backgroundTouchTrigger);
+                    if (btnClose != null) {
+                        btnClose.setOnClickListener(normalCloseTrigger);
+                        btnClose.setClickable(true);
+                        btnClose.bringToFront(); // Nổi lên để nhận click
+                    }
+                    if (blurBg != null) {
+                        blurBg.setOnClickListener(normalCloseTrigger);
+                        blurBg.setClickable(true);
+                    }
+                }
+
+                // Chốt đăng ký với SDK
+                adView.setNativeAd(currentNativeAd);
 
                 FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
                 params.gravity = isTop ? Gravity.TOP : Gravity.BOTTOM;

