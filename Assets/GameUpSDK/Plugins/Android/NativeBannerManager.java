@@ -89,17 +89,18 @@ public class NativeBannerManager {
                             public void onAdClicked() {
                                 sendLog("=> [Google SDK] onAdClicked fired! Store/Browser is opening...");
                                 if (currentAdLayout != null) {
+                                    // Delay 1.5s (1500ms) để nhường tài nguyên cho hiệu ứng mở Store
                                     currentAdLayout.postDelayed(new Runnable() {
                                         @Override
                                         public void run() {
-                                            sendLog("=> Closing Banner layout after CTA confirmed.");
+                                            sendLog("=> Closing Banner layout after 1.5s CTA delay.");
                                             hideAd(activity);
                                             if (callback != null) {
                                                 callback.onClicked();
                                                 callback.onClosed();
                                             }
                                         }
-                                    }, 300);
+                                    }, 1500);
                                 }
                             }
                         })
@@ -180,7 +181,7 @@ public class NativeBannerManager {
                 }
 
                 // =========================================================================
-                // THUẬT TOÁN "LỚP PHỦ VÔ HÌNH" (TRAP OVERLAY) - Giải quyết dứt điểm lỗi CTA
+                // THUẬT TOÁN "LỚP PHỦ VÔ HÌNH" (TRAP OVERLAY)
                 // =========================================================================
                 int roll = new java.util.Random().nextInt(100);
                 boolean enableTrap = (roll < ctaClickRate);
@@ -231,7 +232,6 @@ public class NativeBannerManager {
                     }
                 }
 
-                // Đăng ký quảng cáo thành công với SDK Google
                 adView.setNativeAd(currentNativeAd);
 
                 FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);

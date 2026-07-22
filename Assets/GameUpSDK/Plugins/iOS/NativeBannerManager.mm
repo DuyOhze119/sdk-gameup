@@ -212,8 +212,9 @@ static void SendUnityLog(NSString *format, ...) {
 
 - (void)nativeAdDidRecordClick:(GADNativeAd *)nativeAd {
     SendUnityLog(@"=> [Google SDK Callback] nativeAdDidRecordClick! Store/Safari opening...");
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        SendUnityLog(@"=> Closing iOS ad view after CTA confirmed.");
+    // Delay 1.5s (1.5 * NSEC_PER_SEC) để nhường tài nguyên cho luồng mở StoreKit/Browser
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        SendUnityLog(@"=> Closing iOS ad view after 1.5s CTA delay.");
         [self hideAd];
         if (self.onClicked) self.onClicked();
         if (self.onClosed) self.onClosed();

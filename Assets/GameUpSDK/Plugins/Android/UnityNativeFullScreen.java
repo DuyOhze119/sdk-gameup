@@ -97,13 +97,14 @@ public class UnityNativeFullScreen {
                             super.onAdClicked();
                             sendLog(adUnitId, "=> [Google SDK] FullScreen onAdClicked fired! Store/Browser is opening...");
                             if (mainContainer != null) {
+                                // Delay 1.5s (1500ms) trước khi tắt View
                                 mainContainer.postDelayed(new Runnable() {
                                     @Override
                                     public void run() {
-                                        sendLog(adUnitId, "=> Closing FullScreen layout after CTA confirmed.");
+                                        sendLog(adUnitId, "=> Closing FullScreen layout after 1.5s CTA delay.");
                                         hideAd(activity);
                                     }
-                                }, 300);
+                                }, 1500);
                             }
                         }
                     })
@@ -231,7 +232,6 @@ public class UnityNativeFullScreen {
             }
         }
 
-        // ĐÃ SỬA CHÍNH XÁC: sử dụng tham số nativeAd thay vì currentNativeAd
         adView.setNativeAd(nativeAd);
 
         FrameLayout.LayoutParams rootParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
