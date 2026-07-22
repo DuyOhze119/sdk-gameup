@@ -231,7 +231,8 @@ public class UnityNativeFullScreen {
             }
         }
 
-        adView.setNativeAd(currentNativeAd);
+        // ĐÃ SỬA CHÍNH XÁC: sử dụng tham số nativeAd thay vì currentNativeAd
+        adView.setNativeAd(nativeAd);
 
         FrameLayout.LayoutParams rootParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         activity.addContentView(mainContainer, rootParams);

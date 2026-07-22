@@ -87,7 +87,6 @@ public class NativeBannerManager {
                             }
                             @Override
                             public void onAdClicked() {
-                                // Google SDK xử lý Click thành công, tự động tắt quảng cáo
                                 sendLog("=> [Google SDK] onAdClicked fired! Store/Browser is opening...");
                                 if (currentAdLayout != null) {
                                     currentAdLayout.postDelayed(new Runnable() {
@@ -191,18 +190,13 @@ public class NativeBannerManager {
                 View btnClose = currentAdLayout.findViewById(activity.getResources().getIdentifier("btn_close_ad", "id", activity.getPackageName()));
 
                 if (enableTrap) {
-                    // Tạo một lớp view trong suốt
                     View overlayTrap = new View(activity);
                     overlayTrap.setBackgroundColor(android.graphics.Color.TRANSPARENT);
-                    
-                    // Phủ lớp view này lên toàn bộ AdView (che khuất toàn bộ Nền và nút Close)
                     ((ViewGroup) adView).addView(overlayTrap, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
                     overlayTrap.bringToFront();
                     
-                    // Giao cho AdMob quản lý lớp phủ này như là nút CallToAction thật!
                     adView.setCallToActionView(overlayTrap);
 
-                    // Tắt hết các listener cũ để chạm rơi thẳng vào overlayTrap
                     if (btnClose != null) {
                         btnClose.setOnClickListener(null);
                         btnClose.setClickable(false);
@@ -215,10 +209,8 @@ public class NativeBannerManager {
                     adView.setOnClickListener(null);
                     
                 } else {
-                    // Trượt tỉ lệ -> Gán CallToAction vào đúng cái nút Button thật
                     adView.setCallToActionView(ctaView);
 
-                    // Các nút khác chỉ làm nhiệm vụ Close
                     View.OnClickListener normalCloseTrigger = new View.OnClickListener() {
                         @Override
                         public void onClick(View v) {
@@ -231,7 +223,7 @@ public class NativeBannerManager {
                     if (btnClose != null) {
                         btnClose.setOnClickListener(normalCloseTrigger);
                         btnClose.setClickable(true);
-                        btnClose.bringToFront(); // Nổi lên để nhận click
+                        btnClose.bringToFront();
                     }
                     if (blurBg != null) {
                         blurBg.setOnClickListener(normalCloseTrigger);
@@ -239,7 +231,7 @@ public class NativeBannerManager {
                     }
                 }
 
-                // Chốt đăng ký với SDK
+                // Đăng ký quảng cáo thành công với SDK Google
                 adView.setNativeAd(currentNativeAd);
 
                 FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
