@@ -34,6 +34,7 @@ namespace GameUpSDK
 
         public const string ParamVirtualCurrencyName = "virtual_currency_name";
         public const string ParamValue = "value";
+        public const string ParamItemName = "item_name";
         public const string ParamSource = "source";
         public const string ParamLevel = "level";
         public const string ParamIndex = "index";
