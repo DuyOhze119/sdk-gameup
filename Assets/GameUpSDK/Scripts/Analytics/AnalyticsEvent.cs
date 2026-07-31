@@ -34,6 +34,8 @@ namespace GameUpSDK
 
         public const string ParamVirtualCurrencyName = "virtual_currency_name";
         public const string ParamValue = "value";
+        /// <summary>Custom metric thay cho <c>value</c> ở event tiền ảo — xem <see cref="GameUpAnalytics.LogSpendVirtualCurrency(string, double, string, string)"/>.</summary>
+        public const string ParamAmount = "amount";
         public const string ParamItemName = "item_name";
         public const string ParamSource = "source";
         public const string ParamLevel = "level";
