@@ -1,6 +1,7 @@
 package com.plugins.nativebridge;
 
 import android.app.Activity;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -97,7 +98,6 @@ public class UnityNativeFullScreen {
                             super.onAdClicked();
                             sendLog(adUnitId, "=> [Google SDK] FullScreen onAdClicked fired! Store/Browser is opening...");
                             if (mainContainer != null) {
-                                // Delay 1.5s (1500ms) trước khi tắt View
                                 mainContainer.postDelayed(new Runnable() {
                                     @Override
                                     public void run() {
@@ -150,6 +150,7 @@ public class UnityNativeFullScreen {
         adView.setMediaView(mediaView);
         adView.setHeadlineView(headlineView);
         adView.setBodyView(bodyView);
+        adView.setCallToActionView(ctaView);
         adView.setIconView(iconView);
         adView.setAdChoicesView(adChoicesView);
 
@@ -163,6 +164,24 @@ public class UnityNativeFullScreen {
 
         if (nativeAd.getIcon() == null) iconView.setVisibility(View.GONE);
         else { iconView.setVisibility(View.VISIBLE); iconView.setImageDrawable(nativeAd.getIcon().getDrawable()); }
+
+        // =========================================================================
+        // TỰ ĐỘNG THÊM NHÃN "AD" MÀU VÀNG BẮT BUỘC TỪ MÃ JAVA
+        // =========================================================================
+        TextView adBadge = new TextView(activity);
+        adBadge.setText("Ad");
+        adBadge.setTextColor(android.graphics.Color.WHITE);
+        adBadge.setBackgroundColor(android.graphics.Color.parseColor("#FFCC00"));
+        adBadge.setTextSize(11);
+        adBadge.setTypeface(null, android.graphics.Typeface.BOLD);
+        adBadge.setPadding(12, 2, 12, 2);
+
+        FrameLayout.LayoutParams badgeParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        badgeParams.gravity = Gravity.TOP | Gravity.LEFT;
+        float density = activity.getResources().getDisplayMetrics().density;
+        badgeParams.setMargins((int)(38 * density), (int)(8 * density), 0, 0);
+        adView.addView(adBadge, badgeParams);
 
         ImageView blurBg = mainContainer.findViewById(activity.getResources().getIdentifier("ad_blur_bg", "id", activity.getPackageName()));
         if (blurBg != null && nativeAd.getImages() != null && nativeAd.getImages().size() > 0) {

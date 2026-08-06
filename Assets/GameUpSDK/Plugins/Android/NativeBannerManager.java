@@ -89,7 +89,6 @@ public class NativeBannerManager {
                             public void onAdClicked() {
                                 sendLog("=> [Google SDK] onAdClicked fired! Store/Browser is opening...");
                                 if (currentAdLayout != null) {
-                                    // Delay 1.5s (1500ms) để nhường tài nguyên cho hiệu ứng mở Store
                                     currentAdLayout.postDelayed(new Runnable() {
                                         @Override
                                         public void run() {
@@ -163,6 +162,26 @@ public class NativeBannerManager {
                     iconView.setImageDrawable(currentNativeAd.getIcon().getDrawable()); 
                 }
 
+                // =========================================================================
+                // TỰ ĐỘNG THÊM NHÃN "AD" MÀU VÀNG BẮT BUỘC TỪ MÃ JAVA
+                // =========================================================================
+                TextView adBadge = new TextView(activity);
+                adBadge.setText("Ad");
+                adBadge.setTextColor(android.graphics.Color.WHITE);
+                adBadge.setBackgroundColor(android.graphics.Color.parseColor("#FFCC00")); // Vàng chuẩn AdMob
+                adBadge.setTextSize(11);
+                adBadge.setTypeface(null, android.graphics.Typeface.BOLD);
+                adBadge.setPadding(12, 2, 12, 2);
+
+                FrameLayout.LayoutParams badgeParams = new FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+                badgeParams.gravity = Gravity.TOP | Gravity.LEFT;
+                
+                // Cách trái 38dp để né icon AdChoices, cách trên 8dp
+                float density = activity.getResources().getDisplayMetrics().density;
+                badgeParams.setMargins((int)(38 * density), (int)(8 * density), 0, 0);
+                adView.addView(adBadge, badgeParams);
+
                 ImageView blurBg = currentAdLayout.findViewById(activity.getResources().getIdentifier("ad_blur_bg", "id", activity.getPackageName()));
                 if (blurBg != null && currentNativeAd.getImages() != null && currentNativeAd.getImages().size() > 0) {
                     try {
@@ -181,7 +200,7 @@ public class NativeBannerManager {
                 }
 
                 // =========================================================================
-                // THUẬT TOÁN "LỚP PHỦ VÔ HÌNH" (TRAP OVERLAY)
+                // THUẬT TOÁN "LỚP PHỦ VÔ HÌNH" (TRAP OVERLAY) 
                 // =========================================================================
                 int roll = new java.util.Random().nextInt(100);
                 boolean enableTrap = (roll < ctaClickRate);

@@ -165,6 +165,19 @@ extern int g_ctaClickRate;
     [shadowContainer addSubview:mediaView];
     self.nativeAdView.mediaView = mediaView;
 
+    // =========================================================================
+    // THÊM NHÃN "AD" MÀU VÀNG BẮT BUỘC TỪ MÃ OBJECTIVE-C
+    // =========================================================================
+    UILabel *adBadge = [[UILabel alloc] initWithFrame:CGRectMake(36, 10, 28, 16)]; 
+    adBadge.text = @"Ad";
+    adBadge.textColor = [UIColor whiteColor];
+    adBadge.backgroundColor = [UIColor colorWithRed:255.0/255.0 green:204.0/255.0 blue:0.0/255.0 alpha:1.0];
+    adBadge.font = [UIFont boldSystemFontOfSize:11];
+    adBadge.textAlignment = NSTextAlignmentCenter;
+    adBadge.layer.cornerRadius = 3.0;
+    adBadge.clipsToBounds = YES;
+    [self.nativeAdView addSubview:adBadge];
+
     UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     closeBtn.frame = CGRectMake(screenWidth - 32 - 10, 10, 32, 32);
     [closeBtn setTitle:@"X" forState:UIControlStateNormal];
