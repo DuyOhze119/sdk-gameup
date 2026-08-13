@@ -50,7 +50,6 @@ public class UnityNativeFullScreen {
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                sendLog(adUnitId, "Start Loading FullScreen ID: " + adUnitId);
                 com.google.android.gms.ads.nativead.NativeAdOptions adOptions = 
                     new com.google.android.gms.ads.nativead.NativeAdOptions.Builder()
                         .setAdChoicesPlacement(com.google.android.gms.ads.nativead.NativeAdOptions.ADCHOICES_TOP_LEFT)
@@ -156,11 +155,10 @@ public class UnityNativeFullScreen {
         if (nativeAd.getIcon() != null) { iconView.setVisibility(View.VISIBLE); iconView.setImageDrawable(nativeAd.getIcon().getDrawable()); } else iconView.setVisibility(View.GONE);
 
         // =========================================================================
-        // THIẾT KẾ MỚI TÁCH RỜI NHÃN AD & SPONSORED (CÓ SHADOW)
+        // THIẾT KẾ CĂN CHỈNH SÁT MÉP ADCHOICES
         // =========================================================================
         float density = activity.getResources().getDisplayMetrics().density;
         
-        // 1. Nhãn Ad
         TextView adBadge = new TextView(activity);
         adBadge.setText("Ad");
         adBadge.setTextColor(android.graphics.Color.BLACK);
@@ -170,11 +168,13 @@ public class UnityNativeFullScreen {
         adBadge.setBackground(adBg);
         adBadge.setTextSize(10);
         adBadge.setTypeface(null, android.graphics.Typeface.BOLD);
-        adBadge.setPadding((int)(4*density), (int)(1*density), (int)(4*density), (int)(1*density));
+        adBadge.setGravity(Gravity.CENTER);
+        adBadge.setPadding((int)(4*density), 0, (int)(4*density), 0);
 
-        FrameLayout.LayoutParams badgeParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        // Chiều cao fix chuẩn 15dp bằng với icon AdChoices, Y = 0, X = 18dp
+        FrameLayout.LayoutParams badgeParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, (int)(15 * density));
         badgeParams.gravity = Gravity.TOP | Gravity.LEFT;
-        badgeParams.setMargins((int)(34 * density), (int)(8 * density), 0, 0);
+        badgeParams.setMargins((int)(18 * density), 0, 0, 0);
         adView.addView(adBadge, badgeParams);
 
         // 2. Chữ Sponsored (Center)
@@ -192,6 +192,7 @@ public class UnityNativeFullScreen {
         sponsoredText.setTypeface(null, android.graphics.Typeface.BOLD);
         sponsoredText.setShadowLayer(5, 1, 1, android.graphics.Color.parseColor("#FF000000"));
 
+        // Kéo lên sát đỉnh màn hình (Y = 0)
         FrameLayout.LayoutParams sponParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         sponParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         sponParams.setMargins(0, (int)(8 * density), 0, 0);
