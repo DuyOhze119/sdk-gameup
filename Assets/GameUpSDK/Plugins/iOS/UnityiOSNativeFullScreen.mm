@@ -147,8 +147,9 @@ extern int g_ctaClickRate;
     self.nativeAdView.mediaView = mediaView;
 
     // =========================================================================
-    // THIẾT KẾ MỚI TÁCH RỜI NHÃN AD & SPONSORED (CÓ SHADOW)
+    // CĂN CHỈNH SÁT MÉP ADCHOICES & SHADOW SPONSORED
     // =========================================================================
+    // 1. Nhãn Ad (Y=0, X=18)
     UILabel *adBadge = [[UILabel alloc] init];
     adBadge.text = @"Ad";
     adBadge.textColor = [UIColor blackColor];
@@ -158,16 +159,17 @@ extern int g_ctaClickRate;
     adBadge.layer.cornerRadius = 3.0;
     adBadge.clipsToBounds = YES;
     [adBadge sizeToFit];
-    adBadge.frame = CGRectMake(26, 8, adBadge.frame.size.width + 8, 16); 
+    adBadge.frame = CGRectMake(18, 0, adBadge.frame.size.width + 8, 15); 
     [self.nativeAdView addSubview:adBadge];
     
+    // 2. Chữ Sponsored (Center, Y=0)
     NSString *advString = self.currentNativeAd.advertiser ? self.currentNativeAd.advertiser : self.currentNativeAd.store;
     NSString *sponText = advString ? [NSString stringWithFormat:@"Sponsored • %@", advString] : @"Sponsored";
     
     UILabel *sponsoredLabel = [[UILabel alloc] init];
     sponsoredLabel.text = sponText;
     sponsoredLabel.textColor = [UIColor whiteColor];
-    sponsoredLabel.font = [UIFont boldSystemFontOfSize:12];
+    sponsoredLabel.font = [UIFont boldSystemFontOfSize:11];
     sponsoredLabel.layer.shadowColor = [UIColor blackColor].CGColor;
     sponsoredLabel.layer.shadowOffset = CGSizeMake(1, 1);
     sponsoredLabel.layer.shadowOpacity = 1.0;
@@ -175,7 +177,7 @@ extern int g_ctaClickRate;
     [sponsoredLabel sizeToFit];
     
     CGFloat sponX = (safeWidth - sponsoredLabel.frame.size.width) / 2;
-    sponsoredLabel.frame = CGRectMake(sponX, 8, sponsoredLabel.frame.size.width, 16);
+    sponsoredLabel.frame = CGRectMake(sponX, 0, sponsoredLabel.frame.size.width, 15);
     [self.nativeAdView addSubview:sponsoredLabel];
     
     if (self.currentNativeAd.advertiser) self.nativeAdView.advertiserView = sponsoredLabel;
