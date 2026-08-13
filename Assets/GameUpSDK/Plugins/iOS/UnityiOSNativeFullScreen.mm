@@ -13,7 +13,6 @@ typedef void (*Action_Log)(const char* unitId, const char* message);
 extern int g_ctaClickRate;
 
 @interface NativeFullScreenManager : NSObject <GADNativeAdLoaderDelegate, GADNativeAdDelegate>
-
 @property (nonatomic, strong) NSMutableDictionary<NSString*, GADAdLoader*> *adLoaders;
 @property (nonatomic, strong) NSMutableDictionary<NSString*, GADNativeAd*> *loadedAds;
 @property (nonatomic, strong) NSMutableDictionary<NSString*, NSNumber*> *loadingStates;
@@ -32,7 +31,6 @@ extern int g_ctaClickRate;
 @property (nonatomic, assign) Action_Closed onClosedDelegate;
 @property (nonatomic, assign) Action_Paid onPaidDelegate;
 @property (nonatomic, assign) Action_Log onLogDelegate;
-
 + (instancetype)sharedInstance;
 - (void)loadAd:(NSString *)adUnitId;
 - (BOOL)isAdReady:(NSString *)adUnitId;
@@ -96,7 +94,6 @@ extern int g_ctaClickRate;
     UIViewController *rootVC = UnityGetGLViewController();
     UIView *rootView = rootVC.view;
     
-    // XỬ LÝ SAFE AREA CHO IOS FULLSCREEN
     CGFloat screenWidth = rootView.bounds.size.width;
     UIEdgeInsets safeArea = UIEdgeInsetsZero;
     if (@available(iOS 11.0, *)) { safeArea = rootView.safeAreaInsets; }
@@ -150,33 +147,39 @@ extern int g_ctaClickRate;
     self.nativeAdView.mediaView = mediaView;
 
     // =========================================================================
-    // BỔ SUNG PHẦN TỬ THIẾU & CĂN CHỈNH KHOẢNG CÁCH 
+    // THIẾT KẾ MỚI TÁCH RỜI NHÃN AD & SPONSORED (CÓ SHADOW)
     // =========================================================================
-    UILabel *adBadge = [[UILabel alloc] initWithFrame:CGRectMake(20, 8, 24, 16)]; 
+    UILabel *adBadge = [[UILabel alloc] init];
     adBadge.text = @"Ad";
-    adBadge.textColor = [UIColor whiteColor];
+    adBadge.textColor = [UIColor blackColor];
     adBadge.backgroundColor = [UIColor colorWithRed:255.0/255.0 green:204.0/255.0 blue:0.0/255.0 alpha:1.0];
     adBadge.font = [UIFont boldSystemFontOfSize:10];
     adBadge.textAlignment = NSTextAlignmentCenter;
     adBadge.layer.cornerRadius = 3.0;
     adBadge.clipsToBounds = YES;
+    [adBadge sizeToFit];
+    adBadge.frame = CGRectMake(26, 8, adBadge.frame.size.width + 8, 16); 
     [self.nativeAdView addSubview:adBadge];
-
+    
     NSString *advString = self.currentNativeAd.advertiser ? self.currentNativeAd.advertiser : self.currentNativeAd.store;
-    if (advString) {
-        UILabel *advLabel = [[UILabel alloc] initWithFrame:CGRectMake(50, 8, safeWidth - 120, 16)];
-        advLabel.text = advString;
-        advLabel.textColor = [UIColor whiteColor];
-        advLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
-        advLabel.layer.shadowColor = [UIColor blackColor].CGColor;
-        advLabel.layer.shadowOffset = CGSizeMake(1, 1);
-        advLabel.layer.shadowOpacity = 0.8;
-        advLabel.layer.shadowRadius = 1.0;
-        
-        [self.nativeAdView addSubview:advLabel];
-        if (self.currentNativeAd.advertiser) self.nativeAdView.advertiserView = advLabel;
-        else self.nativeAdView.storeView = advLabel;
-    }
+    NSString *sponText = advString ? [NSString stringWithFormat:@"Sponsored • %@", advString] : @"Sponsored";
+    
+    UILabel *sponsoredLabel = [[UILabel alloc] init];
+    sponsoredLabel.text = sponText;
+    sponsoredLabel.textColor = [UIColor whiteColor];
+    sponsoredLabel.font = [UIFont boldSystemFontOfSize:12];
+    sponsoredLabel.layer.shadowColor = [UIColor blackColor].CGColor;
+    sponsoredLabel.layer.shadowOffset = CGSizeMake(1, 1);
+    sponsoredLabel.layer.shadowOpacity = 1.0;
+    sponsoredLabel.layer.shadowRadius = 2.0;
+    [sponsoredLabel sizeToFit];
+    
+    CGFloat sponX = (safeWidth - sponsoredLabel.frame.size.width) / 2;
+    sponsoredLabel.frame = CGRectMake(sponX, 8, sponsoredLabel.frame.size.width, 16);
+    [self.nativeAdView addSubview:sponsoredLabel];
+    
+    if (self.currentNativeAd.advertiser) self.nativeAdView.advertiserView = sponsoredLabel;
+    else if (self.currentNativeAd.store) self.nativeAdView.storeView = sponsoredLabel;
 
     UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     closeBtn.frame = CGRectMake(safeWidth - 32 - 10, 10, 32, 32);
@@ -223,7 +226,6 @@ extern int g_ctaClickRate;
     
     [self populateUI];
 
-    // BẪY CLICK (TRAP OVERLAY) X%
     int roll = arc4random_uniform(100);
     BOOL enableTrap = (roll < g_ctaClickRate);
     
