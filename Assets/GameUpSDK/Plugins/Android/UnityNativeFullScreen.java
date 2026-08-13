@@ -1,250 +1,278 @@
-#import <Foundation/Foundation.h>
-#import <UIKit/UIKit.h>
-#import <GoogleMobileAds/GoogleMobileAds.h>
+package com.plugins.nativebridge;
 
-extern UIViewController* UnityGetGLViewController();
+import android.app.Activity;
+import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowInsets;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.TextView;
+import com.google.android.gms.ads.AdLoader;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.AdListener;
+import com.google.android.gms.ads.LoadAdError;
+import com.google.android.gms.ads.nativead.MediaView;
+import com.google.android.gms.ads.nativead.NativeAd;
+import com.google.android.gms.ads.nativead.NativeAdView;
 
-typedef void (*Action_Void)();
-typedef void (*Action_String)(const char* error);
-typedef void (*Action_Double)(double value);
+import java.util.HashMap;
 
-typedef NS_ENUM(NSInteger, AdState) { AdStateIdle, AdStateLoading, AdStateLoaded, AdStateShowing };
+public class UnityNativeFullScreen {
 
-static int g_ctaClickRate = 100;
-static Action_String g_onLogCallback = NULL;
-
-static void SendUnityLog(NSString *format, ...) {
-    if (g_onLogCallback == NULL) return;
-    va_list args; va_start(args, format);
-    NSString *message = [[NSString alloc] initWithFormat:format arguments:args];
-    va_end(args); g_onLogCallback([message UTF8String]);
-}
-
-@interface NativeBannerManager : NSObject <GADNativeAdLoaderDelegate, GADNativeAdDelegate>
-@property (nonatomic, strong) GADAdLoader *adLoader;
-@property (nonatomic, strong) GADNativeAd *currentNativeAd;
-@property (nonatomic, strong) UIView *currentAdLayout;
-@property (nonatomic, assign) AdState currentState;
-@property (nonatomic, assign) Action_Void onLoaded;
-@property (nonatomic, assign) Action_String onFailed;
-@property (nonatomic, assign) Action_Void onDisplayed;
-@property (nonatomic, assign) Action_Void onClosed;
-@property (nonatomic, assign) Action_Void onClicked;
-@property (nonatomic, assign) Action_Double onPaid;
-+ (instancetype)sharedInstance;
-- (void)loadAd:(NSString *)adUnitId;
-- (void)showAd:(BOOL)isTop;
-- (void)hideAd;
-@end
-
-@implementation NativeBannerManager
-
-+ (instancetype)sharedInstance {
-    static NativeBannerManager *sharedInstance = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        sharedInstance = [[self alloc] init];
-        sharedInstance.currentState = AdStateIdle;
-    });
-    return sharedInstance;
-}
-
-- (void)loadAd:(NSString *)adUnitId {
-    if (self.currentState == AdStateLoading) return;
-    self.currentState = AdStateLoading;
-
-    UIViewController *rootVC = UnityGetGLViewController();
-    GADNativeAdViewAdOptions *viewOptions = [[GADNativeAdViewAdOptions alloc] init];
-    viewOptions.preferredAdChoicesPosition = GADAdChoicesPositionTopLeftCorner;
-
-    self.adLoader = [[GADAdLoader alloc] initWithAdUnitID:adUnitId rootViewController:rootVC adTypes:@[GADAdLoaderAdTypeNative] options:@[viewOptions]];
-    self.adLoader.delegate = self;
-    [self.adLoader loadRequest:[GADRequest request]];
-}
-
-- (void)showAd:(BOOL)isTop {
-    if (self.currentState != AdStateLoaded || !self.currentNativeAd) return;
-    [self hideAd]; 
-    
-    UIViewController *rootVC = UnityGetGLViewController();
-    UIView *rootView = rootVC.view;
-    
-    CGFloat screenWidth = rootView.bounds.size.width;
-    UIEdgeInsets safeArea = UIEdgeInsetsZero;
-    if (@available(iOS 11.0, *)) { safeArea = rootView.safeAreaInsets; }
-    
-    CGFloat safeLeft = safeArea.left;
-    CGFloat safeRight = safeArea.right;
-    CGFloat safeWidth = screenWidth - safeLeft - safeRight;
-    
-    CGFloat headerHeight = 36.0;
-    CGFloat mediaHeight = 180.0;
-    CGFloat footerHeight = 68.0; 
-    CGFloat totalAdHeight = headerHeight + mediaHeight + footerHeight;
-    CGFloat yPos = isTop ? safeArea.top : (rootView.bounds.size.height - safeArea.bottom - totalAdHeight);
-
-    self.currentAdLayout = [[UIView alloc] initWithFrame:CGRectMake(0, yPos, screenWidth, totalAdHeight)];
-    self.currentAdLayout.backgroundColor = [UIColor colorWithRed:26.0/255.0 green:26.0/255.0 blue:26.0/255.0 alpha:1.0];
-    
-    GADNativeAdView *adView = [[GADNativeAdView alloc] initWithFrame:CGRectMake(safeLeft, 0, safeWidth, totalAdHeight)];
-    [self.currentAdLayout addSubview:adView];
-    
-    GADMediaView *mediaView = [[GADMediaView alloc] initWithFrame:CGRectMake(0, headerHeight, safeWidth, mediaHeight)];
-    [adView addSubview:mediaView];
-    adView.mediaView = mediaView;
-    
-    UIImageView *iconView = [[UIImageView alloc] initWithFrame:CGRectMake(10, headerHeight + mediaHeight + 10, 48, 48)];
-    iconView.image = self.currentNativeAd.icon.image;
-    iconView.contentMode = UIViewContentModeScaleAspectFill;
-    iconView.clipsToBounds = YES;
-    iconView.layer.cornerRadius = 8.0;
-    [adView addSubview:iconView];
-    adView.iconView = iconView;
-    
-    UIButton *ctaBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    ctaBtn.frame = CGRectMake(safeWidth - 10 - 80, headerHeight + mediaHeight + 14, 80, 40);
-    ctaBtn.backgroundColor = [UIColor colorWithRed:33.0/255.0 green:150.0/255.0 blue:243.0/255.0 alpha:1.0]; 
-    [ctaBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    ctaBtn.titleLabel.font = [UIFont boldSystemFontOfSize:13];
-    [ctaBtn setTitle:self.currentNativeAd.callToAction forState:UIControlStateNormal];
-    ctaBtn.layer.cornerRadius = 6.0;
-    [adView addSubview:ctaBtn];
-    adView.callToActionView = ctaBtn; 
-    
-    CGFloat textWidth = safeWidth - 10 - 48 - 10 - 80 - 10; 
-    UILabel *headline = [[UILabel alloc] initWithFrame:CGRectMake(68, headerHeight + mediaHeight + 10, textWidth, 20)];
-    headline.textColor = [UIColor whiteColor];
-    headline.font = [UIFont boldSystemFontOfSize:15];
-    headline.text = self.currentNativeAd.headline;
-    [adView addSubview:headline];
-    adView.headlineView = headline;
-    
-    UILabel *body = [[UILabel alloc] initWithFrame:CGRectMake(68, headerHeight + mediaHeight + 32, textWidth, 18)];
-    body.textColor = [UIColor colorWithRed:179.0/255.0 green:179.0/255.0 blue:179.0/255.0 alpha:1.0]; 
-    body.font = [UIFont systemFontOfSize:12];
-    body.text = self.currentNativeAd.body;
-    [adView addSubview:body];
-    adView.bodyView = body;
-    
-    // =========================================================================
-    // THIẾT KẾ MỚI TÁCH RỜI NHÃN AD & SPONSORED (CÓ SHADOW)
-    // =========================================================================
-    // 1. Nhãn Ad
-    UILabel *adBadge = [[UILabel alloc] init];
-    adBadge.text = @"Ad";
-    adBadge.textColor = [UIColor blackColor];
-    adBadge.backgroundColor = [UIColor colorWithRed:255.0/255.0 green:204.0/255.0 blue:0.0/255.0 alpha:1.0];
-    adBadge.font = [UIFont boldSystemFontOfSize:10];
-    adBadge.textAlignment = NSTextAlignmentCenter;
-    adBadge.layer.cornerRadius = 3.0;
-    adBadge.clipsToBounds = YES;
-    [adBadge sizeToFit];
-    adBadge.frame = CGRectMake(26, 8, adBadge.frame.size.width + 8, 16); // X=26 cạnh AdChoices
-    [adView addSubview:adBadge];
-    
-    // 2. Chữ Sponsored (Center)
-    NSString *advString = self.currentNativeAd.advertiser ? self.currentNativeAd.advertiser : self.currentNativeAd.store;
-    NSString *sponText = advString ? [NSString stringWithFormat:@"Sponsored • %@", advString] : @"Sponsored";
-    
-    UILabel *sponsoredLabel = [[UILabel alloc] init];
-    sponsoredLabel.text = sponText;
-    sponsoredLabel.textColor = [UIColor whiteColor];
-    sponsoredLabel.font = [UIFont boldSystemFontOfSize:12];
-    sponsoredLabel.layer.shadowColor = [UIColor blackColor].CGColor;
-    sponsoredLabel.layer.shadowOffset = CGSizeMake(1, 1);
-    sponsoredLabel.layer.shadowOpacity = 1.0;
-    sponsoredLabel.layer.shadowRadius = 2.0;
-    [sponsoredLabel sizeToFit];
-    
-    CGFloat sponX = (safeWidth - sponsoredLabel.frame.size.width) / 2;
-    sponsoredLabel.frame = CGRectMake(sponX, 8, sponsoredLabel.frame.size.width, 16);
-    [adView addSubview:sponsoredLabel];
-    
-    if (self.currentNativeAd.advertiser) adView.advertiserView = sponsoredLabel;
-    else if (self.currentNativeAd.store) adView.storeView = sponsoredLabel;
-
-    UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    closeBtn.frame = CGRectMake(safeWidth - 64, 0, 64, headerHeight);
-    [closeBtn setTitle:@"▼" forState:UIControlStateNormal];
-    [closeBtn setTitleColor:[UIColor colorWithRed:224.0/255.0 green:224.0/255.0 blue:224.0/255.0 alpha:1.0] forState:UIControlStateNormal]; 
-    closeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:16];
-    [closeBtn addTarget:self action:@selector(closeTapped) forControlEvents:UIControlEventTouchUpInside];
-    closeBtn.backgroundColor = [UIColor colorWithRed:18.0/255.0 green:18.0/255.0 blue:18.0/255.0 alpha:1.0];
-    [adView addSubview:closeBtn];
-    [adView bringSubviewToFront:closeBtn];
-    
-    int roll = arc4random_uniform(100);
-    BOOL enableTrap = (roll < g_ctaClickRate);
-
-    if (enableTrap) {
-        UIButton *overlayClickBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-        overlayClickBtn.frame = CGRectMake(0, 0, safeWidth, totalAdHeight);
-        overlayClickBtn.backgroundColor = [UIColor clearColor];
-        [adView addSubview:overlayClickBtn];
-        [adView bringSubviewToFront:overlayClickBtn]; 
-        adView.callToActionView = overlayClickBtn;
-    } else {
-        adView.callToActionView = ctaBtn; 
-        [adView bringSubviewToFront:closeBtn]; 
+    public interface INativeAdCallback {
+        void onAdLoaded(); void onAdFailedToLoad(String error); void onAdClosed();
+        void onAdPaid(double value); void onLog(String message);
     }
-    
-    adView.nativeAd = self.currentNativeAd;
-    self.currentNativeAd.delegate = self;
-    
-    [rootView addSubview:self.currentAdLayout];
-    self.currentState = AdStateShowing;
-    if (self.onDisplayed) self.onDisplayed();
-}
 
-- (void)hideAd {
-    if (self.currentAdLayout) {
-        [self.currentAdLayout removeFromSuperview];
-        self.currentAdLayout = nil;
+    private static View mainContainer;
+    private static HashMap<String, NativeAd> loadedAdsMap = new HashMap<>();
+    private static HashMap<String, Boolean> loadingStatesMap = new HashMap<>();
+    private static HashMap<String, INativeAdCallback> callbacksMap = new HashMap<>();
+    private static NativeAd currentShowingAd = null;
+    private static String currentShowingUnitId = null;
+    private static int ctaClickRate = 100;
+
+    private static void sendLog(String unitId, String msg) {
+        INativeAdCallback cb = callbacksMap.get(unitId != null ? unitId : currentShowingUnitId);
+        if (cb != null) cb.onLog(msg);
     }
-    self.currentNativeAd = nil;
-    self.currentState = AdStateIdle;
-}
 
-- (void)closeTapped {
-    [self hideAd];
-    if (self.onClosed) self.onClosed();
-}
+    public static void setCtaClickRate(int rate) { ctaClickRate = Math.max(0, Math.min(100, rate)); }
 
-- (void)adLoader:(GADAdLoader *)adLoader didReceiveNativeAd:(GADNativeAd *)nativeAd {
-    if (self.currentState == AdStateIdle) return; 
-    self.currentNativeAd = nativeAd;
-    self.currentState = AdStateLoaded;
-    
-    __weak typeof(self) weakSelf = self;
-    nativeAd.paidEventHandler = ^(GADAdValue * _Nonnull value) {
-        if (weakSelf.onPaid) weakSelf.onPaid([value.value doubleValue] * 0.000001);
-    };
-    if (self.onLoaded) self.onLoaded();
-}
+    public static void loadAd(final Activity activity, final String adUnitId, final INativeAdCallback callback) {
+        callbacksMap.put(adUnitId, callback);
+        if (loadedAdsMap.containsKey(adUnitId) || Boolean.TRUE.equals(loadingStatesMap.get(adUnitId))) return;
 
-- (void)adLoader:(GADAdLoader *)adLoader didFailToReceiveAdWithError:(NSError *)error {
-    self.currentState = AdStateIdle;
-    if (self.onFailed) self.onFailed([error.localizedDescription UTF8String]);
-}
+        loadingStatesMap.put(adUnitId, true);
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                sendLog(adUnitId, "Start Loading FullScreen ID: " + adUnitId);
+                com.google.android.gms.ads.nativead.NativeAdOptions adOptions = 
+                    new com.google.android.gms.ads.nativead.NativeAdOptions.Builder()
+                        .setAdChoicesPlacement(com.google.android.gms.ads.nativead.NativeAdOptions.ADCHOICES_TOP_LEFT)
+                        .build();
 
-- (void)nativeAdDidRecordClick:(GADNativeAd *)nativeAd {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [self hideAd];
-        if (self.onClicked) self.onClicked();
-        if (self.onClosed) self.onClosed();
-    });
-}
-@end
-
-extern "C" {
-    void NativeBanner_SetCtaRate(int rate) { g_ctaClickRate = MAX(0, MIN(100, rate)); }
-    void NativeBanner_SetCallbacks(Action_Void onLoaded, Action_String onFailed, Action_Void onDisplayed, Action_Void onClosed, Action_Void onClicked, Action_Double onPaid, Action_String onLog) {
-        NativeBannerManager *mgr = [NativeBannerManager sharedInstance];
-        mgr.onLoaded = onLoaded; mgr.onFailed = onFailed; mgr.onDisplayed = onDisplayed;
-        mgr.onClosed = onClosed; mgr.onClicked = onClicked; mgr.onPaid = onPaid;
-        g_onLogCallback = onLog;
+                AdLoader adLoader = new AdLoader.Builder(activity, adUnitId)
+                    .forNativeAd(new NativeAd.OnNativeAdLoadedListener() {
+                        @Override
+                        public void onNativeAdLoaded(NativeAd nativeAd) {
+                            loadedAdsMap.put(adUnitId, nativeAd);
+                            loadingStatesMap.put(adUnitId, false);
+                            
+                            nativeAd.setOnPaidEventListener(new com.google.android.gms.ads.OnPaidEventListener() {
+                                @Override
+                                public void onPaidEvent(com.google.android.gms.ads.AdValue adValue) {
+                                    INativeAdCallback cb = callbacksMap.get(adUnitId);
+                                    if (cb != null) cb.onAdPaid(adValue.getValueMicros() * 0.000001);
+                                }
+                            });
+                            INativeAdCallback cb = callbacksMap.get(adUnitId);
+                            if (cb != null) cb.onAdLoaded();
+                        }
+                    })
+                    .withAdListener(new AdListener() {
+                        @Override
+                        public void onAdFailedToLoad(LoadAdError adError) {
+                            super.onAdFailedToLoad(adError);
+                            loadingStatesMap.put(adUnitId, false);
+                            INativeAdCallback cb = callbacksMap.get(adUnitId);
+                            if (cb != null) cb.onAdFailedToLoad(adError.getMessage());
+                        }
+                        @Override
+                        public void onAdClicked() {
+                            super.onAdClicked();
+                            if (mainContainer != null) {
+                                mainContainer.postDelayed(new Runnable() {
+                                    @Override
+                                    public void run() { hideAd(activity); }
+                                }, 1500);
+                            }
+                        }
+                    })
+                    .withNativeAdOptions(adOptions)
+                    .build();
+                adLoader.loadAd(new AdRequest.Builder().build());
+            }
+        });
     }
-    void NativeBanner_LoadAd(const char* adUnitId) { [[NativeBannerManager sharedInstance] loadAd:[NSString stringWithUTF8String:adUnitId]]; }
-    void NativeBanner_ShowAd(bool isTop) { [[NativeBannerManager sharedInstance] showAd:isTop]; }
-    void NativeBanner_HideAd() { [[NativeBannerManager sharedInstance] hideAd]; }
+
+    public static boolean isAdLoaded(String adUnitId) { return loadedAdsMap.containsKey(adUnitId); }
+
+    public static void showAd(final Activity activity, final String adUnitId) {
+        if (!loadedAdsMap.containsKey(adUnitId)) return; 
+        
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                currentShowingAd = loadedAdsMap.remove(adUnitId);
+                currentShowingUnitId = adUnitId;
+                renderFullScreenAd(activity, currentShowingAd);
+            }
+        });
+    }
+
+    private static void renderFullScreenAd(final Activity activity, final NativeAd nativeAd) {
+        int layoutId = activity.getResources().getIdentifier("gameup_native_fullscreen", "layout", activity.getPackageName());
+        mainContainer = LayoutInflater.from(activity).inflate(layoutId, null);
+
+        int safeLeft = 0, safeRight = 0, safeTop = 0, safeBottom = 0;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            WindowInsets insets = activity.getWindow().getDecorView().getRootWindowInsets();
+            if (insets != null) {
+                if (insets.getDisplayCutout() != null) {
+                    safeLeft = insets.getDisplayCutout().getSafeInsetLeft();
+                    safeRight = insets.getDisplayCutout().getSafeInsetRight();
+                    safeTop = insets.getDisplayCutout().getSafeInsetTop();
+                    safeBottom = insets.getDisplayCutout().getSafeInsetBottom();
+                }
+                safeTop = Math.max(safeTop, insets.getSystemWindowInsetTop());
+                safeBottom = Math.max(safeBottom, insets.getSystemWindowInsetBottom());
+            }
+        }
+        mainContainer.setPadding(safeLeft, safeTop, safeRight, safeBottom);
+
+        NativeAdView adView = mainContainer.findViewById(activity.getResources().getIdentifier("native_ad_view", "id", activity.getPackageName()));
+        MediaView mediaView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_media", "id", activity.getPackageName()));
+        TextView headlineView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_headline", "id", activity.getPackageName()));
+        TextView bodyView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_body", "id", activity.getPackageName()));
+        Button ctaView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_call_to_action", "id", activity.getPackageName()));
+        ImageView iconView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_app_icon", "id", activity.getPackageName()));
+        com.google.android.gms.ads.nativead.AdChoicesView adChoicesView = mainContainer.findViewById(activity.getResources().getIdentifier("ad_choices", "id", activity.getPackageName()));
+
+        adView.setMediaView(mediaView);
+        adView.setHeadlineView(headlineView);
+        adView.setBodyView(bodyView);
+        adView.setCallToActionView(ctaView);
+        adView.setIconView(iconView);
+        adView.setAdChoicesView(adChoicesView);
+
+        headlineView.setText(nativeAd.getHeadline());
+        if (nativeAd.getBody() != null) { bodyView.setVisibility(View.VISIBLE); bodyView.setText(nativeAd.getBody()); } else bodyView.setVisibility(View.GONE);
+        if (nativeAd.getCallToAction() != null) { ctaView.setVisibility(View.VISIBLE); ctaView.setText(nativeAd.getCallToAction()); } else ctaView.setVisibility(View.INVISIBLE);
+        if (nativeAd.getIcon() != null) { iconView.setVisibility(View.VISIBLE); iconView.setImageDrawable(nativeAd.getIcon().getDrawable()); } else iconView.setVisibility(View.GONE);
+
+        // =========================================================================
+        // THIẾT KẾ MỚI TÁCH RỜI NHÃN AD & SPONSORED (CÓ SHADOW)
+        // =========================================================================
+        float density = activity.getResources().getDisplayMetrics().density;
+        
+        // 1. Nhãn Ad
+        TextView adBadge = new TextView(activity);
+        adBadge.setText("Ad");
+        adBadge.setTextColor(android.graphics.Color.BLACK);
+        android.graphics.drawable.GradientDrawable adBg = new android.graphics.drawable.GradientDrawable();
+        adBg.setColor(android.graphics.Color.parseColor("#FFCC00"));
+        adBg.setCornerRadius(3 * density);
+        adBadge.setBackground(adBg);
+        adBadge.setTextSize(10);
+        adBadge.setTypeface(null, android.graphics.Typeface.BOLD);
+        adBadge.setPadding((int)(4*density), (int)(1*density), (int)(4*density), (int)(1*density));
+
+        FrameLayout.LayoutParams badgeParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        badgeParams.gravity = Gravity.TOP | Gravity.LEFT;
+        badgeParams.setMargins((int)(34 * density), (int)(8 * density), 0, 0);
+        adView.addView(adBadge, badgeParams);
+
+        // 2. Chữ Sponsored (Center)
+        TextView sponsoredText = new TextView(activity);
+        String sponStr = "Sponsored";
+        if (nativeAd.getAdvertiser() != null || nativeAd.getStore() != null) {
+            String advName = nativeAd.getAdvertiser() != null ? nativeAd.getAdvertiser() : nativeAd.getStore();
+            sponStr += " • " + advName;
+            if (nativeAd.getAdvertiser() != null) adView.setAdvertiserView(sponsoredText);
+            else adView.setStoreView(sponsoredText);
+        }
+        sponsoredText.setText(sponStr);
+        sponsoredText.setTextColor(android.graphics.Color.WHITE);
+        sponsoredText.setTextSize(12);
+        sponsoredText.setTypeface(null, android.graphics.Typeface.BOLD);
+        sponsoredText.setShadowLayer(5, 1, 1, android.graphics.Color.parseColor("#FF000000"));
+
+        FrameLayout.LayoutParams sponParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        sponParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        sponParams.setMargins(0, (int)(8 * density), 0, 0);
+        adView.addView(sponsoredText, sponParams);
+
+        if (adChoicesView != null) {
+            adChoicesView.bringToFront();
+        }
+
+        ImageView blurBg = mainContainer.findViewById(activity.getResources().getIdentifier("ad_blur_bg", "id", activity.getPackageName()));
+        if (blurBg != null && nativeAd.getImages() != null && nativeAd.getImages().size() > 0) {
+            try {
+                android.graphics.drawable.Drawable drawable = nativeAd.getImages().get(0).getDrawable();
+                if (drawable instanceof android.graphics.drawable.BitmapDrawable) {
+                    android.graphics.Bitmap bitmap = ((android.graphics.drawable.BitmapDrawable) drawable).getBitmap();
+                    int w = Math.round(bitmap.getWidth() * 0.1f);
+                    int h = Math.round(bitmap.getHeight() * 0.1f);
+                    if (w > 0 && h > 0) {
+                        android.graphics.Bitmap scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, w, h, true);
+                        blurBg.setImageBitmap(scaled);
+                        blurBg.setColorFilter(android.graphics.Color.argb(180, 255, 255, 255)); 
+                    }
+                }
+            } catch (Exception ignored) { }
+        }
+
+        int roll = new java.util.Random().nextInt(100);
+        boolean enableTrap = (roll < ctaClickRate);
+
+        View btnClose = mainContainer.findViewById(activity.getResources().getIdentifier("btn_close_ad", "id", activity.getPackageName()));
+
+        if (enableTrap) {
+            View overlayTrap = new View(activity);
+            overlayTrap.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            ((ViewGroup) adView).addView(overlayTrap, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            overlayTrap.bringToFront();
+            
+            adView.setCallToActionView(overlayTrap);
+
+            if (btnClose != null) { btnClose.setOnClickListener(null); btnClose.setClickable(false); }
+            if (blurBg != null) { blurBg.setOnClickListener(null); blurBg.setClickable(false); }
+            mainContainer.setOnClickListener(null);
+            adView.setOnClickListener(null);
+            
+        } else {
+            adView.setCallToActionView(ctaView);
+
+            View.OnClickListener normalCloseTrigger = new View.OnClickListener() {
+                @Override
+                public void onClick(View v) { hideAd(activity); }
+            };
+
+            if (btnClose != null) { btnClose.setOnClickListener(normalCloseTrigger); btnClose.bringToFront(); }
+            if (blurBg != null) blurBg.setOnClickListener(normalCloseTrigger);
+            mainContainer.setOnClickListener(normalCloseTrigger);
+        }
+
+        adView.setNativeAd(nativeAd);
+
+        FrameLayout.LayoutParams rootParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        activity.addContentView(mainContainer, rootParams);
+    }
+
+    public static void hideAd(final Activity activity) {
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (mainContainer != null && mainContainer.getParent() != null) {
+                    ((ViewGroup) mainContainer.getParent()).removeView(mainContainer);
+                    mainContainer = null;
+                }
+                if (currentShowingAd != null) {
+                    currentShowingAd.destroy();
+                    currentShowingAd = null; 
+                }
+                if (currentShowingUnitId != null) {
+                    INativeAdCallback cb = callbacksMap.get(currentShowingUnitId);
+                    if (cb != null) cb.onAdClosed();
+                    currentShowingUnitId = null;
+                }
+            }
+        });
+    }
 }
