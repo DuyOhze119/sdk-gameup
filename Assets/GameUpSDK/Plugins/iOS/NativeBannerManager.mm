@@ -8,20 +8,16 @@ typedef void (*Action_Void)();
 typedef void (*Action_String)(const char* error);
 typedef void (*Action_Double)(double value);
 
-typedef NS_ENUM(NSInteger, AdState) {
-    AdStateIdle, AdStateLoading, AdStateLoaded, AdStateShowing
-};
+typedef NS_ENUM(NSInteger, AdState) { AdStateIdle, AdStateLoading, AdStateLoaded, AdStateShowing };
 
 static int g_ctaClickRate = 100;
 static Action_String g_onLogCallback = NULL;
 
 static void SendUnityLog(NSString *format, ...) {
     if (g_onLogCallback == NULL) return;
-    va_list args;
-    va_start(args, format);
+    va_list args; va_start(args, format);
     NSString *message = [[NSString alloc] initWithFormat:format arguments:args];
-    va_end(args);
-    g_onLogCallback([message UTF8String]);
+    va_end(args); g_onLogCallback([message UTF8String]);
 }
 
 @interface NativeBannerManager : NSObject <GADNativeAdLoaderDelegate, GADNativeAdDelegate>
@@ -29,14 +25,12 @@ static void SendUnityLog(NSString *format, ...) {
 @property (nonatomic, strong) GADNativeAd *currentNativeAd;
 @property (nonatomic, strong) UIView *currentAdLayout;
 @property (nonatomic, assign) AdState currentState;
-
 @property (nonatomic, assign) Action_Void onLoaded;
 @property (nonatomic, assign) Action_String onFailed;
 @property (nonatomic, assign) Action_Void onDisplayed;
 @property (nonatomic, assign) Action_Void onClosed;
 @property (nonatomic, assign) Action_Void onClicked;
 @property (nonatomic, assign) Action_Double onPaid;
-
 + (instancetype)sharedInstance;
 - (void)loadAd:(NSString *)adUnitId;
 - (void)showAd:(BOOL)isTop;
@@ -63,10 +57,7 @@ static void SendUnityLog(NSString *format, ...) {
     GADNativeAdViewAdOptions *viewOptions = [[GADNativeAdViewAdOptions alloc] init];
     viewOptions.preferredAdChoicesPosition = GADAdChoicesPositionTopLeftCorner;
 
-    self.adLoader = [[GADAdLoader alloc] initWithAdUnitID:adUnitId
-                                       rootViewController:rootVC
-                                                  adTypes:@[GADAdLoaderAdTypeNative]
-                                                  options:@[viewOptions]];
+    self.adLoader = [[GADAdLoader alloc] initWithAdUnitID:adUnitId rootViewController:rootVC adTypes:@[GADAdLoaderAdTypeNative] options:@[viewOptions]];
     self.adLoader.delegate = self;
     [self.adLoader loadRequest:[GADRequest request]];
 }
@@ -78,9 +69,7 @@ static void SendUnityLog(NSString *format, ...) {
     UIViewController *rootVC = UnityGetGLViewController();
     UIView *rootView = rootVC.view;
     
-    // =========================================================================
-    // XỬ LÝ SAFE AREA (DYNAMIC ISLAND / KHE TAI THỎ IOS)
-    // =========================================================================
+    // XỬ LÝ SAFE AREA
     CGFloat screenWidth = rootView.bounds.size.width;
     UIEdgeInsets safeArea = UIEdgeInsetsZero;
     if (@available(iOS 11.0, *)) { safeArea = rootView.safeAreaInsets; }
@@ -95,11 +84,9 @@ static void SendUnityLog(NSString *format, ...) {
     CGFloat totalAdHeight = headerHeight + mediaHeight + footerHeight;
     CGFloat yPos = isTop ? safeArea.top : (rootView.bounds.size.height - safeArea.bottom - totalAdHeight);
 
-    // Layout gốc kéo full ngang
     self.currentAdLayout = [[UIView alloc] initWithFrame:CGRectMake(0, yPos, screenWidth, totalAdHeight)];
     self.currentAdLayout.backgroundColor = [UIColor colorWithRed:26.0/255.0 green:26.0/255.0 blue:26.0/255.0 alpha:1.0];
     
-    // adView được bóp vào Safe Area
     GADNativeAdView *adView = [[GADNativeAdView alloc] initWithFrame:CGRectMake(safeLeft, 0, safeWidth, totalAdHeight)];
     [self.currentAdLayout addSubview:adView];
     
@@ -123,6 +110,7 @@ static void SendUnityLog(NSString *format, ...) {
     [ctaBtn setTitle:self.currentNativeAd.callToAction forState:UIControlStateNormal];
     ctaBtn.layer.cornerRadius = 6.0;
     [adView addSubview:ctaBtn];
+    adView.callToActionView = ctaBtn; 
     
     CGFloat textWidth = safeWidth - 10 - 48 - 10 - 80 - 10; 
     UILabel *headline = [[UILabel alloc] initWithFrame:CGRectMake(68, headerHeight + mediaHeight + 10, textWidth, 20)];
@@ -140,17 +128,35 @@ static void SendUnityLog(NSString *format, ...) {
     adView.bodyView = body;
     
     // =========================================================================
-    // THÊM NHÃN "AD" TRONG VÙNG SAFE AREA (Né icon AdChoices)
+    // BỔ SUNG PHẦN TỬ THIẾU & CĂN CHỈNH KHOẢNG CÁCH 
     // =========================================================================
-    UILabel *adBadge = [[UILabel alloc] initWithFrame:CGRectMake(36, 10, 28, 16)]; 
+    // 1. Nhãn AdBadge (Sát lại gần AdChoices với X=20)
+    UILabel *adBadge = [[UILabel alloc] initWithFrame:CGRectMake(20, 8, 24, 16)]; 
     adBadge.text = @"Ad";
     adBadge.textColor = [UIColor whiteColor];
     adBadge.backgroundColor = [UIColor colorWithRed:255.0/255.0 green:204.0/255.0 blue:0.0/255.0 alpha:1.0];
-    adBadge.font = [UIFont boldSystemFontOfSize:11];
+    adBadge.font = [UIFont boldSystemFontOfSize:10];
     adBadge.textAlignment = NSTextAlignmentCenter;
     adBadge.layer.cornerRadius = 3.0;
     adBadge.clipsToBounds = YES;
     [adView addSubview:adBadge];
+
+    // 2. Thêm Tên Nhà Quảng Cáo (Advertiser / Store) ngay bên cạnh Badge (X=50)
+    NSString *advString = self.currentNativeAd.advertiser ? self.currentNativeAd.advertiser : self.currentNativeAd.store;
+    if (advString) {
+        UILabel *advLabel = [[UILabel alloc] initWithFrame:CGRectMake(50, 8, safeWidth - 120, 16)];
+        advLabel.text = advString;
+        advLabel.textColor = [UIColor whiteColor];
+        advLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+        advLabel.layer.shadowColor = [UIColor blackColor].CGColor;
+        advLabel.layer.shadowOffset = CGSizeMake(1, 1);
+        advLabel.layer.shadowOpacity = 0.8;
+        advLabel.layer.shadowRadius = 1.0;
+        
+        [adView addSubview:advLabel];
+        if (self.currentNativeAd.advertiser) adView.advertiserView = advLabel;
+        else adView.storeView = advLabel;
+    }
 
     UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     closeBtn.frame = CGRectMake(safeWidth - 64, 0, 64, headerHeight);
@@ -160,14 +166,12 @@ static void SendUnityLog(NSString *format, ...) {
     [closeBtn addTarget:self action:@selector(closeTapped) forControlEvents:UIControlEventTouchUpInside];
     closeBtn.backgroundColor = [UIColor colorWithRed:18.0/255.0 green:18.0/255.0 blue:18.0/255.0 alpha:1.0];
     [adView addSubview:closeBtn];
-
-    // =========================================================================
-    // BẪY CLICK (TRAP OVERLAY) VỚI TỶ LỆ X%
-    // =========================================================================
+    [adView bringSubviewToFront:closeBtn];
+    
+    // BẪY CLICK (TRAP OVERLAY) X%
     int roll = arc4random_uniform(100);
     BOOL enableTrap = (roll < g_ctaClickRate);
-    
-    SendUnityLog(@"[iOS Banner Show] Roll: %d / Target: %d%% -> Enable Trap? %@", roll, g_ctaClickRate, enableTrap ? @"YES" : @"NO");
+    SendUnityLog(@"[iOS Banner] Roll: %d / Target: %d%% -> Enable Trap? %@", roll, g_ctaClickRate, enableTrap ? @"YES" : @"NO");
 
     if (enableTrap) {
         UIButton *overlayClickBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -186,7 +190,6 @@ static void SendUnityLog(NSString *format, ...) {
     
     [rootView addSubview:self.currentAdLayout];
     self.currentState = AdStateShowing;
-    SendUnityLog(@"=> iOS Banner DISPLAYED on screen.");
     if (self.onDisplayed) self.onDisplayed();
 }
 
@@ -200,14 +203,12 @@ static void SendUnityLog(NSString *format, ...) {
 }
 
 - (void)closeTapped {
-    SendUnityLog(@"=> Close button tapped. Hiding ad.");
     [self hideAd];
     if (self.onClosed) self.onClosed();
 }
 
 - (void)adLoader:(GADAdLoader *)adLoader didReceiveNativeAd:(GADNativeAd *)nativeAd {
     if (self.currentState == AdStateIdle) return; 
-    
     self.currentNativeAd = nativeAd;
     self.currentState = AdStateLoaded;
     
@@ -224,7 +225,6 @@ static void SendUnityLog(NSString *format, ...) {
 }
 
 - (void)nativeAdDidRecordClick:(GADNativeAd *)nativeAd {
-    SendUnityLog(@"=> Valid CTA Click. Store/Safari opening...");
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [self hideAd];
         if (self.onClicked) self.onClicked();
@@ -234,10 +234,7 @@ static void SendUnityLog(NSString *format, ...) {
 @end
 
 extern "C" {
-    void NativeBanner_SetCtaRate(int rate) {
-        g_ctaClickRate = MAX(0, MIN(100, rate));
-        SendUnityLog(@"=> [RemoteConfig] Set iOS Banner CTA Rate: %d%%", g_ctaClickRate);
-    }
+    void NativeBanner_SetCtaRate(int rate) { g_ctaClickRate = MAX(0, MIN(100, rate)); }
     void NativeBanner_SetCallbacks(Action_Void onLoaded, Action_String onFailed, Action_Void onDisplayed, Action_Void onClosed, Action_Void onClicked, Action_Double onPaid, Action_String onLog) {
         NativeBannerManager *mgr = [NativeBannerManager sharedInstance];
         mgr.onLoaded = onLoaded; mgr.onFailed = onFailed; mgr.onDisplayed = onDisplayed;

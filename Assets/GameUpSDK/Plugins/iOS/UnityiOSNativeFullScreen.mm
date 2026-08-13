@@ -17,19 +17,16 @@ extern int g_ctaClickRate;
 @property (nonatomic, strong) NSMutableDictionary<NSString*, GADAdLoader*> *adLoaders;
 @property (nonatomic, strong) NSMutableDictionary<NSString*, GADNativeAd*> *loadedAds;
 @property (nonatomic, strong) NSMutableDictionary<NSString*, NSNumber*> *loadingStates;
-
 @property (nonatomic, strong) GADNativeAd *currentNativeAd;
 @property (nonatomic, strong) NSString *currentShowingUnitId;
 @property (nonatomic, strong) UIView *currentAdLayout;
 
-// UI Elements
 @property (nonatomic, strong) GADNativeAdView *nativeAdView;
 @property (nonatomic, strong) UILabel *headlineLabel;
 @property (nonatomic, strong) UILabel *bodyLabel;
 @property (nonatomic, strong) UIButton *ctaBtn;
 @property (nonatomic, strong) UIImageView *iconView;
 
-// Global Callbacks
 @property (nonatomic, assign) Action_Loaded onLoadedDelegate;
 @property (nonatomic, assign) Action_Failed onFailedDelegate;
 @property (nonatomic, assign) Action_Closed onClosedDelegate;
@@ -59,29 +56,22 @@ extern int g_ctaClickRate;
 }
 
 - (void)sendLog:(NSString *)unitId format:(NSString *)format, ... {
-    va_list args;
-    va_start(args, format);
+    va_list args; va_start(args, format);
     NSString *message = [[NSString alloc] initWithFormat:format arguments:args];
     va_end(args);
-    
     NSString *targetId = unitId != nil ? unitId : (self.currentShowingUnitId != nil ? self.currentShowingUnitId : @"UNKNOWN");
-    if (self.onLogDelegate != NULL) {
-        self.onLogDelegate([targetId UTF8String], [message UTF8String]);
-    }
+    if (self.onLogDelegate != NULL) self.onLogDelegate([targetId UTF8String], [message UTF8String]);
 }
 
 - (void)loadAd:(NSString *)adUnitId {
     if (self.loadedAds[adUnitId] != nil || [self.loadingStates[adUnitId] boolValue] == YES) return;
-    
     self.loadingStates[adUnitId] = @(YES);
+    
     UIViewController *rootVC = UnityGetGLViewController();
     GADNativeAdViewAdOptions *viewOptions = [[GADNativeAdViewAdOptions alloc] init];
     viewOptions.preferredAdChoicesPosition = GADAdChoicesPositionTopLeftCorner;
 
-    GADAdLoader *adLoader = [[GADAdLoader alloc] initWithAdUnitID:adUnitId
-                                       rootViewController:rootVC
-                                                  adTypes:@[GADAdLoaderAdTypeNative]
-                                                  options:@[viewOptions]];
+    GADAdLoader *adLoader = [[GADAdLoader alloc] initWithAdUnitID:adUnitId rootViewController:rootVC adTypes:@[GADAdLoaderAdTypeNative] options:@[viewOptions]];
     adLoader.delegate = self;
     self.adLoaders[adUnitId] = adLoader;
     [adLoader loadRequest:[GADRequest request]];
@@ -106,9 +96,7 @@ extern int g_ctaClickRate;
     UIViewController *rootVC = UnityGetGLViewController();
     UIView *rootView = rootVC.view;
     
-    // =========================================================================
     // XỬ LÝ SAFE AREA CHO IOS FULLSCREEN
-    // =========================================================================
     CGFloat screenWidth = rootView.bounds.size.width;
     UIEdgeInsets safeArea = UIEdgeInsetsZero;
     if (@available(iOS 11.0, *)) { safeArea = rootView.safeAreaInsets; }
@@ -119,7 +107,6 @@ extern int g_ctaClickRate;
     CGFloat safeBottom = safeArea.bottom;
     
     CGFloat safeWidth = screenWidth - safeLeft - safeRight;
-    CGFloat safeHeight = rootView.bounds.size.height - safeTop - safeBottom;
     
     CGFloat mediaHeight = 180.0;
     CGFloat footerHeight = 68.0;
@@ -163,17 +150,33 @@ extern int g_ctaClickRate;
     self.nativeAdView.mediaView = mediaView;
 
     // =========================================================================
-    // THÊM NHÃN "AD" VÀO SAFE AREA NATIVE VIEW
+    // BỔ SUNG PHẦN TỬ THIẾU & CĂN CHỈNH KHOẢNG CÁCH 
     // =========================================================================
-    UILabel *adBadge = [[UILabel alloc] initWithFrame:CGRectMake(36, 10, 28, 16)]; 
+    UILabel *adBadge = [[UILabel alloc] initWithFrame:CGRectMake(20, 8, 24, 16)]; 
     adBadge.text = @"Ad";
     adBadge.textColor = [UIColor whiteColor];
     adBadge.backgroundColor = [UIColor colorWithRed:255.0/255.0 green:204.0/255.0 blue:0.0/255.0 alpha:1.0];
-    adBadge.font = [UIFont boldSystemFontOfSize:11];
+    adBadge.font = [UIFont boldSystemFontOfSize:10];
     adBadge.textAlignment = NSTextAlignmentCenter;
     adBadge.layer.cornerRadius = 3.0;
     adBadge.clipsToBounds = YES;
     [self.nativeAdView addSubview:adBadge];
+
+    NSString *advString = self.currentNativeAd.advertiser ? self.currentNativeAd.advertiser : self.currentNativeAd.store;
+    if (advString) {
+        UILabel *advLabel = [[UILabel alloc] initWithFrame:CGRectMake(50, 8, safeWidth - 120, 16)];
+        advLabel.text = advString;
+        advLabel.textColor = [UIColor whiteColor];
+        advLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+        advLabel.layer.shadowColor = [UIColor blackColor].CGColor;
+        advLabel.layer.shadowOffset = CGSizeMake(1, 1);
+        advLabel.layer.shadowOpacity = 0.8;
+        advLabel.layer.shadowRadius = 1.0;
+        
+        [self.nativeAdView addSubview:advLabel];
+        if (self.currentNativeAd.advertiser) self.nativeAdView.advertiserView = advLabel;
+        else self.nativeAdView.storeView = advLabel;
+    }
 
     UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     closeBtn.frame = CGRectMake(safeWidth - 32 - 10, 10, 32, 32);
@@ -220,14 +223,10 @@ extern int g_ctaClickRate;
     
     [self populateUI];
 
-    // =========================================================================
-    // TRAP OVERLAY THEO RATE X% (HOÀN HẢO CHO ĐIỀU KHIỂN REMOTE)
-    // =========================================================================
+    // BẪY CLICK (TRAP OVERLAY) X%
     int roll = arc4random_uniform(100);
     BOOL enableTrap = (roll < g_ctaClickRate);
     
-    [self sendLog:adUnitId format:@"[iOS FullScreen Show] Roll: %d / Target: %d%% -> Enable Trap? %@", roll, g_ctaClickRate, enableTrap ? @"YES" : @"NO"];
-
     if (enableTrap) {
         UIButton *overlayClickBtn = [UIButton buttonWithType:UIButtonTypeCustom];
         overlayClickBtn.frame = CGRectMake(0, 0, safeWidth, totalAdHeight);
@@ -241,7 +240,6 @@ extern int g_ctaClickRate;
     }
 
     [rootView addSubview:self.currentAdLayout];
-    [self sendLog:adUnitId format:@"=> iOS FullScreen DISPLAYED (Safe Area & Compliant)."];
 }
 
 - (void)populateUI {
@@ -305,9 +303,7 @@ extern int g_ctaClickRate;
 @end
 
 extern "C" {
-    void _iosSetNativeFullScreenCtaRate(int rate) {
-        g_ctaClickRate = MAX(0, MIN(100, rate));
-    }
+    void _iosSetNativeFullScreenCtaRate(int rate) { g_ctaClickRate = MAX(0, MIN(100, rate)); }
 
     void _iosLoadNativeAd(const char* adUnitId, Action_Loaded onLoaded, Action_Failed onFailed, Action_Closed onClosed, Action_Paid onPaid, Action_Log onLog) {
         NativeFullScreenManager *mgr = [NativeFullScreenManager sharedInstance];
