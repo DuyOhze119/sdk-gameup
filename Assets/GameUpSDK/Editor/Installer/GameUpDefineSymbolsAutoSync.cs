@@ -6,6 +6,8 @@ using UnityEditor;
 using UnityEditor.Compilation;
 using UnityEditor.PackageManager;
 using UnityEngine;
+using GameUpSDK.Ads;
+using GameUpSDK;
 
 namespace GameUpSDK.Installer
 {
@@ -24,12 +26,15 @@ namespace GameUpSDK.Installer
             BuildTargetGroup.Standalone,
         };
 
-        private const string LevelPlayDepsDefine = "LEVELPLAY_DEPENDENCIES_INSTALLED";
-        private const string AdMobDepsDefine = "ADMOB_DEPENDENCIES_INSTALLED";
-        private const string FirebaseDepsDefine = "FIREBASE_DEPENDENCIES_INSTALLED";
-        private const string AppsFlyerDepsDefine = "APPSFLYER_DEPENDENCIES_INSTALLED";
-        private const string GameAnalyticsDepsDefine = "GAMEANALYTICS_DEPENDENCIES_INSTALLED";
-        private const string FacebookDepsDefine = "FACEBOOK_DEPENDENCIES_INSTALLED";
+        private const string LevelPlayDepsDefine = GUDefinetion.LevelPlayDepsInstalled;
+        private const string AdMobDepsDefine = GUDefinetion.AdMobDepsInstalled;
+        private const string MaxSdkDepsDefine = GUDefinetion.MaxDepsInstalled;
+        private const string FirebaseDepsDefine = GUDefinetion.FirebaseDepsInstalled;
+        private const string AppsFlyerDepsDefine = GUDefinetion.AppsFlyerDepsInstalled;
+        private const string GameAnalyticsDepsDefine = GUDefinetion.GameAnalyticsDepsInstalled;
+        private const string FacebookDepsDefine = GUDefinetion.FacebookDepsInstalled;
+        private const string AppmetricaDepsDefine = GUDefinetion.AppMetricaDepsInstalled;
+        private const string AdjustDepsDefine = GUDefinetion.AdjustDepsInstalled;
 
         private const string SessionThrottleKey = "GameUpSDK_DefinesAutoSync_Throttled";
 
@@ -130,26 +135,37 @@ namespace GameUpSDK.Installer
 
         private static void SyncDefines()
         {
-            TryEnsureGameAnalyticsRuntimeAsmdef(out _, out _);
-            EnsurePrimaryMediationDefines();
+            // Installer đang gỡ pack: define đã được clear có chủ đích, sync lúc này sẽ set lại chúng.
+            if (GameUpDependenciesWindow.IsDependencyRemovalInProgress)
+                return;
 
-            bool levelPlayInstalled = IsAssemblyLoaded("Unity.LevelPlay");
-            bool admobInstalled = IsAssemblyLoaded("GoogleMobileAds");
-            bool firebaseInstalled = IsAssemblyLoaded("Firebase.App");
-            bool appsFlyerInstalled = IsAssemblyLoaded("AppsFlyer");
-            bool gameAnalyticsInstalled = GameUpDependenciesWindow.IsGameAnalyticsSdkPresent();
-            bool facebookInstalled = IsAssemblyLoaded("Facebook.Unity.Editor");
+            TryEnsureGameAnalyticsRuntimeAsmdef(out _, out _);
+            GameUpDependenciesWindow.EnsureMmpDefines();
+
+            // Dựa vào asset trên disk, không dựa vào AppDomain: assembly của SDK vừa gỡ vẫn còn load
+            // cho tới lần domain reload kế tiếp, nên IsAssemblyLoaded sẽ bật lại define vừa clear.
+            bool levelPlayInstalled = IsDependencyInstalled("Unity.LevelPlay");
+            bool admobInstalled = IsDependencyInstalled("GoogleMobileAds");
+            bool maxInstalled = IsDependencyInstalled("MaxSdk.Scripts");
+            bool firebaseInstalled = IsDependencyInstalled("Firebase.App");
+            bool appsFlyerInstalled = IsDependencyInstalled("AppsFlyer");
+            bool gameAnalyticsInstalled = IsDependencyInstalled("GameAnalyticsSDK");
+            bool facebookInstalled = IsDependencyInstalled("Facebook.Unity.Editor");
+            bool appMetricaInstalled = IsDependencyInstalled("AppMetrica");
+            bool adjustInstalled = IsDependencyInstalled(GameUpDependenciesWindow.AdjustAssemblyName);
 
             SetDefine(LevelPlayDepsDefine, levelPlayInstalled);
             SetDefine(AdMobDepsDefine, admobInstalled);
+            SetDefine(MaxSdkDepsDefine, maxInstalled);
             SetDefine(FirebaseDepsDefine, firebaseInstalled);
             SetDefine(AppsFlyerDepsDefine, appsFlyerInstalled);
             SetDefine(GameAnalyticsDepsDefine, gameAnalyticsInstalled);
             SetDefine(FacebookDepsDefine, facebookInstalled);
+            SetDefine(AppmetricaDepsDefine, appMetricaInstalled);
+            SetDefine(AdjustDepsDefine, adjustInstalled);
 
-            // Backward compat: bật khi có (Firebase hoặc AppsFlyer hoặc GameAnalytics) AND (AdMob hoặc LevelPlay)
-            bool hasAnalytics = firebaseInstalled || appsFlyerInstalled || gameAnalyticsInstalled;
-            bool hasMediation = admobInstalled || levelPlayInstalled;
+            bool hasAnalytics = firebaseInstalled || appsFlyerInstalled || adjustInstalled || gameAnalyticsInstalled || appMetricaInstalled;
+            bool hasMediation = admobInstalled || levelPlayInstalled || maxInstalled;
             bool sdkEnabled = hasAnalytics && hasMediation;
             GameUpDependenciesWindow.SetDepsReadyDefine(sdkEnabled);
         }
@@ -193,36 +209,25 @@ namespace GameUpSDK.Installer
             return true;
         }
 
-        private static void EnsurePrimaryMediationDefines()
+        private static bool IsDependencyInstalled(string assemblyName)
         {
-            bool lp = HasDefine(GUDefinetion.PrimaryMediationLevelPlay);
-            bool admob = HasDefine(GUDefinetion.PrimaryMediationAdMob);
-            if (!lp && !admob)
-            {
-                SetDefine(GUDefinetion.PrimaryMediationLevelPlay, true);
-                return;
-            }
-
-            // Nếu lỡ có cả 2, ưu tiên giữ AdMob (giống logic window).
-            if (lp && admob)
-                SetDefine(GUDefinetion.PrimaryMediationLevelPlay, false);
-        }
-
-        private static bool IsAssemblyLoaded(string assemblyName)
-        {
-            if (string.IsNullOrEmpty(assemblyName)) return false;
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (string.Equals(asm.GetName().Name, assemblyName, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-            return false;
+            return GameUpDependenciesWindow.IsDependencyInstalledByAssembly(assemblyName);
         }
 
         private static bool HasDefine(string define)
         {
+            if (string.IsNullOrEmpty(define))
+                return false;
+
             string symbols = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Android);
-            return !string.IsNullOrEmpty(symbols) && symbols.Contains(define);
+            // So khớp từng symbol thay vì Contains: tránh khớp nhầm khi define là chuỗi con của define khác.
+            foreach (string symbol in symbols.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (symbol.Trim().Equals(define, StringComparison.Ordinal))
+                    return true;
+            }
+
+            return false;
         }
 
         private static void SetDefine(string define, bool enabled)
@@ -235,15 +240,16 @@ namespace GameUpSDK.Installer
                     var list = new List<string>(
                         current.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
 
-                    bool changed = false;
-                    if (enabled && !list.Contains(define))
+                    bool changed;
+                    if (enabled)
                     {
-                        list.Add(define);
-                        changed = true;
+                        changed = !list.Contains(define);
+                        if (changed)
+                            list.Add(define);
                     }
-                    else if (!enabled && list.Remove(define))
+                    else
                     {
-                        changed = true;
+                        changed = list.RemoveAll(s => s.Trim().Equals(define, StringComparison.Ordinal)) > 0;
                     }
 
                     if (!changed)

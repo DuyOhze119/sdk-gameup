@@ -2,23 +2,27 @@ using UnityEngine;
 using System;
 using System.Runtime.InteropServices;
 using UnityEngine.Scripting; // Bắt buộc cho [Preserve]
+using GameUpSDK.Singletons;
+using GameUpSDK.Ads;
 
 namespace GameUpSDK
 {
-    public class FullScreenNativeAdManager : Singletons.MonoSingletonSdk<FullScreenNativeAdManager>
+    public class FullScreenNativeAdManager : MonoSingletonSdk<FullScreenNativeAdManager>
     {
         private AndroidJavaClass bridgeClass;
         private AndroidJavaObject currentActivity;
         private bool _initialized;
 
+        // Lưu vết vị trí và ID đang hiển thị trên màn hình
         private string _currentShowingUnitId;
         private string _currentShowingWhere;
 
+        // Các event giờ đây mang theo tham số unitId (và where) để phân biệt quảng cáo
         public event Action<string> OnAdLoadedEvent;
         public event Action<string, string> OnAdLoadFailedEvent;
         public event Action<string, string> OnAdClosedEvent;
         public event Action<string, string> OnAdDisplayedEvent;
-        public event Action<string, string, double> OnAdPaidEvent; 
+        public event Action<string, string, double> OnAdPaidEvent;
         public event Action<string, string> OnAdLogEvent; // Sự kiện Log mở rộng nếu cần dùng ở UI
 
 #if UNITY_IOS && !UNITY_EDITOR
@@ -62,7 +66,8 @@ namespace GameUpSDK
             private readonly FullScreenNativeAdManager _manager;
             private readonly string _unitId;
 
-            public NativeAdCallbackProxy(FullScreenNativeAdManager manager, string unitId) 
+            // Proxy nay lưu trữ UnitId để gọi ngược về đúng ID
+            public NativeAdCallbackProxy(FullScreenNativeAdManager manager, string unitId)
                 : base("com.plugins.nativebridge.UnityNativeFullScreen$INativeAdCallback")
             {
                 _manager = manager;
@@ -76,7 +81,7 @@ namespace GameUpSDK
             [Preserve] public void onLog(string message) => _manager.HandleAdLog(_unitId, message);
         }
 
-        protected void Awake()
+        private void Awake()
         {
             DontDestroyOnLoad(gameObject);
         }
@@ -145,7 +150,7 @@ namespace GameUpSDK
         internal void HandleAdDisplayed(string unitId, string where) => MainThreadDispatcher.Enqueue(() => OnAdDisplayedEvent?.Invoke(unitId, where));
         internal void HandleAdClosed(string unitId) => MainThreadDispatcher.Enqueue(() => OnAdClosedEvent?.Invoke(unitId, _currentShowingWhere));
         internal void HandleAdPaid(string unitId, double value) => MainThreadDispatcher.Enqueue(() => OnAdPaidEvent?.Invoke(unitId, _currentShowingWhere, value));
-        
+
         internal void HandleAdLog(string unitId, string message) => MainThreadDispatcher.Enqueue(() => {
             Debug.Log($"<color=#00FF00>[GameUp-FullScreenNative ({unitId})]</color> {message}");
             OnAdLogEvent?.Invoke(unitId, message);

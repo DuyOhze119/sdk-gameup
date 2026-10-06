@@ -35,17 +35,25 @@ namespace GameUpSDK.Ads
 #if ADMOB_DEPENDENCIES_INSTALLED
             if (_ads.TryGetValue(unitId, out var oldAd) && oldAd != null) oldAd.Destroy();
 
-            InterstitialAd.Load(unitId, new AdRequest(), (ad, error) =>
+            // RaiseAdEventsOnUnityMainThread đã bị bỏ (obsolete từ GMA 10.7) nên callback này
+            // về từ thread native — mọi thao tác trên state/Unity API phải đẩy về main thread.
+            InterstitialAd.Load(unitId, new AdRequest(), (ad, error) => MainThreadDispatcher.Enqueue(() =>
             {
                 if (error != null || ad == null)
                 {
                     HandleLoadFailed(unitId, where, floor, error?.GetMessage());
                     return;
                 }
-                ad.OnAdPaid += (adValue) => { if (adValue != null) TrackRevenue(unitId, where, $"Interstitial_{floor}", adValue.Value * 0.000001f); };
+                ad.OnAdPaid += (adValue) =>
+                {
+                    if (adValue == null) return;
+                    double revenue = adValue.Value / 1_000_000d;
+                    string currency = adValue.CurrencyCode;
+                    MainThreadDispatcher.Enqueue(() => TrackRevenue(unitId, where, $"Interstitial_{floor}", revenue, currency));
+                };
                 _ads[unitId] = ad;
                 HandleLoadSuccess(unitId, where);
-            });
+            }));
 #endif
         }
 
@@ -59,20 +67,34 @@ namespace GameUpSDK.Ads
 
                 if (_ads.TryGetValue(unitId, out var ad) && ad != null && ad.CanShowAd())
                 {
-                    NotifyAdDisplayed(where);
                     _ads.Remove(unitId);
 
+                    // Ad đã bị gỡ khỏi _ads nên Destroy() ở RequestAdInternal không còn với tới nó
+                    // → phải tự giải phóng, nếu không mỗi impression rò một native object.
+                    bool released = false;
+                    void Release()
+                    {
+                        if (released) return;
+                        released = true;
+                        ad.Destroy();
+                    }
+
+                    // Chỉ báo "đã hiển thị" khi ad THỰC SỰ lên màn hình. Gọi trước ad.Show() thì
+                    // khi present lỗi sẽ vừa log impression giả vừa PauseAllCapping mà không ai nhả.
+                    ad.OnAdFullScreenContentOpened += () => MainThreadDispatcher.Enqueue(() => NotifyAdDisplayed(where));
                     ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
                     {
                         NotifyAdClosed(where);
+                        Release();
                         onSuccess?.Invoke();
-                        LoadByFloor(where, currentFloor);
+                        Load(where);
                     });
                     ad.OnAdFullScreenContentFailed += (err) => MainThreadDispatcher.Enqueue(() =>
                     {
                         NotifyAdDisplayFailed(where, err.GetMessage());
+                        Release();
                         onFail?.Invoke();
-                        LoadByFloor(where, currentFloor);
+                        Load(where);
                     });
                     ad.Show();
                     return;
@@ -108,22 +130,30 @@ namespace GameUpSDK.Ads
             return false;
         }
 
-        protected override void RequestAdInternal(string unitId, string where , EcpmFloor floor)
+        protected override void RequestAdInternal(string unitId, string where, EcpmFloor floor)
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
             if (_ads.TryGetValue(unitId, out var oldAd) && oldAd != null) oldAd.Destroy();
 
-            RewardedAd.Load(unitId, new AdRequest(), (ad, error) =>
+            // RaiseAdEventsOnUnityMainThread đã bị bỏ (obsolete từ GMA 10.7) nên callback này
+            // về từ thread native — mọi thao tác trên state/Unity API phải đẩy về main thread.
+            RewardedAd.Load(unitId, new AdRequest(), (ad, error) => MainThreadDispatcher.Enqueue(() =>
             {
                 if (error != null || ad == null)
                 {
                     HandleLoadFailed(unitId, where, floor, error?.GetMessage());
                     return;
                 }
-                ad.OnAdPaid += (adValue) => { if (adValue != null) TrackRevenue(unitId, where, $"Rewarded_{floor}", adValue.Value * 0.000001f); };
+                ad.OnAdPaid += (adValue) =>
+                {
+                    if (adValue == null) return;
+                    double revenue = adValue.Value / 1_000_000d;
+                    string currency = adValue.CurrencyCode;
+                    MainThreadDispatcher.Enqueue(() => TrackRevenue(unitId, where, $"Rewarded_{floor}", revenue, currency));
+                };
                 _ads[unitId] = ad;
                 HandleLoadSuccess(unitId, where);
-            });
+            }));
 #endif
         }
 
@@ -137,21 +167,32 @@ namespace GameUpSDK.Ads
 
                 if (_ads.TryGetValue(unitId, out var ad) && ad != null && ad.CanShowAd())
                 {
-                    NotifyAdDisplayed(where);
                     _ads.Remove(unitId);
                     bool earned = false;
 
+                    // Xem ghi chú ở AdmobInterstitialAd.Show: ad đã rời _ads nên phải tự Destroy().
+                    bool released = false;
+                    void Release()
+                    {
+                        if (released) return;
+                        released = true;
+                        ad.Destroy();
+                    }
+
+                    ad.OnAdFullScreenContentOpened += () => MainThreadDispatcher.Enqueue(() => NotifyAdDisplayed(where));
                     ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
                     {
                         NotifyAdClosed(where);
+                        Release();
                         if (!earned) onFail?.Invoke();
-                        LoadByFloor(where, currentFloor);
+                        Load(where);
                     });
                     ad.OnAdFullScreenContentFailed += (err) => MainThreadDispatcher.Enqueue(() =>
                     {
                         NotifyAdDisplayFailed(where, err.GetMessage());
+                        Release();
                         onFail?.Invoke();
-                        LoadByFloor(where, currentFloor);
+                        Load(where);
                     });
                     ad.Show((reward) =>
                     {
@@ -187,7 +228,7 @@ namespace GameUpSDK.Ads
             {
                 string unitId = _config.ResolveUnitId(_adType, where, floor);
                 if (!string.IsNullOrEmpty(unitId) && _ads.TryGetValue(unitId, out var ad) && ad != null && ad.CanShowAd() &&
-                    _expireTimes.TryGetValue(unitId, out var exp) && DateTime.Now < exp)
+                    _expireTimes.TryGetValue(unitId, out var exp) && DateTime.UtcNow < exp)
                     return true;
             }
 #endif
@@ -199,18 +240,26 @@ namespace GameUpSDK.Ads
 #if ADMOB_DEPENDENCIES_INSTALLED
             if (_ads.TryGetValue(unitId, out var oldAd) && oldAd != null) oldAd.Destroy();
 
-            AppOpenAd.Load(unitId, new AdRequest(), (ad, error) =>
+            // RaiseAdEventsOnUnityMainThread đã bị bỏ (obsolete từ GMA 10.7) nên callback này
+            // về từ thread native — mọi thao tác trên state/Unity API phải đẩy về main thread.
+            AppOpenAd.Load(unitId, new AdRequest(), (ad, error) => MainThreadDispatcher.Enqueue(() =>
             {
                 if (error != null || ad == null)
                 {
                     HandleLoadFailed(unitId, where, floor, error?.GetMessage());
                     return;
                 }
-                ad.OnAdPaid += (adValue) => { if (adValue != null) TrackRevenue(unitId, where, $"AppOpen_{floor}", adValue.Value * 0.000001f); };
+                ad.OnAdPaid += (adValue) =>
+                {
+                    if (adValue == null) return;
+                    double revenue = adValue.Value / 1_000_000d;
+                    string currency = adValue.CurrencyCode;
+                    MainThreadDispatcher.Enqueue(() => TrackRevenue(unitId, where, $"AppOpen_{floor}", revenue, currency));
+                };
                 _ads[unitId] = ad;
-                _expireTimes[unitId] = DateTime.Now.AddHours(4);
+                _expireTimes[unitId] = DateTime.UtcNow.AddHours(4);
                 HandleLoadSuccess(unitId, where);
-            });
+            }));
 #endif
         }
 
@@ -223,23 +272,34 @@ namespace GameUpSDK.Ads
                 if (string.IsNullOrEmpty(unitId)) continue;
 
                 if (_ads.TryGetValue(unitId, out var ad) && ad != null && ad.CanShowAd() &&
-                    _expireTimes.TryGetValue(unitId, out var exp) && DateTime.Now < exp)
+                    _expireTimes.TryGetValue(unitId, out var exp) && DateTime.UtcNow < exp)
                 {
-                    NotifyAdDisplayed(where);
                     _ads.Remove(unitId);
                     _expireTimes.Remove(unitId);
 
+                    // Xem ghi chú ở AdmobInterstitialAd.Show: ad đã rời _ads nên phải tự Destroy().
+                    bool released = false;
+                    void Release()
+                    {
+                        if (released) return;
+                        released = true;
+                        ad.Destroy();
+                    }
+
+                    ad.OnAdFullScreenContentOpened += () => MainThreadDispatcher.Enqueue(() => NotifyAdDisplayed(where));
                     ad.OnAdFullScreenContentClosed += () => MainThreadDispatcher.Enqueue(() =>
                     {
                         NotifyAdClosed(where);
+                        Release();
                         onSuccess?.Invoke();
-                        LoadByFloor(where, currentFloor);
+                        Load(where);
                     });
                     ad.OnAdFullScreenContentFailed += (err) => MainThreadDispatcher.Enqueue(() =>
                     {
                         NotifyAdDisplayFailed(where, err.GetMessage());
+                        Release();
                         onFail?.Invoke();
-                        LoadByFloor(where, currentFloor);
+                        Load(where);
                     });
                     ad.Show();
                     return;
@@ -262,6 +322,19 @@ namespace GameUpSDK.Ads
 #endif
         private readonly Dictionary<string, bool> _isLoaded = new Dictionary<string, bool>();
 
+        /// <summary>
+        /// Ad unit đã có lệnh Show nhưng chưa có banner sẵn — dùng để phát ĐÚNG một request.
+        /// AdsManager.OnBannerLoaded sẽ gọi lại Show() khi load xong, lúc đó banner đã có và được hiện.
+        /// </summary>
+        private readonly HashSet<string> _pendingShow = new HashSet<string>();
+
+        /// <summary>
+        /// Unit đang được AdsManager cho hiện (Show → thêm, Hide → bỏ). BannerView tự refresh định kỳ và bắn lại
+        /// OnBannerAdLoaded; chỉ ẩn trong callback đó khi unit KHÔNG nằm trong tập này, nếu không banner đang hiện
+        /// sẽ nháy tắt mỗi lần refresh.
+        /// </summary>
+        private readonly HashSet<string> _visible = new HashSet<string>();
+
         public AdmobBannerAd(AdUnitConfig config) : base(config, AdUnitType.Banner, "Admob") { }
 
         // OVERRIDE Tắt Waterfall: Banner chỉ Load duy nhất tầng All
@@ -272,8 +345,9 @@ namespace GameUpSDK.Ads
 #if ADMOB_DEPENDENCIES_INSTALLED
             string unitId = _config.ResolveUnitId(_adType, where, EcpmFloor.All);
             return _isLoaded.TryGetValue(unitId, out var isLoaded) && isLoaded;
-#endif
+#else
             return false;
+#endif
         }
 
         protected override void RequestAdInternal(string unitId, string where, EcpmFloor floor)
@@ -288,24 +362,46 @@ namespace GameUpSDK.Ads
                 var pos = entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top ? AdPosition.Top : AdPosition.Bottom;
                 var banner = new BannerView(unitId, GetAdMobBannerSize(entry.BannerSize), pos);
                 _banners[unitId] = banner;
+                banner.Hide();
 
                 banner.OnBannerAdLoaded += () => MainThreadDispatcher.Enqueue(() =>
                 {
+                    // AdMob TỰ hiển thị BannerView ngay khi load xong. Gọi Hide() trước LoadAd() không
+                    // có tác dụng bền → phải ẩn lại NGAY trong callback loaded để banner giữ trạng thái ẩn,
+                    // chỉ hiện khi AdsManager chủ động gọi Show() qua cổng điều kiện (enable_banner...).
+                    if (!_visible.Contains(unitId)) banner.Hide();
                     _isLoaded[unitId] = true;
                     HandleLoadSuccess(unitId, where);
                 });
                 banner.OnBannerAdLoadFailed += (err) => MainThreadDispatcher.Enqueue(() =>
                 {
                     _isLoaded[unitId] = false;
+                    // Mở lại cổng để lệnh Show kế tiếp được phép phát request mới
+                    // (retry tự động của BaseAdFormat vẫn chạy song song).
+                    _pendingShow.Remove(unitId);
                     banner.Destroy();
                     _banners.Remove(unitId);
                     HandleLoadFailed(unitId, where, floor, err?.GetMessage());
                 });
-                banner.OnAdPaid += (adValue) => { if (adValue != null) TrackRevenue(unitId, where, "Banner", adValue.Value * 0.000001f); };
+                banner.OnAdPaid += (adValue) =>
+                {
+                    if (adValue == null) return;
+                    double revenue = adValue.Value / 1_000_000d;
+                    string currency = adValue.CurrencyCode;
+                    MainThreadDispatcher.Enqueue(() => TrackRevenue(unitId, where, "Banner", revenue, currency));
+                };
 
                 var request = new AdRequest();
                 if (entry.CollapsiblePlacement != CollapsibleBannerPlacement.None)
                 {
+                    // AdMob chỉ phục vụ collapsible banner cho anchored adaptive banner. Cấu hình
+                    // MREC/Leaderboard sẽ im lặng trả về banner thường — cảnh báo để không mất công dò.
+                    if (entry.BannerSize == BannerSize.MediumRectangle || entry.BannerSize == BannerSize.Leaderboard)
+                    {
+                        Debug.LogWarning("[GameUp] " + $"Banner '{where}': collapsible chỉ hợp lệ với anchored adaptive banner, " +
+                            $"nhưng bannerSize đang là {entry.BannerSize} — AdMob sẽ bỏ qua collapsible.");
+                    }
+
                     request.Extras.Add("collapsible", entry.CollapsiblePlacement == CollapsibleBannerPlacement.Top ? "top" : "bottom");
                     request.Extras.Add("collapsible_request_id", System.Guid.NewGuid().ToString());
                 }
@@ -320,21 +416,24 @@ namespace GameUpSDK.Ads
             MainThreadDispatcher.Enqueue(() =>
             {
                 string unitId = _config.ResolveUnitId(_adType, where, EcpmFloor.All);
-                var entry = _config.GetEntry(_adType, where, EcpmFloor.All);
+                if (string.IsNullOrEmpty(unitId)) return;
 
-                if (entry.CollapsiblePlacement != CollapsibleBannerPlacement.None)
+                // Đã có banner sẵn (kể cả collapsible) thì hiện luôn. TUYỆT ĐỐI không load lại ở đây:
+                // Show() được gọi từ AdsManager.OnBannerLoaded, nên load lại sẽ tạo vòng lặp
+                // load → loaded → Show → load … khiến banner không bao giờ hiện được.
+                if (_isLoaded.TryGetValue(unitId, out bool loaded) && loaded
+                    && _banners.TryGetValue(unitId, out var banner) && banner != null)
                 {
-                    Load(where); // Collapsible luôn load mới
+                    _pendingShow.Remove(unitId);
+                    _visible.Add(unitId);
+                    NotifyAdDisplayed(where);
+                    banner.Show();
+                    return;
                 }
-                else
-                {
-                    if (_isLoaded.TryGetValue(unitId, out bool loaded) && loaded)
-                    {
-                        NotifyAdDisplayed(where);
-                        _banners[unitId].Show();
-                    }
-                    else Load(where);
-                }
+
+                // Chưa có banner: phát đúng một request. Khi load xong, AdsManager.OnBannerLoaded
+                // gọi lại Show() và nhánh trên sẽ hiện banner.
+                if (_pendingShow.Add(unitId)) Load(where);
             });
 #endif
         }
@@ -343,7 +442,11 @@ namespace GameUpSDK.Ads
         {
 #if ADMOB_DEPENDENCIES_INSTALLED
             string unitId = _config.ResolveUnitId(_adType, where, EcpmFloor.All);
-            MainThreadDispatcher.Enqueue(() => { if (_banners.TryGetValue(unitId, out var banner) && banner != null) banner.Hide(); });
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                _visible.Remove(unitId);
+                if (_banners.TryGetValue(unitId, out var banner) && banner != null) banner.Hide();
+            });
 #endif
         }
 
@@ -423,7 +526,7 @@ namespace GameUpSDK.Ads
             return entry != null && entry.BannerFormat == BannerFormatType.NativeOverlay ? (IBannerAd)_nativeExpandBanner : _standardBanner;
         }
     }
-    
+
     public class AdmobNativeFullscreenAd : BaseAdFormat, INativeFullScreenAd
     {
         // Dictionary để lưu lại ánh xạ unitId -> where khi gọi RequestAd
@@ -469,7 +572,7 @@ namespace GameUpSDK.Ads
                 if (FullScreenNativeAdManager.Instance.IsAdReady(unitId))
                 {
                     FullScreenNativeAdManager.Instance.ShowFullScreenAd(unitId, where);
-                    return; 
+                    return;
                 }
             }
 
@@ -481,7 +584,7 @@ namespace GameUpSDK.Ads
         {
             FullScreenNativeAdManager.Instance.ForceCloseAd();
         }
-        
+
         // =========================================================================
         // CALLBACKS TỪ MANAGER
         // =========================================================================
@@ -494,7 +597,7 @@ namespace GameUpSDK.Ads
         private void OnNativeAdClosed(string unitId, string where)
         {
             NotifyAdClosed(where);
-            Load(where); 
+            Load(where);
         }
 
         private void OnNativeAdLoaded(string unitId)
@@ -508,7 +611,9 @@ namespace GameUpSDK.Ads
         {
             // Lấy lại vị trí "where" từ Dictionary đã lưu
             _unitIdToWhere.TryGetValue(unitId, out string where);
-            HandleLoadFailed(unitId, where ?? "default", EcpmFloor.All, error);
+            // Phải trả về ĐÚNG tầng đã request (FloorOf tra theo unitId). Hardcode EcpmFloor.All như
+            // trước sẽ khiến waterfall tưởng đã ở tầng cuối và không bao giờ rơi xuống Medium/All.
+            HandleLoadFailed(unitId, where ?? "default", FloorOf(unitId), error);
         }
 
         private void OnNativeAdDisplayed(string unitId, string where)

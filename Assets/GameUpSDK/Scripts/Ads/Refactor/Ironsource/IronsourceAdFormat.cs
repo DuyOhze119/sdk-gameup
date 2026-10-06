@@ -50,25 +50,34 @@ namespace GameUpSDK.Ads
 
                 if (_ads.TryGetValue(unitId, out var ad) && ad != null && ad.IsAdReady())
                 {
-                    NotifyAdDisplayed(where);
+                    Action<LevelPlayAdInfo> onDisplayed = null;
                     Action<LevelPlayAdInfo> onClosed = null;
                     Action<LevelPlayAdInfo, LevelPlayAdError> onFailed = null;
 
-                    onClosed = (_) =>
+                    void Unsubscribe()
                     {
+                        ad.OnAdDisplayed -= onDisplayed;
                         ad.OnAdClosed -= onClosed;
                         ad.OnAdDisplayFailed -= onFailed;
+                    }
+
+                    // Báo displayed từ callback thật thay vì ngay trước ShowAd: present lỗi thì
+                    // không còn log impression giả và không kẹt PauseAllCapping.
+                    onDisplayed = (_) => NotifyAdDisplayed(where);
+                    onClosed = (_) =>
+                    {
+                        Unsubscribe();
                         NotifyAdClosed(where);
-                        MainThreadDispatcher.Enqueue(() => { onSuccess?.Invoke(); LoadByFloor(where, currentFloor); });
+                        MainThreadDispatcher.Enqueue(() => { onSuccess?.Invoke(); Load(where); });
                     };
                     onFailed = (_, err) =>
                     {
-                        ad.OnAdClosed -= onClosed;
-                        ad.OnAdDisplayFailed -= onFailed;
+                        Unsubscribe();
                         NotifyAdDisplayFailed(where, err.ErrorMessage);
-                        MainThreadDispatcher.Enqueue(() => { onFail?.Invoke(); LoadByFloor(where, currentFloor); });
+                        MainThreadDispatcher.Enqueue(() => { onFail?.Invoke(); Load(where); });
                     };
 
+                    ad.OnAdDisplayed += onDisplayed;
                     ad.OnAdClosed += onClosed;
                     ad.OnAdDisplayFailed += onFailed;
                     ad.ShowAd(where);
@@ -126,30 +135,37 @@ namespace GameUpSDK.Ads
 
                 if (_ads.TryGetValue(unitId, out var ad) && ad != null && ad.IsAdReady())
                 {
-                    NotifyAdDisplayed(where);
                     bool earned = false;
+                    Action<LevelPlayAdInfo> onDisplayed = null;
                     Action<LevelPlayAdInfo> onClosed = null;
                     Action<LevelPlayAdInfo, LevelPlayReward> onReward = null;
                     Action<LevelPlayAdInfo, LevelPlayAdError> onFailed = null;
 
-                    onClosed = (_) =>
+                    void Unsubscribe()
                     {
+                        ad.OnAdDisplayed -= onDisplayed;
                         ad.OnAdClosed -= onClosed;
                         ad.OnAdRewarded -= onReward;
                         ad.OnAdDisplayFailed -= onFailed;
+                    }
+
+                    // Xem ghi chú ở IronSourceInterstitialAd.Show.
+                    onDisplayed = (_) => NotifyAdDisplayed(where);
+                    onClosed = (_) =>
+                    {
+                        Unsubscribe();
                         NotifyAdClosed(where);
-                        MainThreadDispatcher.Enqueue(() => { if (earned) onSuccess?.Invoke(); else onFail?.Invoke(); LoadByFloor(where, currentFloor); });
+                        MainThreadDispatcher.Enqueue(() => { if (earned) onSuccess?.Invoke(); else onFail?.Invoke(); Load(where); });
                     };
                     onReward = (_, reward) => { earned = true; };
                     onFailed = (_, err) =>
                     {
-                        ad.OnAdClosed -= onClosed;
-                        ad.OnAdRewarded -= onReward;
-                        ad.OnAdDisplayFailed -= onFailed;
+                        Unsubscribe();
                         NotifyAdDisplayFailed(where, err.ErrorMessage);
-                        MainThreadDispatcher.Enqueue(() => { onFail?.Invoke(); LoadByFloor(where, currentFloor); });
+                        MainThreadDispatcher.Enqueue(() => { onFail?.Invoke(); Load(where); });
                     };
 
+                    ad.OnAdDisplayed += onDisplayed;
                     ad.OnAdClosed += onClosed;
                     ad.OnAdRewarded += onReward;
                     ad.OnAdDisplayFailed += onFailed;
@@ -181,8 +197,9 @@ namespace GameUpSDK.Ads
 #if LEVELPLAY_DEPENDENCIES_INSTALLED
             string unitId = _config.ResolveUnitId(_adType, where, EcpmFloor.All);
             return _isLoaded.TryGetValue(unitId, out var loaded) && loaded;
-#endif
+#else
             return false;
+#endif
         }
 
         protected override void RequestAdInternal(string unitId, string where, EcpmFloor floor)

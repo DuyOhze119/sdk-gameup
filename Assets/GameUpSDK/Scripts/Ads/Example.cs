@@ -1,4 +1,5 @@
 using System;
+using GameUpSDK;
 using GameUpSDK.Ads;
 using UnityEngine;
 

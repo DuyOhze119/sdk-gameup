@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using System.Collections.Generic;
 using GameUpSDK.Singletons;
+using GameUpSDK.Ads;
 #if FIREBASE_DEPENDENCIES_INSTALLED
 using Firebase;
 using Firebase.Analytics;
@@ -15,7 +16,7 @@ namespace GameUpSDK
     {
         private bool _initialized;
         public Action<bool> onInitialized;
-        /// <summary>True khi Firebase đã init xong (dùng để RemoteConfig init sau).</summary>
+        /// <summary>True khi Firebase Ä‘Ã£ init xong (dÃ¹ng Ä‘á»ƒ RemoteConfig init sau).</summary>
         public bool IsInitialized => _initialized;
 
 #if FIREBASE_DEPENDENCIES_INSTALLED

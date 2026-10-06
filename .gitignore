@@ -105,3 +105,11 @@ Assets/Firebase/Plugins/x86_64/FirebaseCppApp-*.bundle.meta
 Assets/Firebase/Plugins/x86_64/FirebaseCppApp-*.bundle
 Assets/Firebase/Plugins/x86_64/FirebaseCppApp-*.dll
 Assets/Firebase/Plugins/x86_64/FirebaseCppApp-*.dll.meta
+
+# >>> GameUp SDK — tự thêm, sửa trong khối này sẽ bị ghi đè (tắt: GameUp SDK → .gitignore)
+*.slnx
+/[Aa]ssets/[Ss]treamingAssets/aa.meta
+/[Aa]ssets/[Ss]treamingAssets/aa/*
+Assets/Firebase/Plugins/x86_64/FirebaseCppApp-*
+.claude/settings.local.json
+# <<< GameUp SDK

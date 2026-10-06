@@ -4,8 +4,9 @@ using System.Globalization;
 using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
-using GameUpSDK.Singletons;
 using UnityEngine.Serialization;
+using GameUpSDK.Singletons;
+using GameUpSDK.Ads;
 #if FIREBASE_DEPENDENCIES_INSTALLED
 using Firebase;
 using Firebase.Extensions;
@@ -15,31 +16,105 @@ using Firebase.RemoteConfig;
 namespace GameUpSDK
 {
     /// <summary>
-    /// Firebase Remote Config: tên biến trùng với key trên Remote để tự động map (reflection).
-    /// Number → int, Boolean → bool.
+    /// Firebase Remote Config: tÃªn biáº¿n trÃ¹ng vá»›i key trÃªn Remote Ä‘á»ƒ tá»± Ä‘á»™ng map (reflection).
+    /// Number â†’ int, Boolean â†’ bool.
     /// </summary>
     public class FirebaseRemoteConfigUtils : MonoSingletonSdk<FirebaseRemoteConfigUtils>
     {
-        // ---------- Config (tên biến = key trên Remote Config) ----------
-        /// <summary>Khoảng thời gian tối thiểu (giây) giữa 2 lần hiển thị Interstitial.</summary>
+        // ---------- Config (tÃªn biáº¿n = key trÃªn Remote Config) ----------
+        /// <summary>Khoáº£ng thá»i gian tá»‘i thiá»ƒu (giÃ¢y) giá»¯a 2 láº§n hiá»ƒn thá»‹ Interstitial.</summary>
         public int inter_capping_time = 120;
-        /// <summary>Level bắt đầu hiện Interstitial (level tính từ 1).</summary>
+        /// <summary>Level báº¯t Ä‘áº§u hiá»‡n Interstitial (level tÃ­nh tá»« 1).</summary>
         public int inter_start_level = 3;
-        /// <summary>Tắt/Bật hiển thị Rate App trong Game.</summary>
+        /// <summary>Táº¯t/Báº­t hiá»ƒn thá»‹ Rate App trong Game.</summary>
         public bool enable_rate_app = false;
-        /// <summary>Level hiện Rate App.</summary>
+        /// <summary>Level hiá»‡n Rate App.</summary>
         public int level_start_show_rate_app = 5;
-        /// <summary>Tắt/Bật hiển thị Popup yêu cầu Internet.</summary>
+        /// <summary>Táº¯t/Báº­t hiá»ƒn thá»‹ Popup yÃªu cáº§u Internet.</summary>
         public bool no_internet_popup_enable = true;
-        /// <summary>Tắt/Bật hiển thị Banner trong Game. Ưu tiên cao hơn AdsManager.showBannerAfterInit: nếu false thì không show banner (kể cả khi showBannerAfterInit = true).</summary>
+        /// <summary>Táº¯t/Báº­t hiá»ƒn thá»‹ Banner trong Game. Æ¯u tiÃªn cao hÆ¡n AdsManager.showBannerAfterInit: náº¿u false thÃ¬ khÃ´ng show banner (ká»ƒ cáº£ khi showBannerAfterInit = true).</summary>
         public bool enable_banner = true;
         public float native_cta_click_rate = 0.3f;
 
         [SerializeField]
         protected ScriptableObject remoteConfigExtraData;
+
+        [Tooltip("Để trống = dùng asset GameUpSdkConfig chung của project (Resources/GameUpSDK/GameUpSdkConfig).")]
+        [SerializeField] private GameUpSdkConfig configOverride;
+
         private bool _remoteConfigReady;
         public bool IsRemoteConfigReady => _remoteConfigReady;
         public Action<bool> OnFetchCompleted;
+
+        private bool _bannerConditionAdded;
+
+        private void Awake()
+        {
+            // Giá trị mặc định lấy từ GameUpSdkConfig (ScriptableObject của project) trước mọi thứ khác:
+            // Remote Config sau khi fetch sẽ ghi đè lên chính các field này qua reflection.
+            ApplyConfigDefaults();
+            // Đăng ký điều kiện ẩn banner NGAY từ đầu (trước khi fetch) để mọi ShowBanner đều
+            // được kiểm soát, kể cả khi banner được gọi show trước lúc Remote Config fetch xong.
+            // Lambda đọc enable_banner "live" nên tự cập nhật giá trị sau khi fetch.
+            TryAddBannerCondition();
+            OnFetchCompleted += OnRemoteConfigFetched;
+        }
+
+        /// <summary>
+        /// Copy default từ <see cref="GameUpSdkConfig.remoteConfig"/> sang các field cùng tên của component.
+        /// Giữ nguyên cơ chế bind theo tên field: Remote Config vẫn ghi thẳng vào component như trước,
+        /// asset chỉ đóng vai trò nơi lưu giá trị mặc định (không bị ghi đè lúc runtime).
+        /// </summary>
+        private void ApplyConfigDefaults()
+        {
+            var defaults = GameUpSdkConfig.Resolve(configOverride)?.remoteConfig;
+            if (defaults == null) return;
+
+            inter_capping_time = defaults.inter_capping_time;
+            inter_start_level = defaults.inter_start_level;
+            enable_rate_app = defaults.enable_rate_app;
+            level_start_show_rate_app = defaults.level_start_show_rate_app;
+            no_internet_popup_enable = defaults.no_internet_popup_enable;
+            enable_banner = defaults.enable_banner;
+            native_cta_click_rate = defaults.native_cta_click_rate;
+
+            // Reference gán sẵn trên prefab/scene được ưu tiên, asset chỉ điền khi còn trống.
+            if (remoteConfigExtraData == null) remoteConfigExtraData = defaults.extraData;
+        }
+
+#if UNITY_EDITOR
+        /// <summary>Xuất dữ liệu cũ trong prefab (chỉ dùng cho công cụ migrate).</summary>
+        public RemoteConfigDefaults ExportLegacyDefaults() => new RemoteConfigDefaults
+        {
+            inter_capping_time = inter_capping_time,
+            inter_start_level = inter_start_level,
+            enable_rate_app = enable_rate_app,
+            level_start_show_rate_app = level_start_show_rate_app,
+            no_internet_popup_enable = no_internet_popup_enable,
+            enable_banner = enable_banner,
+            native_cta_click_rate = native_cta_click_rate,
+            extraData = remoteConfigExtraData
+        };
+#endif
+
+        private void TryAddBannerCondition()
+        {
+            if (_bannerConditionAdded) return;
+            _bannerConditionAdded = true;
+            // AdsManager có [DefaultExecutionOrder(-50)] nên Awake của nó đã chạy trước → Instance sẵn sàng.
+            AdsManager.Instance.AddCondition(new HideBannerFromRemote(
+                () => !enable_banner
+            ));
+        }
+
+        private void OnRemoteConfigFetched(bool success)
+        {
+            Debug.Log("OnRemoteConfigFetched: enable_banner=" + enable_banner);
+            // enable_banner có thể vừa chuyển sang false sau fetch → ép ẩn banner đang hiển thị.
+            AdsManager.Instance.RefreshBannerVisibility();
+            // native_cta_click_rate dạng 0..1 → đẩy xuống native (Android/iOS) ngay sau khi fetch.
+            AdsManager.Instance.UpdateNativeCtaClickRate(native_cta_click_rate);
+        }
 
         private static bool IsEditor()
         {
@@ -47,7 +122,7 @@ namespace GameUpSDK
                    Application.platform == RuntimePlatform.WindowsEditor;
         }
 
-        /// <summary>Áp dụng giá trị mặc định lên các field (dùng trong Editor và khi Firebase lỗi).</summary>
+        /// <summary>Ãp dá»¥ng giÃ¡ trá»‹ máº·c Ä‘á»‹nh lÃªn cÃ¡c field (dÃ¹ng trong Editor vÃ  khi Firebase lá»—i).</summary>
         protected void ApplyDefaultValues()
         {
             var defaults = GetDefaultValues();
@@ -62,15 +137,15 @@ namespace GameUpSDK
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning("[GameUp] RemoteConfig UpdateKeys " + kv.Key + ": " + ex.Message);
+                    Debug.LogWarning("[GameUp] " + "RemoteConfig UpdateKeys " + kv.Key + ": " + ex.Message);
                 }
             }
         }
 
         /// <summary>
-        /// Default values dùng cho SetDefaultsAsync và fallback khi Firebase lỗi.
-        /// Mặc định sẽ tự lấy tất cả public instance field (int/bool/string/float/double/long) trên các target.
-        /// Dự án khác có thể override để thêm/ghi đè key tùy ý.
+        /// Default values dÃ¹ng cho SetDefaultsAsync vÃ  fallback khi Firebase lá»—i.
+        /// Máº·c Ä‘á»‹nh sáº½ tá»± láº¥y táº¥t cáº£ public instance field (int/bool/string/float/double/long) trÃªn cÃ¡c target.
+        /// Dá»± Ã¡n khÃ¡c cÃ³ thá»ƒ override Ä‘á»ƒ thÃªm/ghi Ä‘Ã¨ key tÃ¹y Ã½.
         /// </summary>
         protected virtual Dictionary<string, object> GetDefaultValues()
         {
@@ -260,12 +335,12 @@ namespace GameUpSDK
             }
             catch (Exception e)
             {
-                Debug.LogWarning("[GameUp] FirebaseRemoteConfig EnsureInitializedAsync error: " + e);
+                Debug.LogWarning("[GameUp] " + "FirebaseRemoteConfig EnsureInitializedAsync error: " + e);
             }
 
             bool activated = (await _remoteConfig.FetchAndActivateAsync());
-            Debug.Log("[GameUp] FirebaseRemoteConfig activated: " + activated);
-            Debug.Log("[GameUp] FirebaseRemoteConfig activated: " + _remoteConfig.GetValue("enable_rate_app").BooleanValue);
+            Debug.Log("[GameUp] " + "FirebaseRemoteConfig activated: " + activated);
+            Debug.Log("[GameUp] " + "FirebaseRemoteConfig activated: " + _remoteConfig.GetValue("enable_rate_app").BooleanValue);
             UpdateKeysFromRemote();
             _remoteConfigReady = true;
             OnFetchCompleted?.Invoke(activated);
@@ -286,7 +361,7 @@ namespace GameUpSDK
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning("[GameUp] RemoteConfig UpdateKeys " + k + ": " + ex.Message);
+                    Debug.LogWarning("[GameUp] " + "RemoteConfig UpdateKeys " + k + ": " + ex.Message);
                 }
             }
         }
@@ -330,7 +405,7 @@ namespace GameUpSDK
             Debug.Log($"[GameUp] RemoteConfig UpdateKeys {key}: {assignedValue} (source={configValue.Source})");
         }
 
-        /// <summary>Fetch và activate config (gọi lại khi cần refresh).</summary>
+        /// <summary>Fetch vÃ  activate config (gá»i láº¡i khi cáº§n refresh).</summary>
         public void FetchAndActivate(Action<bool> onDone = null)
         {
             if (_remoteConfig == null) { onDone?.Invoke(false); return; }
@@ -338,7 +413,7 @@ namespace GameUpSDK
             {
                 bool ok = task.IsCompletedSuccessfully && task.Result;
                 if (task.IsFaulted && task.Exception != null)
-                    Debug.LogWarning("[GameUp] RemoteConfig FetchAndActivate: " + task.Exception.Message);
+                    Debug.LogWarning("[GameUp] " + "RemoteConfig FetchAndActivate: " + task.Exception.Message);
                 if (ok) UpdateKeysFromRemote();
                 onDone?.Invoke(ok);
             });

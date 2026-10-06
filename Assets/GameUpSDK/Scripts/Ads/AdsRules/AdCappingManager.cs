@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using GameUpSDK.Singletons;
 using UnityEngine;
+using GameUpSDK.Singletons;
 
 namespace GameUpSDK.Ads
 {
@@ -41,7 +41,7 @@ namespace GameUpSDK.Ads
         {
             float limit = _cappingLimits.GetValueOrDefault(groupId, defaultCappingTime);
             float current = _currentTimers.GetValueOrDefault(groupId, 0f);
-            Debug.LogError($"AdUnit: {groupId} current: {current} - limit: {limit}");
+            Debug.Log($"[GameUp] AdUnit: {groupId} current: {current} - limit: {limit}");
             return current >= limit;
         }
 

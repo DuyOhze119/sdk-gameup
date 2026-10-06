@@ -1,3 +1,4 @@
+using GameUpSDK.Ads;
 namespace GameUpSDK
 {
     /// <summary>

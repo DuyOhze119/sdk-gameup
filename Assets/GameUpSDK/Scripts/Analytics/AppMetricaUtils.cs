@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using UnityEngine;
+using GameUpSDK.Ads;
 #if APPMETRICA_DEPENDENCIES_INSTALLED && (UNITY_ANDROID || UNITY_IOS)
 using Io.AppMetrica;
 #endif
@@ -68,7 +69,7 @@ namespace GameUpSDK
                 return;
             }
 
-            var adRevenue = new AdRevenue(data.Revenue.Value, "USD")
+            var adRevenue = new AdRevenue(data.Revenue.Value, data.ResolvedCurrency)
             {
                 AdNetwork = data.AdNetwork,
                 AdUnitId = data.AdUnit,
@@ -76,7 +77,7 @@ namespace GameUpSDK
                 AdType = MapAdType(data.AdFormat)
             };
             AppMetrica.ReportAdRevenue(adRevenue);
-            DebugLogSent("ReportAdRevenue", $"{data.Revenue.Value} USD", $"network={data.AdNetwork}");
+            DebugLogSent("ReportAdRevenue", $"{data.Revenue.Value} {data.ResolvedCurrency}", $"network={data.AdNetwork}");
 
             var eventParams = BuildAfAdRevenueParams(data);
             if (eventParams != null && eventParams.Count > 0)
@@ -200,7 +201,7 @@ namespace GameUpSDK
             {
                 [AppMetricaEvent.ParamMonetizationNetwork] = data.AdNetwork ?? "",
                 [AppMetricaEvent.ParamAfRevenue] = data.Revenue.Value.ToString(CultureInfo.InvariantCulture),
-                [AppMetricaEvent.ParamAfCurrency] = "USD"
+                [AppMetricaEvent.ParamAfCurrency] = data.ResolvedCurrency
             };
             if (!string.IsNullOrEmpty(data.AdUnit)) p[AppMetricaEvent.ParamAdUnit] = data.AdUnit;
             if (!string.IsNullOrEmpty(data.AdFormat)) p["ad_format"] = data.AdFormat;

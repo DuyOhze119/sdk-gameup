@@ -1,3 +1,5 @@
+using GameUpSDK.Ads;
+using GameUpSDK;
 #if UNITY_IOS
 using UnityEditor;
 using UnityEditor.Callbacks;

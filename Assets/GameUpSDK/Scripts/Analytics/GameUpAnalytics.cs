@@ -1,10 +1,11 @@
 using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
+using GameUpSDK.Ads;
 #if FIREBASE_DEPENDENCIES_INSTALLED
 using Firebase.Analytics;
 #endif
-#if APPSFLYER_DEPENDENCIES_INSTALLED
+#if APPSFLYER_DEPENDENCIES_INSTALLED && !GAMEUP_MMP_ADJUST
 using AppsFlyerSDK;
 #endif
 #if FACEBOOK_DEPENDENCIES_INSTALLED && !UNITY_EDITOR && (UNITY_ANDROID || UNITY_IOS)
@@ -14,7 +15,9 @@ using Facebook.Unity;
 namespace GameUpSDK
 {
     /// <summary>
-    /// Game analytics: Firebase, AppsFlyer (MMP), AppMetrica (tùy chọn), GameAnalytics progression (Start / Complete / Fail) theo
+    /// Game analytics: Firebase (mặc định — mọi event đều log), MMP (AppsFlyer hoặc Adjust),
+    /// AppMetrica (tùy chọn — chỉ gửi khi đã cài + bật <c>enableEventLogging</c>, không cài thì bỏ qua),
+    /// GameAnalytics progression (Start / Complete / Fail) theo
     /// <see href="https://docs.gameanalytics.com/event-tracking-and-integrations/sdks-and-collection-api/game-engine-sdks/unity/event-tracking">GA Unity — Progression events</see>
     /// (world <c>main</c> → level → wave). Cần init GameAnalytics + keys trong scene.
     /// </summary>
@@ -57,10 +60,15 @@ namespace GameUpSDK
             FirebaseUtils.LogEventsAPI(eventName, fbParam);
         }
 
-        private static void LogAppsFlyer(string eventName, Dictionary<string, string> eventValues = null)
+        /// <summary>
+        /// Event chuyển đổi gửi cho MMP (AppsFlyer hoặc Adjust — bên nào đã cài). Adjust chỉ gửi khi event
+        /// có token trong GameUpSdkConfig.adjust.eventTokens.
+        /// </summary>
+        internal static void LogMmp(string eventName, Dictionary<string, string> eventValues = null)
         {
             if (string.IsNullOrEmpty(eventName)) return;
             AppsFlyerUtils.LogEvents(eventName, eventValues);
+            AdjustAnalyticsUtils.LogEvent(eventName, eventValues);
         }
 
         private static void LogAppMetrica(string eventName, Dictionary<string, string> parameters = null)
@@ -94,27 +102,32 @@ namespace GameUpSDK
             return p;
         }
 
-        /// <summary>AppMetrica: video_ads_available — mỗi lần user request show (IDLE spec).</summary>
+        /// <summary>Funnel video_ads_*: Firebase luôn nhận, AppMetrica nhận thêm nếu đã cài.</summary>
+        private static void LogVideoAdsEvent(string eventName, string adType, string placement, string result, bool hasConnection)
+        {
+            var p = BuildVideoAdsParams(adType, placement, result, hasConnection);
+            LogFirebaseParams(eventName, p);
+            LogAppMetrica(eventName, p);
+        }
+
+        /// <summary>video_ads_available — mỗi lần user request show (IDLE spec).</summary>
         public static void LogVideoAdsAvailable(string adType, string placement, string result, bool hasConnection)
         {
             if (!VideoAdsAppMetricaTracker.ShouldSendAvailable(placement, adType, result)) return;
-            LogAppMetrica(AppMetricaEvent.VideoAdsAvailable,
-                BuildVideoAdsParams(adType, placement, result, hasConnection));
+            LogVideoAdsEvent(AppMetricaEvent.VideoAdsAvailable, adType, placement, result, hasConnection);
         }
 
-        /// <summary>AppMetrica: video_ads_started — khi ad bắt đầu hiển thị (chỉ sau available success).</summary>
+        /// <summary>video_ads_started — khi ad bắt đầu hiển thị (chỉ sau available success).</summary>
         public static void LogVideoAdsStarted(string adType, string placement, string result, bool hasConnection)
         {
             if (!VideoAdsAppMetricaTracker.CanSendStarted(placement, adType)) return;
-            LogAppMetrica(AppMetricaEvent.VideoAdsStarted,
-                BuildVideoAdsParams(adType, placement, result, hasConnection));
+            LogVideoAdsEvent(AppMetricaEvent.VideoAdsStarted, adType, placement, result, hasConnection);
         }
 
-        /// <summary>AppMetrica: video_ads_watch — sau khi ad kết thúc (watched / canceled / failed).</summary>
+        /// <summary>video_ads_watch — sau khi ad kết thúc (watched / canceled / failed).</summary>
         public static void LogVideoAdsWatch(string adType, string placement, string result, bool hasConnection)
         {
-            LogAppMetrica(AppMetricaEvent.VideoAdsWatch,
-                BuildVideoAdsParams(adType, placement, result, hasConnection));
+            LogVideoAdsEvent(AppMetricaEvent.VideoAdsWatch, adType, placement, result, hasConnection);
             VideoAdsAppMetricaTracker.ClearSession();
         }
 
@@ -282,7 +295,7 @@ namespace GameUpSDK
 
             var af = new Dictionary<string, string> { [AnalyticsEvent.ParamAfLevel] = level.ToString() };
             if (score.HasValue) af[AnalyticsEvent.ParamAfScore] = score.Value.ToString();
-            LogAppsFlyer(AnalyticsEvent.AfLevelAchieved, af);
+            LogMmp(AnalyticsEvent.AfLevelAchieved, af);
 
             var ga = new Dictionary<string, string>(fb);
             if (score.HasValue) ga[AnalyticsEvent.ParamAfScore] = score.Value.ToString();
@@ -342,7 +355,7 @@ namespace GameUpSDK
             LogGameAnalyticsProgression(GaProgressionStatus.Complete, level, wave, stringFields: p);
         }
 
-        // ---------- AppsFlyer only ----------
+        // ---------- MMP only (AppsFlyer / Adjust) ----------
 
         /// <summary> af_complete_registration: af_registration_method </summary>
         public static void LogCompleteRegistration(string registrationMethod)
@@ -350,7 +363,7 @@ namespace GameUpSDK
             var p = new Dictionary<string, string>();
             if (!string.IsNullOrEmpty(registrationMethod))
                 p[AnalyticsEvent.ParamAfRegistrationMethod] = registrationMethod;
-            LogAppsFlyer(AnalyticsEvent.AfCompleteRegistration, p.Count > 0 ? p : null);
+            LogMmp(AnalyticsEvent.AfCompleteRegistration, p.Count > 0 ? p : null);
         }
 
         /// <summary> af_purchase; <paramref name="level"/> — level đang chơi khi mua (Firebase/AppsFlyer/Facebook params). </summary>
@@ -378,12 +391,14 @@ namespace GameUpSDK
             if (level.HasValue) afParams[AnalyticsEvent.ParamLevel] = level.Value.ToString();
             if (!AppsFlyerUtils.ShouldSkipManualPurchaseRevenueEvent())
             {
-                LogAppsFlyer(AnalyticsEvent.AfPurchase, afParams);
+                AppsFlyerUtils.LogEvents(AnalyticsEvent.AfPurchase, afParams);
             }
             else
             {
                 Debug.Log("[GameUpAnalytics] Skip manual af_purchase for iOS because ROI360 Purchase Connector is enabled.");
             }
+            AdjustAnalyticsUtils.LogPurchase(AnalyticsEvent.AfPurchase, hasRevenue ? revenueAmount : 0d, normalizedCurrency,
+                orderId, contentId, afParams);
 
             var firebaseParams = new Dictionary<string, string>
             {
@@ -434,11 +449,12 @@ namespace GameUpSDK
         }
 
         /// <summary>
-        /// Set AppsFlyer Customer User ID (CUID) để khớp dữ liệu ROI360.
+        /// Set Customer User ID cho MMP: AppsFlyer CUID (khớp dữ liệu ROI360) hoặc global callback parameter của Adjust.
         /// </summary>
         public static void SetCustomerUserId(string userId)
         {
             AppsFlyerUtils.SetCustomerUserId(userId);
+            AdjustAnalyticsUtils.SetCustomerUserId(userId);
         }
 
         /// <summary> af_tutorial_completion </summary>
@@ -446,7 +462,7 @@ namespace GameUpSDK
         {
             var p = new Dictionary<string, string> { [AnalyticsEvent.ParamAfSuccess] = success.ToString().ToLowerInvariant() };
             if (!string.IsNullOrEmpty(tutorialId)) p[AnalyticsEvent.ParamAfTutorialId] = tutorialId;
-            LogAppsFlyer(AnalyticsEvent.AfTutorialCompletion, p);
+            LogMmp(AnalyticsEvent.AfTutorialCompletion, p);
         }
 
         /// <summary> af_achievement_unlocked </summary>
@@ -454,35 +470,40 @@ namespace GameUpSDK
         {
             var p = new Dictionary<string, string> { [AnalyticsEvent.ParamContentId] = contentId ?? "" };
             if (level.HasValue) p[AnalyticsEvent.ParamAfLevel] = level.Value.ToString();
-            LogAppsFlyer(AnalyticsEvent.AfAchievementUnlocked, p);
+            LogMmp(AnalyticsEvent.AfAchievementUnlocked, p);
         }
 
         // ---------- Firebase: Ad Revenue Measurement (ARM) ----------
 
-#if APPSFLYER_DEPENDENCIES_INSTALLED
-        private static MediationNetwork GetMediationNetworkFromAdNetwork(string adNetwork)
+#if APPSFLYER_DEPENDENCIES_INSTALLED && !GAMEUP_MMP_ADJUST
+        /// <summary>MediationNetwork của AppsFlyer = mediation đã phục vụ impression (AdNetwork chỉ là ad network con).</summary>
+        private static MediationNetwork GetAppsFlyerMediationNetwork(AdImpressionData data)
         {
-            if (string.IsNullOrEmpty(adNetwork)) return MediationNetwork.Custom;
-            var n = adNetwork.Trim().ToLowerInvariant();
-            if (n.Contains("admob") || n.Contains("google")) return MediationNetwork.GoogleAdMob;
-            if (n.Contains("unity")) return MediationNetwork.Unity;
-            if (n.Contains("applovin") || n.Contains("max")) return MediationNetwork.ApplovinMax;
-            if (n.Contains("meta") || n.Contains("facebook")) return MediationNetwork.Custom;
-            if (n.Contains("chartboost")) return MediationNetwork.ChartBoost;
-            if (n.Contains("fyber")) return MediationNetwork.Fyber;
-            if (n.Contains("appodeal")) return MediationNetwork.Appodeal;
-            if (n.Contains("admost")) return MediationNetwork.Admost;
-            if (n.Contains("topon")) return MediationNetwork.Topon;
-            if (n.Contains("tradplus")) return MediationNetwork.Tradplus;
-            if (n.Contains("yandex")) return MediationNetwork.Yandex;
-            if (n.Contains("ironsource")) return MediationNetwork.IronSource;
-            return MediationNetwork.Custom;
+            return data.Mediation switch
+            {
+                MediationProvider.Admob => MediationNetwork.GoogleAdMob,
+                MediationProvider.Max => MediationNetwork.ApplovinMax,
+                MediationProvider.IronSource => MediationNetwork.IronSource,
+                _ => MediationNetwork.Custom,
+            };
         }
 #endif
 
+        /// <summary>ad_platform của Firebase ARM là tên mediation (trước đây gửi cứng chuỗi "mediation").</summary>
+        private static string GetFirebaseAdPlatform(MediationProvider mediation)
+        {
+            return mediation switch
+            {
+                MediationProvider.Admob => "AdMob",
+                MediationProvider.Max => "AppLovin",
+                MediationProvider.IronSource => "ironSource",
+                _ => "mediation",
+            };
+        }
+
         /// <summary>
         /// Logs ad_impression to Firebase for Ad Revenue Measurement (ARM).
-        /// Also logs ad revenue to AppsFlyer via LogAdRevenue.
+        /// Also logs ad revenue to the MMP (AppsFlyer LogAdRevenue / Adjust TrackAdRevenue).
         /// </summary>
         public static void LogAdImpression(AdImpressionData data)
         {
@@ -490,12 +511,12 @@ namespace GameUpSDK
 
             double revenue = data.Revenue.Value;
             string adNetwork = data.AdNetwork ?? "unknown";
-            string currency = "USD";
+            string currency = data.ResolvedCurrency;
 
 #if FIREBASE_DEPENDENCIES_INSTALLED
             var parameters = new Parameter[]
             {
-                new Parameter(FirebaseAnalytics.ParameterAdPlatform, "mediation"),
+                new Parameter(FirebaseAnalytics.ParameterAdPlatform, GetFirebaseAdPlatform(data.Mediation)),
                 new Parameter(FirebaseAnalytics.ParameterAdSource, adNetwork),
                 new Parameter(FirebaseAnalytics.ParameterAdUnitName, data.AdUnit ?? ""),
                 new Parameter(FirebaseAnalytics.ParameterAdFormat, data.InstanceName ?? data.AdFormat ?? ""),
@@ -505,10 +526,10 @@ namespace GameUpSDK
             FirebaseUtils.LogEvent(FirebaseAnalytics.EventAdImpression, parameters);
 #endif
 
-#if APPSFLYER_DEPENDENCIES_INSTALLED
+#if APPSFLYER_DEPENDENCIES_INSTALLED && !GAMEUP_MMP_ADJUST
             var adRevenueData = new AFAdRevenueData(
                 adNetwork,
-                GetMediationNetworkFromAdNetwork(adNetwork),
+                GetAppsFlyerMediationNetwork(data),
                 currency,
                 revenue);
             var adRevenueParams = new Dictionary<string, string>();
@@ -518,6 +539,7 @@ namespace GameUpSDK
 
             AppsFlyerUtils.LogAdRevenue(adRevenueData, adRevenueParams.Count > 0 ? adRevenueParams : null);
 #endif
+            AdjustAnalyticsUtils.LogAdRevenue(data);
             AppMetricaUtils.LogAdRevenue(data);
             Debug.Log($"[GameUpAnalytics] Logged Ad Revenue: {revenue} {currency}, network: {adNetwork}");
         }

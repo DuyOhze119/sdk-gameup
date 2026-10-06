@@ -1,5 +1,7 @@
 using UnityEditor;
 using UnityEngine;
+using GameUpSDK.Ads;
+using GameUpSDK;
 
 namespace GameUpSDK.Installer
 {

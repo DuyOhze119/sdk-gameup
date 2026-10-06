@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using GameUpSDK.Ads;
 #if GAMEANALYTICS_DEPENDENCIES_INSTALLED
 using GameAnalyticsSDK;
 #endif
@@ -8,8 +9,8 @@ using GameAnalyticsSDK;
 namespace GameUpSDK
 {
     /// <summary>
-    /// Gọi trực tiếp API runtime GameAnalytics (assembly <c>GameAnalyticsSDK</c>).
-    /// Progression: <see href="https://docs.gameanalytics.com/event-tracking-and-integrations/sdks-and-collection-api/game-engine-sdks/unity/event-tracking">GA Unity — Progression events</see>.
+    /// Gá»i trá»±c tiáº¿p API runtime GameAnalytics (assembly <c>GameAnalyticsSDK</c>).
+    /// Progression: <see href="https://docs.gameanalytics.com/event-tracking-and-integrations/sdks-and-collection-api/game-engine-sdks/unity/event-tracking">GA Unity â€” Progression events</see>.
     /// </summary>
     internal static class GameAnalyticsUtils
     {
@@ -30,9 +31,9 @@ namespace GameUpSDK
 #endif
 
         /// <summary>
-        /// Gửi progression theo hierarchy GA: progression01 = level, progression02 = wave (vd. <c>w0</c>, <c>w1</c>), progression03 tùy chọn;
-        /// GameUp dùng 2 tier (level → wave) qua <see cref="GameUpAnalytics"/>.
-        /// Custom fields (index, time, …) chỉ có trong raw export theo tài liệu GA.
+        /// Gá»­i progression theo hierarchy GA: progression01 = level, progression02 = wave (vd. <c>w0</c>, <c>w1</c>), progression03 tÃ¹y chá»n;
+        /// GameUp dÃ¹ng 2 tier (level â†’ wave) qua <see cref="GameUpAnalytics"/>.
+        /// Custom fields (index, time, â€¦) chá»‰ cÃ³ trong raw export theo tÃ i liá»‡u GA.
         /// </summary>
         public static void LogProgression(
             GaProgressionStatus status,
@@ -87,7 +88,7 @@ namespace GameUpSDK
 #endif
         }
 
-        /// <summary>Design event (tương thích; level/wave dùng <see cref="LogProgression"/>).</summary>
+        /// <summary>Design event (tÆ°Æ¡ng thÃ­ch; level/wave dÃ¹ng <see cref="LogProgression"/>).</summary>
         public static void LogDesign(string eventPath, float value, Dictionary<string, string> stringFields)
         {
 #if GAMEANALYTICS_DEPENDENCIES_INSTALLED

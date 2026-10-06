@@ -56,5 +56,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "sdk-gameup.sln"
+    "dotnet.defaultSolution": "sdk-gameup.slnx"
 }

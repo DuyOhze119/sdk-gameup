@@ -3,7 +3,9 @@
     "rootNamespace": "GameUpSDK",
     "references": [
         "Unity.LevelPlay",
+        "UnityEngine.UI",
         "AppsFlyer",
+        "AdjustSdk.Scripts",
         "GoogleMobileAds.Mediation.UnityAds.Api",
         "GoogleMobileAds.Mediation.IronSource.Api",
         "GameAnalyticsSDK",

@@ -1,3 +1,4 @@
+using GameUpSDK.Ads;
 namespace GameUpSDK
 {
     public class GUDefinetion
@@ -12,10 +13,21 @@ namespace GameUpSDK
         public const string AdMobDepsInstalled = "ADMOB_DEPENDENCIES_INSTALLED";
         public const string LevelPlayDepsInstalled = "LEVELPLAY_DEPENDENCIES_INSTALLED";
         public const string FacebookDepsInstalled = "FACEBOOK_DEPENDENCIES_INSTALLED";
+        public const string MaxDepsInstalled = "MAXSDK_DEPENDENCIES_INSTALLED";
+        public const string AppMetricaDepsInstalled = "APPMETRICA_DEPENDENCIES_INSTALLED";
+        public const string AdjustDepsInstalled = "ADJUST_DEPENDENCIES_INSTALLED";
 
-        /// <summary>Chỉ một trong hai được bật; do GameUpDependenciesWindow set — phù hợp khi SDK là UPM package (không cần asset trong Assets/).</summary>
-        public const string PrimaryMediationLevelPlay = "GAMEUP_PRIMARY_MEDIATION_LEVELPLAY";
-        public const string PrimaryMediationAdMob = "GAMEUP_PRIMARY_MEDIATION_ADMOB";
-        public const string PrimaryMediationMax = "GAMEUP_PRIMARY_MEDIATION_MAX";
+        /// <summary>MMP (attribution) được chọn ở Setup Dependencies — quyết định cài AppsFlyer hay Adjust. Mặc định AppsFlyer.</summary>
+        public const string MmpAppsFlyer = "GAMEUP_MMP_APPSFLYER";
+        public const string MmpAdjust = "GAMEUP_MMP_ADJUST";
+
+        // Define "Primary Mediation" cũ: installer giờ cho chọn nhiều mạng cùng lúc (thứ tự ở GameUpAdsConfig.mediationPriority)
+        // nên không còn set nữa. Giữ hằng để project cũ migrate lựa chọn và để nút "Dọn define cũ" gỡ được.
+        private const string PrimaryMediationObsolete =
+            "Không còn dùng: mạng quảng cáo đang chạy = các SDK đã cài (*_DEPENDENCIES_INSTALLED), thứ tự ở GameUpAdsConfig.mediationPriority.";
+
+        [System.Obsolete(PrimaryMediationObsolete)] public const string PrimaryMediationLevelPlay = "GAMEUP_PRIMARY_MEDIATION_LEVELPLAY";
+        [System.Obsolete(PrimaryMediationObsolete)] public const string PrimaryMediationAdMob = "GAMEUP_PRIMARY_MEDIATION_ADMOB";
+        [System.Obsolete(PrimaryMediationObsolete)] public const string PrimaryMediationMax = "GAMEUP_PRIMARY_MEDIATION_MAX";
     }
 }

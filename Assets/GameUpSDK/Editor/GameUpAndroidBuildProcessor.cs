@@ -1,3 +1,5 @@
+using GameUpSDK.Ads;
+using GameUpSDK;
 #if UNITY_EDITOR
 using System.IO;
 using UnityEditor.Android;

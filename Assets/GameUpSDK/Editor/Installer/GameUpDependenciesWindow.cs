@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
+using GameUpSDK;
 using GameUpSDK.Ads;
 using UnityEditor;
 using UnityEditor.Compilation;
@@ -73,6 +74,11 @@ namespace GameUpSDK.Installer
             /// <summary>Đánh dấu package là adapter thuộc AdMob Mediation.</summary>
             public bool IsAdMobMediationAdapter;
 
+            /// <summary>
+            /// Bắt buộc khi project dùng AdMob (mediation stack GameUp SDK + forward GDPR consent).
+            /// </summary>
+            public bool RequiredForAdMobRuntime;
+
             public InstallMethod Method;
 
             // Git URL (dùng khi Method == GitUrl)
@@ -109,7 +115,7 @@ namespace GameUpSDK.Installer
             public string[] DeleteAssetPathsAfterImport;
 
             /// <summary>
-            /// Thứ tự cài khuyến nghị (số nhỏ trước): Facebook → Firebase (EDM) → AdMob/LevelPlay → AppsFlyer → GameAnalytics.
+            /// Thứ tự cài khuyến nghị (số nhỏ trước): Facebook → Firebase (EDM) → AdMob/LevelPlay → MMP (AppsFlyer/Adjust) → GameAnalytics.
             /// Batch install, import sau download và danh sách UI đều sort theo trường này.
             /// </summary>
             public int InstallPriority;
@@ -130,7 +136,7 @@ namespace GameUpSDK.Installer
             {
                 DisplayName = "Facebook Unity SDK 18.0.0",
                 Description =
-                    "Bắt buộc. Facebook SDK cho Unity (login, sharing, v.v.). Khi cài qua installer, thư mục Examples sẽ tự bỏ để tránh lỗi.",
+                    "Bắt buộc. Facebook SDK cho Unity (login, sharing, v.v.). Cài qua installer sẽ tự xóa thư mục Examples sau khi import xong.",
                 Required = true,
                 // Facebook.Unity.dll thường tắt trên Editor; assembly Editor luôn load khi đã import SDK.
                 AssemblyName = "Facebook.Unity.Editor",
@@ -149,7 +155,7 @@ namespace GameUpSDK.Installer
             new PackageDef
             {
                 DisplayName = "Firebase SDK  (Analytics + Crashlytics + Remote Config)",
-                Description = "Bắt buộc. Analytics, crash reporting, remote configuration. Bao gồm EDM4U.",
+                Description = "Mặc định. Kênh analytics chính — mọi event của GameUpAnalytics đều log Firebase. Kèm Crashlytics, Remote Config và EDM4U (dùng chung cho AdMob/AppsFlyer/GA).",
                 Required = false,
                 AssemblyName = "Firebase.App",
                 Method = InstallMethod.UnityPackage,
@@ -167,13 +173,22 @@ namespace GameUpSDK.Installer
                 },
                 DownloadUrl = "https://firebase.google.com/docs/unity/setup",
                 DownloadLabel = "Tải Firebase Unity SDK →",
-                RemoveAssetPaths = new[] { "Assets/Firebase" },
+                // Không liệt kê Assets/ExternalDependencyManager: EDM4U dùng chung với AdMob/AppsFlyer/GA,
+                // chỉ dọn khi gỡ toàn bộ dependencies.
+                RemoveAssetPaths = new[]
+                {
+                    "Assets/Firebase",
+                    "Assets/Editor Default Resources/Firebase",
+                    "Assets/GeneratedLocalRepo/Firebase",
+                    "Assets/Plugins/iOS/Firebase",
+                    "Assets/Plugins/tvOS/Firebase",
+                },
                 InstallPriority = 20,
             },
             new PackageDef
             {
                 DisplayName = "Google Mobile Ads — AdMob",
-                Description = "Bắt buộc nếu dùng AdMob standalone (Interstitial/Rewarded/AppOpen) hoặc muốn bắt paid event để log ad_impression.",
+                Description = "Mạng quảng cáo mặc định. Tick AdMob ở bước 1 để \"Cài tất cả\" cài kèm 2 adapter bắt buộc. Chạy song song được với MAX / LevelPlay.",
                 Required = false,
                 AssemblyName = "GoogleMobileAds",
                 Method = InstallMethod.UnityPackage,
@@ -184,13 +199,19 @@ namespace GameUpSDK.Installer
                 },
                 DownloadUrl = "https://github.com/googlesamples/unity-admob-sdk/releases",
                 DownloadLabel = "Tải AdMob Plugin →",
-                RemoveAssetPaths = new[] { "Assets/GoogleMobileAds" },
+                RemoveAssetPaths = new[]
+                {
+                    "Assets/GoogleMobileAds",
+                    "Assets/Plugins/Android/GoogleMobileAdsPlugin.androidlib",
+                    "Assets/Plugins/Android/googlemobileads-unity.aar",
+                    "Assets/Plugins/iOS/GADUAdNetworkExtras.h",
+                },
                 InstallPriority = 30,
             },
             new PackageDef
             {
                 DisplayName = "IronSource LevelPlay SDK",
-                Description = "Tùy chọn. Cần nếu bạn chọn Primary Mediation = LevelPlay trong AdsManager.",
+                Description = "Tùy chọn. Tick LevelPlay ở bước 1 để cài; dùng riêng hoặc chạy song song với AdMob / MAX (thứ tự ưu tiên chỉnh ở GameUp SDK → Setup).",
                 Required = false,
                 AssemblyName = "Unity.LevelPlay",
                 Method = InstallMethod.UnityPackage,
@@ -206,8 +227,9 @@ namespace GameUpSDK.Installer
             },
             new PackageDef
             {
-                DisplayName = "MaxSDK SDK",
-                Description = "Tùy chọn. Cần nếu bạn chọn Primary Mediation = Max trong AdsManager.",
+                DisplayName = "AppLovin MAX Unity Plugin 8.6.3",
+                Description =
+                    "Tùy chọn. Tick AppLovin MAX ở bước 1 để cài; dùng riêng hoặc chạy song song với AdMob / LevelPlay (thứ tự ưu tiên chỉnh ở GameUp SDK → Setup). Android/iOS SDK 13.6.2.",
                 Required = false,
                 AssemblyName = "MaxSdk.Scripts",
                 Method = InstallMethod.UnityPackage,
@@ -216,8 +238,8 @@ namespace GameUpSDK.Installer
                 {
                     "https://github.com/AppLovin/AppLovin-MAX-Unity-Plugin/releases/download/release_8_6_3/AppLovin-MAX-Unity-Plugin-8.6.3-Android-13.6.2-iOS-13.6.2.unitypackage",
                 },
-                DownloadUrl = "https://developers.is.com/ironsource-mobile/unity/unity-plugin/",
-                DownloadLabel = "Tải Max SDK →",
+                DownloadUrl = "https://github.com/AppLovin/AppLovin-MAX-Unity-Plugin/releases",
+                DownloadLabel = "AppLovin MAX releases (GitHub) →",
                 RemoveAssetPaths = new[] { "Assets/MaxSdk" },
                 InstallPriority = 33,
             },
@@ -226,9 +248,9 @@ namespace GameUpSDK.Installer
                 // Firebase gồm 3 file riêng trong subfolder Firebase/
                 // EDM4U (Google.VersionHandler) được bundle kèm trong FirebaseAnalytics
                 DisplayName      = "AppsFlyer Attribution SDK",
-                Description      = "Tùy chọn. Mobile measurement & attribution.",
+                Description      = "MMP (attribution) — cài khi bước 1 chọn MMP = AppsFlyer. Tương đương Adjust, chỉ dùng một trong hai.",
                 Required         = false,
-                AssemblyName     = "AppsFlyer",
+                AssemblyName     = AppsFlyerAssemblyName,
                 Method           = InstallMethod.UnityPackage,
                 BundledFileNames = new[] { "appsflyer-unity-plugin-6.17.81.unitypackage" },
                 HostedUrls       = new[]
@@ -241,6 +263,25 @@ namespace GameUpSDK.Installer
                 InstallPriority = 45,
             },
             new PackageDef
+            {
+                DisplayName = "Adjust SDK 5.8.0",
+                Description =
+                    "MMP (attribution) — cài khi bước 1 chọn MMP = Adjust. Tương đương AppsFlyer, chỉ dùng một trong hai. " +
+                    "Define: ADJUST_DEPENDENCIES_INSTALLED. Không cần kéo prefab Adjust vào scene — GameUp tự init từ GameUpSdkConfig.",
+                Required = false,
+                AssemblyName = AdjustAssemblyName,
+                Method = InstallMethod.UnityPackage,
+                BundledFileNames = new[] { "Adjust_v5.8.0.unitypackage" },
+                HostedUrls = new[]
+                {
+                    "https://github.com/adjust/unity_sdk/releases/download/v5.8.0/Adjust_v5.8.0.unitypackage",
+                },
+                DownloadUrl = "https://github.com/adjust/unity_sdk/releases",
+                DownloadLabel = "Adjust Unity SDK releases →",
+                RemoveAssetPaths = new[] { "Assets/Adjust" },
+                InstallPriority = 45,
+            },
+             new PackageDef
             {
                 DisplayName = "GameAnalytics SDK",
                 Description = "Tùy chọn. Analytics sản phẩm (funnels, progression). GameUpAnalytics gửi design event (tiền tố gameup:) khi bật define GAMEANALYTICS_DEPENDENCIES_INSTALLED. Cần GameObject GameAnalytics + keys trong scene (Window → GameAnalytics).",
@@ -255,16 +296,16 @@ namespace GameUpSDK.Installer
                 },
                 DownloadUrl = "https://github.com/DuyOhze119/sdk-gameup/releases/download/deps/GameAnalytics.unitypackage",
                 DownloadLabel = "GameAnalytics Unity SDK →",
-                RemoveAssetPaths = new[] { "Assets/GameAnalytics" },
+                RemoveAssetPaths = new[] { "Assets/GameAnalytics", "Assets/Resources/GameAnalytics" },
                 InstallPriority = 46,
             },
 
             new PackageDef
             {
                 DisplayName = "Appmetrica SDK",
-                Description = "Tùy chọn. Analytics sản phẩm thay thế Firebase",
+                Description = "Tùy chọn, mặc định không cài. Gửi thêm event song song với Firebase (Firebase vẫn luôn log). Bật ở bước 1 để đưa vào \"Cài tất cả\".",
                 Required = false,
-                AssemblyName = "AppMetrica",
+                AssemblyName = AppMetricaAssemblyName,
                 InstalledTypeFullName = "AppMetrica",
                 Method = InstallMethod.UnityPackage,
                 BundledFileNames = new[] { "Appmetrica.unitypackage" },
@@ -371,20 +412,22 @@ namespace GameUpSDK.Installer
             new PackageDef
             {
                 DisplayName = "AdMob Adapter — IronSource Ads",
-                Description = "Adapter mediation cho IronSource Ads (Unity).",
+                Description =
+                    "Bắt buộc khi project dùng AdMob (GameUp SDK). Adapter mediation IronSource / LevelPlay trong waterfall AdMob.",
                 Required = false,
                 AssemblyName = "GoogleMobileAds.Mediation.IronSource.Api",
                 InstalledAssetPath = "Assets/GoogleMobileAds/Mediation/IronSource",
                 IsAdMobMediationAdapter = true,
+                RequiredForAdMobRuntime = true,
                 Method = InstallMethod.UnityPackage,
-                BundledFileNames = new[] { "IronSourceUnityAdapter-4.5.0.zip" },
+                BundledFileNames = new[] { "IronSourceUnityAdapter-4.5.1.zip" },
                 HostedUrls = new[]
                 {
-                    "https://dl.google.com/googleadmobadssdk/mediation/unity/ironsource/IronSourceUnityAdapter-4.5.0.zip",
+                    "https://dl.google.com/googleadmobadssdk/mediation/unity/ironsource/IronSourceUnityAdapter-4.5.1.zip",
                 },
                 DownloadUrl = "https://developers.google.com/admob/unity/mediation/ironsource",
                 DownloadLabel = "Chi tiết adapter →",
-                InstallPriority = 35,
+                InstallPriority = 31,
             },
             new PackageDef
             {
@@ -551,20 +594,22 @@ namespace GameUpSDK.Installer
             new PackageDef
             {
                 DisplayName = "AdMob Adapter — Unity Ads",
-                Description = "Adapter mediation cho Unity Ads (Unity).",
+                Description =
+                    "Bắt buộc khi project dùng AdMob (GameUp SDK). Adapter mediation Unity Ads trong waterfall AdMob.",
                 Required = false,
                 AssemblyName = "GoogleMobileAds.Mediation.UnityAds.Api",
                 InstalledAssetPath = "Assets/GoogleMobileAds/Mediation/UnityAds",
                 IsAdMobMediationAdapter = true,
+                RequiredForAdMobRuntime = true,
                 Method = InstallMethod.UnityPackage,
-                BundledFileNames = new[] { "UnityAdsUnityAdapter-3.17.0.zip" },
+                BundledFileNames = new[] { "UnityAdsUnityAdapter-3.18.0.zip" },
                 HostedUrls = new[]
                 {
-                    "https://dl.google.com/googleadmobadssdk/mediation/unity/unity/UnityAdsUnityAdapter-3.17.0.zip",
+                    "https://dl.google.com/googleadmobadssdk/mediation/unity/unity/UnityAdsUnityAdapter-3.18.0.zip",
                 },
                 DownloadUrl = "https://developers.google.com/admob/unity/mediation/unity",
                 DownloadLabel = "Chi tiết adapter →",
-                InstallPriority = 35,
+                InstallPriority = 31,
             },
         };
 
@@ -572,7 +617,6 @@ namespace GameUpSDK.Installer
         // ─── State ────────────────────────────────────────────────────────────────
 
         private Vector2 _scroll;
-        private bool _isRefreshing;
         private bool _isBatchInstalling;
 
         /// <summary>Package sẽ cài trong lần batch hiện tại (null = toàn bộ s_packages — chỉ dùng nội bộ).</summary>
@@ -582,6 +626,16 @@ namespace GameUpSDK.Installer
         private bool _gameAnalyticsSetupHintAfterBatch;
         private bool _wasCompiling;
         private bool _wasBusy;
+
+        /// <summary>
+        /// File .unitypackage đang chờ Unity import xong (key = tên file không đuôi, đúng giá trị Unity
+        /// trả về trong importPackageCompleted/Failed/Cancelled) → package sở hữu file đó.
+        /// </summary>
+        private readonly Dictionary<string, PackageDef> _pendingImports =
+            new Dictionary<string, PackageDef>(StringComparer.OrdinalIgnoreCase);
+
+        private double _pendingImportsStartedAt;
+        private const double PendingImportTimeoutSeconds = 300;
 
         // Queue PackageManager (GitUrl / ScopedRegistry)
         private readonly Queue<PackageDef> _installQueue = new Queue<PackageDef>();
@@ -602,23 +656,53 @@ namespace GameUpSDK.Installer
 
         private List<DownloadTask> _parallelTasks;
         private Action _parallelDoneCallback;
-        private float _downloadProgress;
-        private string _downloadStatus;
-
-        // Kept for backward compat with OnDisable / PollDownloadQueue references — sẽ không dùng nữa
-        private UnityWebRequest _activeDownload;
-        private PackageDef _downloadingPkg;
-        private bool _foldoutUgUiPackageCacheHelp;
-        private bool _foldoutAdMobMediationAdapters = true;
         private WindowTab _activeTab = WindowTab.SetupDependencies;
-        private const string LevelPlayDepsDefine = "LEVELPLAY_DEPENDENCIES_INSTALLED";
-        private const string MaxSdkDepsDefine = "MAXSDK_DEPENDENCIES_INSTALLED";
-        private const string AdMobDepsDefine = "ADMOB_DEPENDENCIES_INSTALLED";
-        private const string FirebaseDepsDefine = "FIREBASE_DEPENDENCIES_INSTALLED";
-        private const string AppsFlyerDepsDefine = "APPSFLYER_DEPENDENCIES_INSTALLED";
-        private const string GameAnalyticsDepsDefine = "GAMEANALYTICS_DEPENDENCIES_INSTALLED";
-        private const string FacebookDepsDefine = "FACEBOOK_DEPENDENCIES_INSTALLED";
-        private const string AppmetricaDepsDefine = "APPMETRICA_DEPENDENCIES_INSTALLED";
+
+        // ── UI state (layout 2 cột + các mục gấp/mở) ──
+        private Vector2 _leftScroll;
+        private bool _foldoutInstallOrder;
+        private bool _foldoutTools;
+        private bool _showOnlyMissing;
+
+        private GUIStyle _cardStyle;
+        private GUIStyle _cardTitleStyle;
+        private GUIStyle _stepTitleStyle;
+        private GUIStyle _mutedStyle;
+        private GUIStyle _descStyle;
+        private GUIStyle _badgeStyle;
+        private GUIStyle _rowStyle;
+        private GUIStyle _sectionHeaderStyle;
+        private GUIStyle _foldoutTitleStyle;
+        private const string LevelPlayDepsDefine = GUDefinetion.LevelPlayDepsInstalled;
+        private const string MaxSdkDepsDefine = GUDefinetion.MaxDepsInstalled;
+        private const string AdMobDepsDefine = GUDefinetion.AdMobDepsInstalled;
+        private const string FirebaseDepsDefine = GUDefinetion.FirebaseDepsInstalled;
+        private const string AppsFlyerDepsDefine = GUDefinetion.AppsFlyerDepsInstalled;
+        private const string GameAnalyticsDepsDefine = GUDefinetion.GameAnalyticsDepsInstalled;
+        private const string FacebookDepsDefine = GUDefinetion.FacebookDepsInstalled;
+        private const string AppmetricaDepsDefine = GUDefinetion.AppMetricaDepsInstalled;
+        private const string AdjustDepsDefine = GUDefinetion.AdjustDepsInstalled;
+
+        /// <summary>Menu của GameUpSetupWindow (assembly Editor) — installer không reference được nên mở qua menu.</summary>
+        public const string SetupWindowMenuPath = "GameUp SDK/Setup";
+
+        /// <summary>SessionState: tiêu đề tab mà GameUpSetupWindow chọn sẵn ở lần mở kế tiếp.</summary>
+        public const string SetupWindowTabSessionKey = "GameUpSDK_SetupWindow_OpenTab";
+
+        /// <summary>Tiêu đề tab thứ tự ưu tiên mediation trong GameUpSetupWindow.</summary>
+        public const string SetupPriorityTabTitle = "Cài đặt chung & Thứ tự ưu tiên";
+
+        /// <summary>Các mạng quảng cáo có thể chạy song song, theo thứ tự hiển thị.</summary>
+        private static readonly MediationProvider[] s_mediationNetworks =
+            { MediationProvider.Admob, MediationProvider.Max, MediationProvider.IronSource };
+
+        internal const string AppsFlyerAssemblyName = "AppsFlyer";
+        internal const string AdjustAssemblyName = "AdjustSdk.Scripts";
+        internal const string AppMetricaAssemblyName = "AppMetrica";
+
+        // Define do editor script của chính SDK third-party ghi vào Player Settings.
+        private const string GameAnalyticsThirdPartyDefinePrefix = "gameanalytics_";
+        private const string AppmetricaThirdPartyDefinePrefix = "APPMETRICA_FEATURES_";
         private const string AdMobReleaseApiUrl = "https://api.github.com/repos/googleads/googleads-mobile-unity/releases/latest";
         private const string AdMobUnityPackagePrefix = "GoogleMobileAds-v";
         private const string AdMobUnityPackageSuffix = ".unitypackage";
@@ -652,14 +736,19 @@ namespace GameUpSDK.Installer
             return s_packages.Where(p => p.IsAdMobMediationAdapter);
         }
 
+        private static IEnumerable<PackageDef> GetRequiredAdMobRuntimeAdapters()
+        {
+            return GetAdMobMediationAdapters().Where(p => p.RequiredForAdMobRuntime);
+        }
+
         [MenuItem("GameUp SDK/Setup Dependencies")]
         public static void ShowWindow()
         {
             var win = GetWindow<GameUpDependenciesWindow>(true, "GameUp SDK — Setup Dependencies");
-            win.minSize = new Vector2(560, 520);
-            // Đặt kích thước ban đầu nếu window chưa được mở
-            if (win.position.width < 560)
-                win.position = new Rect(win.position.x, win.position.y, 620, 580);
+            win.minSize = new Vector2(620, 540);
+            // Mở mặc định đủ rộng để dùng layout 2 cột (hướng dẫn | danh sách package).
+            if (win.position.width < 900)
+                win.position = new Rect(win.position.x, win.position.y, 1000, 660);
             win.RefreshStatus();
         }
 
@@ -756,19 +845,23 @@ namespace GameUpSDK.Installer
             AssemblyReloadEvents.afterAssemblyReload += AfterAssemblyReloadRefresh;
             CompilationPipeline.compilationFinished -= OnCompilationFinishedRefresh;
             CompilationPipeline.compilationFinished += OnCompilationFinishedRefresh;
-            AssetDatabase.importPackageCompleted -= OnImportPackageRefresh;
-            AssetDatabase.importPackageCompleted += OnImportPackageRefresh;
-            AssetDatabase.importPackageFailed -= OnImportPackageFailedRefresh;
-            AssetDatabase.importPackageFailed += OnImportPackageFailedRefresh;
-            AssetDatabase.importPackageCancelled -= OnImportPackageRefresh;
-            AssetDatabase.importPackageCancelled += OnImportPackageRefresh;
+            AssetDatabase.importPackageCompleted -= OnImportPackageCompleted;
+            AssetDatabase.importPackageCompleted += OnImportPackageCompleted;
+            AssetDatabase.importPackageFailed -= OnImportPackageFailed;
+            AssetDatabase.importPackageFailed += OnImportPackageFailed;
+            AssetDatabase.importPackageCancelled -= OnImportPackageCancelled;
+            AssetDatabase.importPackageCancelled += OnImportPackageCancelled;
 
             // Sau domain reload/restore window, timing load assemblies có thể trễ hơn compilationFinished.
             // DelayCall 1 nhịp là đủ để tránh scan quá sớm.
             EditorApplication.delayCall += () =>
             {
                 if (this == null) return;
+                // Cleanup sau import bị domain reload cắt ngang (vd Facebook Examples) — chạy bù ở đây.
+                RunPendingPostImportCleanups();
                 RefreshStatus();
+                // Batch install bị domain reload cắt ngang giữa chừng thì chạy tiếp tại đây.
+                TryResumePendingBatch();
             };
         }
 
@@ -779,9 +872,9 @@ namespace GameUpSDK.Installer
             EditorApplication.update -= PollParallelDownloads;
             AssemblyReloadEvents.afterAssemblyReload -= AfterAssemblyReloadRefresh;
             CompilationPipeline.compilationFinished -= OnCompilationFinishedRefresh;
-            AssetDatabase.importPackageCompleted -= OnImportPackageRefresh;
-            AssetDatabase.importPackageFailed -= OnImportPackageFailedRefresh;
-            AssetDatabase.importPackageCancelled -= OnImportPackageRefresh;
+            AssetDatabase.importPackageCompleted -= OnImportPackageCompleted;
+            AssetDatabase.importPackageFailed -= OnImportPackageFailed;
+            AssetDatabase.importPackageCancelled -= OnImportPackageCancelled;
             if (_parallelTasks != null)
             {
                 foreach (var t in _parallelTasks)
@@ -789,8 +882,6 @@ namespace GameUpSDK.Installer
                 _parallelTasks = null;
             }
 
-            _activeDownload?.Dispose();
-            _activeDownload = null;
             _admobLatestReleaseRequest?.Dispose();
             _admobLatestReleaseRequest = null;
         }
@@ -816,28 +907,40 @@ namespace GameUpSDK.Installer
             };
         }
 
-        private void OnImportPackageRefresh(string _)
+        private void OnImportPackageCompleted(string packageName)
+        {
+            FinishPendingImport(packageName, success: true, error: null);
+            ScheduleRefreshAfterImport();
+        }
+
+        private void OnImportPackageFailed(string packageName, string error)
+        {
+            FinishPendingImport(packageName, success: false, error: error);
+            ScheduleRefreshAfterImport();
+        }
+
+        private void OnImportPackageCancelled(string packageName)
+        {
+            FinishPendingImport(packageName, success: false, error: "Import bị hủy.");
+            ScheduleRefreshAfterImport();
+        }
+
+        private void ScheduleRefreshAfterImport()
         {
             // ImportPackage hoàn thành có thể trigger refresh/compile; delayCall để tránh scan quá sớm.
             EditorApplication.delayCall += () =>
             {
                 if (this == null) return;
                 RefreshStatus();
-            };
-        }
-
-        private void OnImportPackageFailedRefresh(string _, string __)
-        {
-            EditorApplication.delayCall += () =>
-            {
-                if (this == null) return;
-                RefreshStatus();
+                TryResumePendingBatch();
             };
         }
 
         /// <summary>Làm mới UI khi đang compile hoặc đang cài để nút bật/tắt đúng lúc compile xong.</summary>
         private void EditorUpdateRepaintWhenBusy()
         {
+            DropStalePendingImports();
+
             bool compiling = EditorApplication.isCompiling;
             bool busy = IsInstallOrDownloadBusy();
 
@@ -896,92 +999,169 @@ namespace GameUpSDK.Installer
 
         private void OnGUI()
         {
-            if (IsInstallOrDownloadBusy())
-            {
-                EditorGUILayout.HelpBox("Đang xử lý cài/tải dependency…", MessageType.Info);
-                EditorGUILayout.Space(4);
-            }
+            EnsureStyles();
 
-            DrawHeader();
-            DrawTabToolbar();
+            DrawToolbar();
+            DrawBusyBar();
 
             if (_activeTab == WindowTab.SetupDependencies)
-            {
                 DrawSetupDependenciesTab();
-            }
             else
-            {
                 DrawAdMobMediationTab();
-            }
+
+            DrawFooter();
         }
 
-        private void DrawTabToolbar()
+        /// <summary>Thanh trên cùng: chuyển tab + tiến độ tổng + làm mới.</summary>
+        private void DrawToolbar()
         {
-            EditorGUILayout.Space(2);
-            _activeTab = (WindowTab)GUILayout.Toolbar(
-                (int)_activeTab,
-                new[] { "Setup Dependencies", "AdMob Mediation" });
-            EditorGUILayout.Space(6);
+            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+
+            if (GUILayout.Toggle(_activeTab == WindowTab.SetupDependencies, "Dependencies", EditorStyles.toolbarButton, GUILayout.Width(120)))
+                _activeTab = WindowTab.SetupDependencies;
+            if (GUILayout.Toggle(_activeTab == WindowTab.AdMobMediation, "AdMob Mediation", EditorStyles.toolbarButton, GUILayout.Width(130)))
+                _activeTab = WindowTab.AdMobMediation;
+
+            GUILayout.FlexibleSpace();
+
+            var planned = GetPackagesForSdkSetup(GetSelectedNetworks());
+            GUILayout.Label($"Bộ hiện tại: {planned.Count(p => p.IsInstalled)}/{planned.Count} đã cài", EditorStyles.miniLabel);
+            GUILayout.Space(6);
+            if (GUILayout.Button("↻ Làm mới", EditorStyles.toolbarButton, GUILayout.Width(80)))
+                RequestManualRefresh();
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        /// <summary>Dải trạng thái khi đang tải/cài — thay cho HelpBox rời rạc trước đây.</summary>
+        private void DrawBusyBar()
+        {
+            if (!IsInstallOrDownloadBusy()) return;
+
+            var rect = EditorGUILayout.BeginVertical(_rowStyle);
+            EditorGUI.DrawRect(rect, Tint(BusyColor, 0.14f));
+            EditorGUI.DrawRect(new Rect(rect.x, rect.y, 3f, rect.height), BusyColor);
+            GUILayout.Label("⟳  Đang tải / cài dependency… Vui lòng chờ Unity import và compile xong.", EditorStyles.boldLabel);
+            EditorGUILayout.EndVertical();
         }
 
         private void DrawSetupDependenciesTab()
         {
-            float totalWidth = Mathf.Max(720f, position.width - 20f);
-            float leftWidth = Mathf.Clamp(totalWidth * 0.42f, 320f, 520f);
-            float rightWidth = Mathf.Max(300f, totalWidth - leftWidth - 10f);
+            // Đủ rộng thì chia 2 cột (hướng dẫn trái | danh sách package phải), hẹp thì xếp dọc.
+            bool twoColumns = position.width >= 900f;
+
+            if (!twoColumns)
+            {
+                _scroll = EditorGUILayout.BeginScrollView(_scroll);
+                DrawGuideColumn();
+                EditorGUILayout.Space(8);
+                DrawPackagePanelContent();
+                EditorGUILayout.Space(8);
+                DrawSetupDependenciesBulkRemoveSection();
+                EditorGUILayout.EndScrollView();
+                return;
+            }
+
+            float leftWidth = Mathf.Clamp(position.width * 0.42f, 340f, 480f);
 
             EditorGUILayout.BeginHorizontal();
 
+            // ── Cột trái: các bước cần làm ──
             EditorGUILayout.BeginVertical(GUILayout.Width(leftWidth), GUILayout.ExpandHeight(true));
-            DrawMediationInfo();
-            DrawUgUiPackageCacheTroubleshootFoldout();
-            DrawFacebookExamplesCleanupSection();
+            _leftScroll = EditorGUILayout.BeginScrollView(_leftScroll, GUILayout.Width(leftWidth));
+            DrawGuideColumn();
+            EditorGUILayout.Space(6);
+            DrawSetupDependenciesBulkRemoveSection();
+            EditorGUILayout.Space(8);
+            EditorGUILayout.EndScrollView();
             EditorGUILayout.EndVertical();
 
-            GUILayout.Space(10);
+            DrawVerticalSeparator();
 
-            EditorGUILayout.BeginVertical("box", GUILayout.Width(rightWidth), GUILayout.ExpandHeight(true));
-            EditorGUILayout.LabelField("Package Installer", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("Danh sách package liên quan và thao tác cài/gỡ.", EditorStyles.miniLabel);
-            EditorGUILayout.Space(4);
-
+            // ── Cột phải: danh sách package ──
+            EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+            DrawPackagePanelHeader();
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
             DrawPackageList(includeAdMobAdapters: false, allowPerPackageRemove: false);
+            EditorGUILayout.Space(8);
             EditorGUILayout.EndScrollView();
-
-            DrawSetupDependenciesBulkRemoveSection();
-            DrawFooter();
             EditorGUILayout.EndVertical();
 
             EditorGUILayout.EndHorizontal();
         }
 
+        /// <summary>Cột trái ở chế độ 1 cột: header + list gộp chung trong scroll ngoài.</summary>
+        private void DrawPackagePanelContent()
+        {
+            DrawPackagePanelHeader();
+            DrawPackageList(includeAdMobAdapters: false, allowPerPackageRemove: false);
+        }
+
+        private void DrawPackagePanelHeader()
+        {
+            EditorGUILayout.BeginHorizontal(_rowStyle);
+            EditorGUILayout.BeginVertical();
+            GUILayout.Label("Danh sách package", _cardTitleStyle);
+            GUILayout.Label("Cài/gỡ từng package. Sau mỗi lần cài nên chờ Unity compile xong rồi mới cài tiếp.", _mutedStyle);
+            EditorGUILayout.EndVertical();
+            GUILayout.FlexibleSpace();
+            _showOnlyMissing = GUILayout.Toggle(_showOnlyMissing, "Chỉ hiện mục chưa cài", EditorStyles.miniButton, GUILayout.Width(150), GUILayout.Height(20));
+            EditorGUILayout.EndHorizontal();
+            DrawSeparatorLine(SeparatorColor, 1f);
+        }
+
+        /// <summary>Cột trái: 2 bước làm theo thứ tự + phần tham khảo/công cụ gấp lại.</summary>
+        private void DrawGuideColumn()
+        {
+            DrawStepMediation();
+            DrawStepInstallAll();
+            DrawInstallOrderCard();
+            DrawToolsCard();
+        }
+
         private static bool HasDefine(string define)
         {
+            if (string.IsNullOrEmpty(define))
+                return false;
+
             string symbols = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Android);
-            return symbols.Contains(define);
+            // So khớp từng symbol, không dùng Contains: tránh define này khớp nhầm khi là chuỗi con của define khác.
+            foreach (string symbol in symbols.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (symbol.Trim().Equals(define, StringComparison.Ordinal))
+                    return true;
+            }
+
+            return false;
         }
 
         private static void SetDefine(string define, bool enabled)
         {
+            if (string.IsNullOrEmpty(define))
+                return;
+
             foreach (var group in s_buildTargetGroups)
             {
                 try
                 {
                     string current = PlayerSettings.GetScriptingDefineSymbolsForGroup(group);
-                    var list = new List<string>(
-                        current.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
+                    var list = current
+                        .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(s => s.Trim())
+                        .Where(s => s.Length > 0)
+                        .ToList();
 
-                    bool changed = false;
-
-                    if (enabled && !list.Contains(define))
+                    bool changed;
+                    if (enabled)
                     {
-                        list.Add(define);
-                        changed = true;
+                        changed = !list.Contains(define);
+                        if (changed)
+                            list.Add(define);
                     }
-                    else if (!enabled && list.Remove(define))
+                    else
                     {
-                        changed = true;
+                        // RemoveAll (không phải Remove): symbols có thể chứa define trùng lặp do nhiều tool cùng ghi.
+                        changed = list.RemoveAll(s => s.Equals(define, StringComparison.Ordinal)) > 0;
                     }
 
                     if (changed)
@@ -993,91 +1173,236 @@ namespace GameUpSDK.Installer
             }
         }
 
-        private void DrawHeader()
+        /// <summary>
+        /// Xóa mọi define khớp <paramref name="shouldRemove"/> khỏi các build target group SDK quan tâm.
+        /// Dùng cho define do SDK third-party tự set (installer không biết trước tên đầy đủ).
+        /// </summary>
+        private static void RemoveDefinesWhere(Func<string, bool> shouldRemove)
         {
-            EditorGUILayout.Space(6);
+            if (shouldRemove == null)
+                return;
 
-            EditorGUILayout.LabelField(
-                "GameUp SDK — Setup Dependencies",
-                new GUIStyle(EditorStyles.boldLabel) { fontSize = 13 });
+            foreach (var group in s_buildTargetGroups)
+            {
+                try
+                {
+                    string current = PlayerSettings.GetScriptingDefineSymbolsForGroup(group);
+                    var list = current
+                        .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(s => s.Trim())
+                        .Where(s => s.Length > 0)
+                        .ToList();
 
-            EditorGUILayout.Space(4);
-
-            EditorGUILayout.HelpBox(
-                "Có thể cài nhanh bằng \"Cài tất cả\" trong khung Mediation (chỉ các dependency cốt lõi), hoặc cài từng bước bằng \"Cài pack\" trên từng dòng — nên chờ Unity compile (và EDM/Android Resolver nếu bật) giữa các bước khi cài lẻ.\n" +
-                "AdMob Mediation adapters không nằm trong \"Cài tất cả\" — cài thủ công trong tab \"AdMob Mediation\" nếu cần.\n" +
-                "Khi đang compile hoặc đang cài/tải, nút Mediation và \"Cài pack\" đều bị khóa.",
-                MessageType.Info);
-
-            EditorGUILayout.Space(6);
+                    if (list.RemoveAll(s => shouldRemove(s)) > 0)
+                        PlayerSettings.SetScriptingDefineSymbolsForGroup(group, string.Join(";", list));
+                }
+                catch { }
+            }
         }
 
-        private void DrawMediationInfo()
+        // ─── Cột trái: các bước hướng dẫn ────────────────────────────────────────
+
+        /// <summary>Bước 1 — chọn tổ hợp mạng quảng cáo (1–3 mạng) và MMP, quyết định bộ pack cài ở bước 2.</summary>
+        private void DrawStepMediation()
         {
-            EditorGUILayout.Space(6);
+            BeginCard();
+            DrawStepTitle(1, "Chọn mạng quảng cáo, MMP & Analytics");
 
-            EditorGUILayout.BeginVertical("box");
+            GUILayout.Label("Mạng quảng cáo — chọn một hoặc nhiều (mặc định AdMob):", _mutedStyle);
+            var selected = GetSelectedNetworks();
+            foreach (var provider in s_mediationNetworks)
+                DrawNetworkRow(provider, selected);
 
-            EditorGUILayout.LabelField("Mediation Settings", EditorStyles.boldLabel);
-
-            EditorGUI.BeginDisabledGroup(IsInteractionLocked());
-            var current = GetPrimaryMediationFromDefines();
-            var next = (MediationProvider)EditorGUILayout.EnumPopup("Primary Mediation", current);
-            if (next != current)
+            if (selected.Count > 1)
             {
-                SetPrimaryMediationDefines(next);
+                GUILayout.Label(
+                    "Nhiều mạng chạy song song: mạng xếp trên không có ad sẵn sàng thì SDK tự thử mạng kế tiếp.",
+                    _descStyle);
+                DrawPriorityOrder();
+            }
+
+            EditorGUILayout.Space(6);
+            EditorGUI.BeginDisabledGroup(IsInteractionLocked());
+            var currentMmp = GetMmpFromDefines();
+            var nextMmp = (MmpProvider)EditorGUILayout.EnumPopup(
+                new GUIContent("MMP (Attribution)", "AppsFlyer và Adjust giữ vai trò tương đương — chọn một bên, installer chỉ cài bên đó."),
+                currentMmp);
+            if (nextMmp != currentMmp)
+            {
+                SetMmpDefines(nextMmp);
                 RefreshStatus();
             }
-
             EditorGUI.EndDisabledGroup();
+            GUILayout.Label("Đổi MMP lưu bằng Scripting Define Symbol nên Unity sẽ compile lại.", _mutedStyle);
 
-            var pm = GetPrimaryMediationFromDefines();
-            var planned = GetPackagesForSdkSetup(pm);
-            var missingAuto = planned.Where(p => !p.IsInstalled && CanAutoInstall(p)).ToList();
-            var missingManual = planned.Where(p => !p.IsInstalled && !CanAutoInstall(p)).ToList();
-
-            string planDesc = pm == MediationProvider.Admob
-                ? "Facebook, Firebase, AppsFlyer, GameAnalytics, Google Mobile Ads."
-                : "Facebook, Firebase, AppsFlyer, GameAnalytics, IronSource LevelPlay.";
-
-            EditorGUILayout.HelpBox(
-                "Primary Mediation chọn bộ pack quảng cáo chính (AdMob hay LevelPlay). " +
-                "Dùng nút bên dưới để cài một lần các dependency cốt lõi còn thiếu (đúng thứ tự), hoặc \"Cài pack\" từng dòng trong danh sách.\n" +
-                "Bộ theo mediation hiện tại: " + planDesc,
-                MessageType.Info);
-
-            EditorGUILayout.HelpBox(
-                "Thứ tự nên cài: (1) Facebook → (2) Firebase (kèm EDM) — chờ compile/resolve xong — → " +
-                "(3) Google Mobile Ads hoặc LevelPlay (trùng với Primary Mediation) → " +
-                "(4) AppsFlyer → (5) GameAnalytics. Các mục tùy chọn có thể bỏ qua nếu không dùng.",
-                MessageType.None);
-
-            if (missingManual.Count > 0)
+            string mmpName = GetMmpFromDefines() == MmpProvider.Adjust ? "Adjust" : "AppsFlyer";
+            var unusedMmp = GetUnusedInstalledMmpPackage();
+            if (unusedMmp != null)
             {
                 EditorGUILayout.HelpBox(
-                    "Có package không cài tự động được (thiếu file trong Packages~ và không có URL tải). Cần tải/import thủ công theo mô tả từng dòng.",
+                    $"\"{unusedMmp.DisplayName}\" vẫn còn trong project dù MMP đang chọn là {mmpName}. " +
+                    "Runtime chỉ init MMP đang chọn, nhưng SDK thừa vẫn làm nặng build — nên gỡ.",
                     MessageType.Warning);
+
+                EditorGUI.BeginDisabledGroup(IsInteractionLocked() || !CanRemovePackage(unusedMmp));
+                if (GUILayout.Button($"Gỡ {unusedMmp.DisplayName}"))
+                    RequestRemovePackage(unusedMmp);
+                EditorGUI.EndDisabledGroup();
             }
 
-            if (missingAuto.Count > 0)
+            EditorGUILayout.Space(6);
+            DrawAppMetricaOption();
+
+            EditorGUILayout.Space(4);
+            string appMetricaPart = IsAppMetricaSelected() ? ", AppMetrica" : "";
+            GUILayout.Label("Bước 2 sẽ cài:", _mutedStyle);
+            GUILayout.Label($"• Facebook, Firebase, {mmpName}, GameAnalytics{appMetricaPart}, {GetNetworkPlanDescription(selected)}.", _descStyle);
+
+            EndCard();
+        }
+
+        /// <summary>
+        /// Analytics: Firebase luôn là kênh log mặc định; AppMetrica là tuỳ chọn thêm (tick để đưa vào bộ cài).
+        /// Đã cài thì khoá tick và cho gỡ — giống dòng mạng quảng cáo.
+        /// </summary>
+        private void DrawAppMetricaOption()
+        {
+            GUILayout.Label("Analytics — Firebase luôn log (mặc định). AppMetrica là tùy chọn thêm:", _mutedStyle);
+
+            var pkg = FindPackageByAssembly(AppMetricaAssemblyName);
+            if (pkg == null) return;
+
+            bool isSelected = IsAppMetricaSelected();
+            EditorGUILayout.BeginHorizontal();
+
+            bool lockToggle = IsInteractionLocked() || pkg.IsInstalled;
+            EditorGUI.BeginDisabledGroup(lockToggle);
+            bool next = EditorGUILayout.ToggleLeft("AppMetrica", isSelected, EditorStyles.boldLabel, GUILayout.Width(150));
+            EditorGUI.EndDisabledGroup();
+            if (!lockToggle && next != isSelected)
+                EditorPrefs.SetBool(UseAppMetricaPrefKey, next);
+
+            if (pkg.IsInstalled)
             {
-                EditorGUILayout.HelpBox(
-                    $"Còn {missingAuto.Count} mục có thể cài tự động — bấm \"Cài tất cả\" hoặc \"Cài pack\" lần lượt từ trên xuống trong danh sách.",
-                    MessageType.Warning);
+                _badgeStyle.normal.textColor = InstalledColor;
+                GUILayout.Label("ĐÃ CÀI", _badgeStyle);
             }
             else
             {
-                EditorGUILayout.HelpBox(
-                    "Theo Primary Mediation, không còn dependency cốt lõi nào thiếu mà installer tự cài được (hoặc đã đủ).",
-                    MessageType.None);
+                GUILayout.Label(isSelected ? "sẽ cài ở bước 2" : "không dùng", _mutedStyle);
             }
+
+            GUILayout.FlexibleSpace();
+            if (pkg.IsInstalled)
+            {
+                EditorGUI.BeginDisabledGroup(IsInteractionLocked() || !CanRemovePackage(pkg));
+                if (GUILayout.Button("Gỡ", GUILayout.Width(60)))
+                    RequestRemovePackage(pkg);
+                EditorGUI.EndDisabledGroup();
+            }
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        /// <summary>Một dòng mạng quảng cáo: tick để đưa vào bộ cài; đã cài thì khoá tick và cho gỡ.</summary>
+        private void DrawNetworkRow(MediationProvider provider, List<MediationProvider> selected)
+        {
+            var pkg = FindMediationPackage(provider);
+            if (pkg == null) return;
+
+            bool isSelected = selected.Contains(provider);
+            EditorGUILayout.BeginHorizontal();
+
+            // Bỏ tick mạng cuối cùng là vô nghĩa (không có ads); mạng đã cài thì gỡ bằng nút bên phải.
+            bool lockToggle = IsInteractionLocked() || pkg.IsInstalled || (isSelected && selected.Count == 1);
+            EditorGUI.BeginDisabledGroup(lockToggle);
+            bool next = EditorGUILayout.ToggleLeft(GetMediationDisplayName(provider), isSelected || pkg.IsInstalled,
+                EditorStyles.boldLabel, GUILayout.Width(150));
+            EditorGUI.EndDisabledGroup();
+            if (!lockToggle && next != isSelected)
+                SetNetworkSelected(provider, next);
+
+            if (pkg.IsInstalled)
+            {
+                _badgeStyle.normal.textColor = InstalledColor;
+                GUILayout.Label("ĐÃ CÀI", _badgeStyle);
+            }
+            else
+            {
+                // Mạng chưa chọn là tùy chọn — không tô đỏ như package bắt buộc còn thiếu.
+                GUILayout.Label(isSelected ? "sẽ cài ở bước 2" : "không dùng", _mutedStyle);
+            }
+
+            GUILayout.FlexibleSpace();
+            if (pkg.IsInstalled)
+            {
+                EditorGUI.BeginDisabledGroup(IsInteractionLocked() || !CanRemovePackage(pkg));
+                if (GUILayout.Button("Gỡ", GUILayout.Width(60)))
+                    RequestRemovePackage(pkg);
+                EditorGUI.EndDisabledGroup();
+            }
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        /// <summary>Thứ tự ưu tiên hiện tại của các mạng đã cài + nút mở tab chỉnh thứ tự.</summary>
+        private void DrawPriorityOrder()
+        {
+            var installed = s_mediationNetworks.Where(n => FindMediationPackage(n)?.IsInstalled == true).ToList();
+            if (installed.Count < 2)
+            {
+                GUILayout.Label("Cài xong có thể chỉnh thứ tự ưu tiên ở GameUp SDK → Setup.", _mutedStyle);
+                return;
+            }
+
+            var order = MediationPriority.Resolve(GameUpAdsConfig.Instance?.mediationPriority)
+                .Where(installed.Contains)
+                .Select(GetMediationDisplayName);
+            GUILayout.Label($"Thứ tự ưu tiên: {string.Join("  →  ", order)}", _descStyle);
+            if (GUILayout.Button("Chỉnh thứ tự ưu tiên…"))
+                EditorApplication.delayCall += OpenPriorityTab;
+        }
+
+        private static string GetNetworkPlanDescription(List<MediationProvider> networks)
+        {
+            return string.Join(", ", networks.Select(n => n == MediationProvider.Admob
+                ? "AdMob + 2 adapter bắt buộc (Unity Ads, IronSource)"
+                : GetMediationDisplayName(n)));
+        }
+
+        /// <summary>Gỡ ngoài OnGUI: dialog + xoá asset giữa lúc đang layout card dễ gây lỗi GUILayout.</summary>
+        private void RequestRemovePackage(PackageDef pkg)
+        {
+            EditorApplication.delayCall += () =>
+            {
+                if (this != null) ConfirmAndRemovePackage(pkg);
+            };
+        }
+
+        /// <summary>Bước 2 — tiến độ bộ pack cốt lõi + nút cài tất cả + các cảnh báo liên quan.</summary>
+        private void DrawStepInstallAll()
+        {
+            var selected = GetSelectedNetworks();
+            var planned = GetPackagesForSdkSetup(selected);
+            var missingAuto = planned.Where(p => !p.IsInstalled && CanAutoInstall(p)).ToList();
+            var missingManual = planned.Where(p => !p.IsInstalled && !CanAutoInstall(p)).ToList();
+            int installed = planned.Count(p => p.IsInstalled);
+
+            BeginCard();
+            DrawStepTitle(2, "Cài dependency cốt lõi");
+
+            // Thanh tiến độ: nhìn là biết còn thiếu bao nhiêu.
+            var barRect = EditorGUILayout.GetControlRect(false, 18f);
+            float progress = planned.Count > 0 ? (float)installed / planned.Count : 1f;
+            EditorGUI.ProgressBar(barRect, progress, $"{installed}/{planned.Count} package đã cài");
+            EditorGUILayout.Space(6);
 
             EditorGUI.BeginDisabledGroup(IsInteractionLocked() || missingAuto.Count == 0);
             if (GUILayout.Button(
                     missingAuto.Count > 0
-                        ? $"⬇ Cài tất cả dependency cốt lõi còn thiếu ({missingAuto.Count})"
-                        : "✓ Đã đủ dependency cốt lõi (tự động) cho Primary Mediation",
-                    GUILayout.Height(28)))
+                        ? $"⬇  Cài tất cả mục còn thiếu ({missingAuto.Count})"
+                        : "✓  Đã đủ dependency cốt lõi",
+                    GUILayout.Height(30)))
             {
                 if (missingAuto.Count > 0)
                     StartBatchInstall(planned, showGameAnalyticsSetupHintWhenComplete: true);
@@ -1085,40 +1410,246 @@ namespace GameUpSDK.Installer
 
             EditorGUI.EndDisabledGroup();
 
-            if (pm == MediationProvider.Admob)
+            GUILayout.Label(
+                "Installer tải và import lần lượt theo đúng thứ tự phụ thuộc. Cứ để Unity compile giữa các bước — đừng tắt Editor giữa chừng.",
+                _mutedStyle);
+
+            var pendingBatch = LoadPendingBatch();
+            if (pendingBatch.Count > 0)
             {
                 EditorGUILayout.HelpBox(
-                    "AdMob Mediation adapters có tab riêng — không nằm trong \"Cài tất cả\". Cài thủ công từng adapter theo network bạn bật trên AdMob console.",
-                    MessageType.None);
+                    "Đang có lượt \"Cài tất cả\" chạy dở. Sau mỗi lần Unity compile/reload, phần còn lại sẽ tự chạy tiếp.",
+                    MessageType.Info);
+                if (GUILayout.Button("Hủy lượt cài đang chờ"))
+                {
+                    ClearPendingBatch();
+                    Debug.Log("[GameUpSDK] Đã hủy lượt cài đang chờ.");
+                }
             }
 
-            EditorGUILayout.HelpBox(
-                "Primary Mediation lưu bằng Scripting Define Symbols (`" + GUDefinetion.PrimaryMediationLevelPlay + "` / `" + GUDefinetion.PrimaryMediationAdMob + "`) — phù hợp khi GameUp SDK cài dạng UPM package (không tạo asset trong Assets/).",
-                MessageType.Info
-            );
+            if (selected.Contains(MediationProvider.Admob))
+            {
+                var missingRequiredAdapters = GetRequiredAdMobRuntimeAdapters().Where(p => !p.IsInstalled).ToList();
+                if (missingRequiredAdapters.Count > 0)
+                {
+                    EditorGUILayout.HelpBox(
+                        "Thiếu adapter AdMob bắt buộc: " + string.Join(", ", missingRequiredAdapters.Select(p => p.DisplayName)) +
+                        ".\nHai adapter này cần cho waterfall trên AdMob console và để forward GDPR consent. Bấm \"Cài tất cả\" ở trên là đủ.",
+                        MessageType.Warning);
+                }
+            }
 
-            EditorGUILayout.EndVertical();
+            if (missingManual.Count > 0)
+            {
+                EditorGUILayout.HelpBox(
+                    "Không tự cài được: " + string.Join(", ", missingManual.Select(p => p.DisplayName)) +
+                    ".\nThiếu file trong Packages~ và không có URL tải — hãy tải thủ công rồi Assets → Import Package → Custom Package…",
+                    MessageType.Warning);
+            }
+
+            EndCard();
+        }
+
+        private static PackageDef FindMediationPackage(MediationProvider provider)
+        {
+            return provider switch
+            {
+                MediationProvider.Admob => FindPackageByAssembly("GoogleMobileAds"),
+                MediationProvider.Max => FindPackageByAssembly("MaxSdk.Scripts"),
+                MediationProvider.IronSource => FindPackageByAssembly("Unity.LevelPlay"),
+                _ => null,
+            };
+        }
+
+        private static string GetMediationDisplayName(MediationProvider provider)
+        {
+            return provider switch
+            {
+                MediationProvider.Admob => "AdMob",
+                MediationProvider.Max => "AppLovin MAX",
+                MediationProvider.IronSource => "LevelPlay",
+                _ => provider.ToString(),
+            };
+        }
+
+        /// <summary>Mở GameUpSetupWindow ở tab thứ tự ưu tiên, không đóng cửa sổ Dependencies.</summary>
+        private static void OpenPriorityTab()
+        {
+            SessionState.SetString(SetupWindowTabSessionKey, SetupPriorityTabTitle);
+            if (!EditorApplication.ExecuteMenuItem(SetupWindowMenuPath))
+                Debug.LogWarning($"[GameUpSDK] Không mở được {SetupWindowMenuPath} — mở thủ công từ menu.");
+        }
+
+        /// <summary>Thứ tự cài khuyến nghị — gấp lại để không chiếm chỗ.</summary>
+        private void DrawInstallOrderCard()
+        {
+            BeginCard();
+            _foldoutInstallOrder = EditorGUILayout.Foldout(_foldoutInstallOrder, "Thứ tự cài khuyến nghị (khi cài lẻ từng pack)", true, _foldoutTitleStyle);
+            if (_foldoutInstallOrder)
+            {
+                EditorGUILayout.Space(4);
+                GUILayout.Label("1.  Facebook SDK", _descStyle);
+                GUILayout.Label("2.  Firebase (kèm EDM4U) — chờ compile + Android Resolver xong", _descStyle);
+                GUILayout.Label("3.  AdMob / MAX / LevelPlay — các mạng đã tick ở bước 1", _descStyle);
+                GUILayout.Label("4.  MMP — AppsFlyer hoặc Adjust, đúng với lựa chọn ở bước 1", _descStyle);
+                GUILayout.Label("5.  GameAnalytics", _descStyle);
+                GUILayout.Label("6.  AppMetrica — chỉ khi đã bật ở bước 1 (tùy chọn)", _descStyle);
+                EditorGUILayout.Space(4);
+                GUILayout.Label(
+                    "Với AdMob, installer tự thêm adapter Unity Ads + IronSource. Các adapter network khác (AppLovin, Meta, Pangle…) nằm ở tab \"AdMob Mediation\" và không nằm trong \"Cài tất cả\".",
+                    _mutedStyle);
+            }
+
+            EndCard();
+        }
+
+        /// <summary>Nhóm công cụ phụ: sửa cache Unity UI, dọn Facebook Examples.</summary>
+        private void DrawToolsCard()
+        {
+            BeginCard();
+            _foldoutTools = EditorGUILayout.Foldout(_foldoutTools, "Công cụ & xử lý sự cố", true, _foldoutTitleStyle);
+            if (_foldoutTools)
+            {
+                EditorGUILayout.Space(4);
+                DrawUgUiPackageCacheTroubleshootFoldout();
+                EditorGUILayout.Space(6);
+                DrawSeparatorLine(SeparatorColor, 1f);
+                EditorGUILayout.Space(6);
+                DrawStaleDefineCleanupSection();
+                EditorGUILayout.Space(6);
+                DrawSeparatorLine(SeparatorColor, 1f);
+                EditorGUILayout.Space(6);
+                DrawFacebookExamplesCleanupSection();
+            }
+
+            EndCard();
         }
 
         private void DrawUgUiPackageCacheTroubleshootFoldout()
         {
-            EditorGUILayout.Space(4);
-            _foldoutUgUiPackageCacheHelp = EditorGUILayout.Foldout(
-                _foldoutUgUiPackageCacheHelp,
-                "Gỡ lỗi: lỗi compile trong com.unity.ugui (PackageCache)",
-                true);
+            GUILayout.Label("Lỗi compile trong com.unity.ugui", EditorStyles.boldLabel);
+            GUILayout.Label(
+                "Console báo lỗi ở Library/PackageCache/com.unity.ugui (GraphicRaycaster, Dropdown, ListPool…) " +
+                "thường là do cache gói Unity lệch phiên bản Editor, không phải lỗi mã GameUp SDK. " +
+                "Luôn mở project bằng đúng phiên bản trong ProjectSettings/ProjectVersion.txt.",
+                _descStyle);
 
-            if (!_foldoutUgUiPackageCacheHelp)
+            if (GUILayout.Button("Xóa Package Cache + ScriptAssemblies", GUILayout.Height(24)))
+                RepairUnityPackageCacheWithConfirmation();
+        }
+
+        /// <summary>Cache của <see cref="GetStaleSdkDefines"/> — tính trong RefreshStatus, không tính lại mỗi lần vẽ.</summary>
+        private List<string> _staleSdkDefines = new List<string>();
+
+        private void DrawStaleDefineCleanupSection()
+        {
+            GUILayout.Label("Define symbols của SDK đã gỡ", EditorStyles.boldLabel);
+
+            var staleDefines = _staleSdkDefines ?? new List<string>();
+            GUILayout.Label(
+                staleDefines.Count == 0
+                    ? "Scripting Define Symbols đang khớp với các SDK có trong project."
+                    : $"Còn sót {staleDefines.Count} define của SDK không còn trong project: {string.Join(", ", staleDefines)}",
+                _descStyle);
+
+            EditorGUI.BeginDisabledGroup(IsInstallOrDownloadBusy() || staleDefines.Count == 0);
+            if (GUILayout.Button("Dọn define symbols còn sót", GUILayout.Height(24)))
+                CleanStaleSdkDefines();
+            EditorGUI.EndDisabledGroup();
+        }
+
+        /// <summary>
+        /// Define của SDK không còn trong project — gặp khi gỡ pack bằng tay (xóa folder trực tiếp)
+        /// hoặc khi một lượt gỡ trước đó dừng giữa chừng.
+        /// </summary>
+        private static List<string> GetStaleSdkDefines()
+        {
+            var stale = new List<string>();
+            var symbols = GetDefinedSymbols();
+
+            foreach (var pkg in s_packages)
+            {
+                if (pkg.IsAdMobMediationAdapter || IsDependencyInstalledByAssembly(pkg.AssemblyName))
+                    continue;
+
+                string depsDefine = GetDepsDefineForPackage(pkg);
+                if (!string.IsNullOrEmpty(depsDefine) && symbols.Contains(depsDefine) && !stale.Contains(depsDefine))
+                    stale.Add(depsDefine);
+
+                string thirdPartyPrefix = GetThirdPartyDefinePrefixForPackage(pkg);
+                if (string.IsNullOrEmpty(thirdPartyPrefix))
+                    continue;
+
+                foreach (string symbol in symbols)
+                {
+                    if (symbol.StartsWith(thirdPartyPrefix, StringComparison.OrdinalIgnoreCase) && !stale.Contains(symbol))
+                        stale.Add(symbol);
+                }
+            }
+
+            foreach (string legacy in LegacyPrimaryMediationDefines)
+            {
+                if (symbols.Contains(legacy)) stale.Add(legacy);
+            }
+
+            return stale;
+        }
+
+        /// <summary>Define "Primary Mediation" cũ — giờ chọn được nhiều mạng nên không còn dùng, chỉ đọc để migrate.</summary>
+#pragma warning disable 0618
+        private static readonly string[] LegacyPrimaryMediationDefines =
+        {
+            GUDefinetion.PrimaryMediationAdMob, GUDefinetion.PrimaryMediationMax, GUDefinetion.PrimaryMediationLevelPlay
+        };
+#pragma warning restore 0618
+
+        private static void ClearLegacyPrimaryMediationDefines()
+        {
+            foreach (string legacy in LegacyPrimaryMediationDefines)
+                SetDefine(legacy, false);
+        }
+
+        private static List<string> GetDefinedSymbols()
+        {
+            var symbols = new List<string>();
+            foreach (var group in s_buildTargetGroups)
+            {
+                try
+                {
+                    string current = PlayerSettings.GetScriptingDefineSymbolsForGroup(group);
+                    foreach (string symbol in current.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        string trimmed = symbol.Trim();
+                        if (trimmed.Length > 0 && !symbols.Contains(trimmed))
+                            symbols.Add(trimmed);
+                    }
+                }
+                catch { }
+            }
+
+            return symbols;
+        }
+
+        private void CleanStaleSdkDefines()
+        {
+            var staleDefines = GetStaleSdkDefines();
+            if (staleDefines.Count == 0)
                 return;
 
-            EditorGUILayout.HelpBox(
-                "Nếu Console báo lỗi trong Library/PackageCache/com.unity.ugui (vd. GraphicRaycaster, Dropdown, ListPool): " +
-                "đó thường do cache gói Unity lệch với bản Editor — không phải do mã GameUp SDK. " +
-                "Mở project luôn bằng đúng phiên bản Unity trong ProjectSettings/ProjectVersion.txt.",
-                MessageType.Warning);
+            if (!EditorUtility.DisplayDialog(
+                    "GameUp SDK — Dọn define symbols",
+                    $"Sẽ xóa {staleDefines.Count} define của SDK không còn trong project:\n• " +
+                    string.Join("\n• ", staleDefines),
+                    "Dọn define",
+                    "Hủy"))
+                return;
 
-            if (GUILayout.Button("Xóa Package Cache + ScriptAssemblies (tải lại gói Unity UI)", GUILayout.Height(26)))
-                RepairUnityPackageCacheWithConfirmation();
+            foreach (string define in staleDefines)
+                SetDefine(define, false);
+
+            PersistPlayerSettings();
+            RefreshStatus(syncDefines: true);
+            Debug.Log($"[GameUpSDK] Đã dọn define symbols còn sót: {string.Join(", ", staleDefines)}");
         }
 
         private const string FacebookExamplesAssetPath = "Assets/FacebookSDK/Examples";
@@ -1130,17 +1661,14 @@ namespace GameUpSDK.Installer
 
         private void DrawFacebookExamplesCleanupSection()
         {
-            EditorGUILayout.Space(4);
-            EditorGUILayout.BeginVertical("box");
-
-            EditorGUILayout.LabelField("Facebook SDK — Examples", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox(
-                "Thư mục Examples thường không cần cho production và có thể gây lỗi compile. " +
-                "Khi cài Facebook qua installer, Examples đã được xóa tự động; nếu bạn import tay hoặc còn sót, dùng nút bên dưới.",
-                MessageType.None);
+            GUILayout.Label("Facebook SDK — thư mục Examples", EditorStyles.boldLabel);
+            GUILayout.Label(
+                "Examples không cần cho production và hay gây lỗi compile. Cài qua installer thì thư mục này đã bị xóa tự động; " +
+                "chỉ dùng nút dưới khi bạn import Facebook SDK bằng tay.",
+                _descStyle);
 
             EditorGUI.BeginDisabledGroup(IsInstallOrDownloadBusy() || !FacebookSdkExamplesFolderExists());
-            if (GUILayout.Button("Xóa thủ công: Assets/FacebookSDK/Examples", GUILayout.Height(26)))
+            if (GUILayout.Button("Xóa Assets/FacebookSDK/Examples", GUILayout.Height(24)))
             {
                 if (EditorUtility.DisplayDialog(
                         "GameUp SDK — Xóa Facebook Examples",
@@ -1157,13 +1685,7 @@ namespace GameUpSDK.Installer
             EditorGUI.EndDisabledGroup();
 
             if (!FacebookSdkExamplesFolderExists())
-            {
-                EditorGUILayout.LabelField(
-                    "Không thấy thư mục (đã xóa hoặc chưa import Facebook SDK).",
-                    EditorStyles.miniLabel);
-            }
-
-            EditorGUILayout.EndVertical();
+                GUILayout.Label("Không thấy thư mục (đã xóa hoặc chưa import Facebook SDK).", _mutedStyle);
         }
 
         /// <summary>Xóa <c>Assets/FacebookSDK/Examples</c> qua AssetDatabase (nút thủ công trong installer).</summary>
@@ -1192,8 +1714,11 @@ namespace GameUpSDK.Installer
             Debug.Log("[GameUpSDK] Đã xóa " + FacebookExamplesAssetPath);
         }
 
-        /// <summary>Firebase + AppsFlyer + bộ mediation theo lựa chọn (AdMob: GMA; LevelPlay: LevelPlay). Không gồm AdMob mediation adapters — cài thủ công trong tab riêng.</summary>
-        private static List<PackageDef> GetPackagesForSdkSetup(MediationProvider mediation)
+        /// <summary>
+        /// Firebase + MMP (AppsFlyer/Adjust) + các mạng quảng cáo đã chọn (+ AppMetrica nếu bật ở bước 1).
+        /// AdMob gồm thêm 2 adapter bắt buộc (Unity Ads + IronSource).
+        /// </summary>
+        private static List<PackageDef> GetPackagesForSdkSetup(List<MediationProvider> networks)
         {
             var list = new List<PackageDef>();
 
@@ -1204,117 +1729,238 @@ namespace GameUpSDK.Installer
                     list.Add(p);
             }
 
+            void AddPackage(PackageDef pkg)
+            {
+                if (pkg != null && !list.Contains(pkg))
+                    list.Add(pkg);
+            }
+
             AddByAssembly("Facebook.Unity.Editor");
             AddByAssembly("Firebase.App");
-            AddByAssembly("AppsFlyer");
+            AddByAssembly(GetMmpFromDefines() == MmpProvider.Adjust ? AdjustAssemblyName : AppsFlyerAssemblyName);
             AddByAssembly("GameAnalyticsSDK");
+            if (IsAppMetricaSelected())
+                AddByAssembly(AppMetricaAssemblyName);
 
-            if (mediation == MediationProvider.Admob)
-                AddByAssembly("GoogleMobileAds");
-            else
-                AddByAssembly("Unity.LevelPlay");
+            foreach (var network in networks)
+            {
+                AddPackage(FindMediationPackage(network));
+                if (network != MediationProvider.Admob) continue;
+
+                // AdMob: core + 2 adapter bắt buộc.
+                foreach (var adapter in GetRequiredAdMobRuntimeAdapters())
+                    AddPackage(adapter);
+            }
 
             return OrderedInstallSequence(list).ToList();
         }
 
-        private static MediationProvider GetPrimaryMediationFromDefines()
+        /// <summary>
+        /// Mạng quảng cáo dev đã chọn ở bước 1, theo thứ tự hiển thị. Luôn gồm mạng đã cài và không bao giờ rỗng.
+        /// Lưu ở EditorPrefs theo project (chỉ có nghĩa trước khi cài — sau đó trạng thái cài là nguồn sự thật),
+        /// nên tick/bỏ tick không đổi define và không bắt Unity compile lại.
+        /// </summary>
+        private static List<MediationProvider> GetSelectedNetworks()
         {
-            if (HasDefine(GUDefinetion.PrimaryMediationAdMob)) return MediationProvider.Admob;
-            if (HasDefine(GUDefinetion.PrimaryMediationMax)) return MediationProvider.Max;
-            return MediationProvider.IronSource;
+            string stored = EditorPrefs.GetString(SelectedNetworksPrefKey, null);
+            var chosen = stored == null ? GetLegacyPrimaryNetworks() : ParseNetworks(stored);
+
+            var result = s_mediationNetworks
+                .Where(n => chosen.Contains(n) || FindMediationPackage(n)?.IsInstalled == true)
+                .ToList();
+            if (result.Count == 0) result.Add(MediationProvider.Admob);
+            return result;
         }
 
-        private static void SetPrimaryMediationDefines(MediationProvider mediation)
+        private static void SetNetworkSelected(MediationProvider provider, bool selected)
         {
-            SetDefine(GUDefinetion.PrimaryMediationAdMob, mediation == MediationProvider.Admob);
-            SetDefine(GUDefinetion.PrimaryMediationLevelPlay, mediation == MediationProvider.IronSource);
-            SetDefine(GUDefinetion.PrimaryMediationMax, mediation == MediationProvider.Max);
+            var current = GetSelectedNetworks();
+            if (selected && !current.Contains(provider)) current.Add(provider);
+            if (!selected) current.Remove(provider);
+            if (current.Count == 0) return;
+            EditorPrefs.SetString(SelectedNetworksPrefKey, string.Join(",", current));
         }
 
-        /// <summary>Đảm bảo có đúng một define mediation (mặc định LevelPlay nếu chưa có).</summary>
-        private static void EnsurePrimaryMediationDefines()
+        /// <summary>Project tạo trước khi có chọn nhiều mạng: lấy theo define GAMEUP_PRIMARY_MEDIATION_* cũ, mặc định AdMob.</summary>
+        private static List<MediationProvider> GetLegacyPrimaryNetworks()
         {
-            bool lp = HasDefine(GUDefinetion.PrimaryMediationLevelPlay);
-            bool admob = HasDefine(GUDefinetion.PrimaryMediationAdMob);
-            if (!lp && !admob)
-                SetDefine(GUDefinetion.PrimaryMediationLevelPlay, true);
-            else if (lp && admob)
-                SetDefine(GUDefinetion.PrimaryMediationAdMob, false);
+#pragma warning disable 0618
+            if (HasDefine(GUDefinetion.PrimaryMediationMax)) return new List<MediationProvider> { MediationProvider.Max };
+            if (HasDefine(GUDefinetion.PrimaryMediationLevelPlay)) return new List<MediationProvider> { MediationProvider.IronSource };
+#pragma warning restore 0618
+            return new List<MediationProvider> { MediationProvider.Admob };
+        }
+
+        private static List<MediationProvider> ParseNetworks(string value)
+        {
+            var list = new List<MediationProvider>();
+            foreach (string part in value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (Enum.TryParse(part.Trim(), out MediationProvider provider) && provider != MediationProvider.None)
+                    list.Add(provider);
+            }
+            return list;
+        }
+
+        /// <summary>Theo project: hai project mở trên cùng máy không dùng chung lựa chọn.</summary>
+        private static string SelectedNetworksPrefKey => $"GameUpSDK_SelectedNetworks_{PlayerSettings.productGUID}";
+
+        /// <summary>Theo project, mặc định tắt — AppMetrica chỉ cài khi dev chủ động bật.</summary>
+        private static string UseAppMetricaPrefKey => $"GameUpSDK_UseAppMetrica_{PlayerSettings.productGUID}";
+
+        /// <summary>AppMetrica nằm trong bộ cài khi dev đã tick ở bước 1, hoặc đã cài sẵn trong project.</summary>
+        private static bool IsAppMetricaSelected()
+        {
+            return EditorPrefs.GetBool(UseAppMetricaPrefKey, false)
+                   || FindPackageByAssembly(AppMetricaAssemblyName)?.IsInstalled == true;
+        }
+
+        private static MmpProvider GetMmpFromDefines()
+        {
+            // Chưa có define (project cũ) → AppsFlyer, giữ nguyên hành vi trước khi có Adjust.
+            return HasDefine(GUDefinetion.MmpAdjust) && !HasDefine(GUDefinetion.MmpAppsFlyer)
+                ? MmpProvider.Adjust
+                : MmpProvider.AppsFlyer;
+        }
+
+        private static void SetMmpDefines(MmpProvider mmp)
+        {
+            SetDefine(GUDefinetion.MmpAppsFlyer, mmp == MmpProvider.AppsFlyer);
+            SetDefine(GUDefinetion.MmpAdjust, mmp == MmpProvider.Adjust);
+        }
+
+        /// <summary>Đảm bảo có đúng một define MMP. Chưa có thì suy từ SDK đang cài (chỉ có Adjust → Adjust), còn lại AppsFlyer.</summary>
+        internal static void EnsureMmpDefines()
+        {
+            bool appsFlyer = HasDefine(GUDefinetion.MmpAppsFlyer);
+            bool adjust = HasDefine(GUDefinetion.MmpAdjust);
+            if (appsFlyer ^ adjust)
+                return;
+
+            if (appsFlyer)
+            {
+                SetDefine(GUDefinetion.MmpAdjust, false);
+                return;
+            }
+
+            bool onlyAdjustInstalled = IsDependencyInstalledByAssembly(AdjustAssemblyName) &&
+                                       !IsDependencyInstalledByAssembly(AppsFlyerAssemblyName);
+            SetMmpDefines(onlyAdjustInstalled ? MmpProvider.Adjust : MmpProvider.AppsFlyer);
+        }
+
+        /// <summary>Package MMP còn trong project nhưng không phải MMP đang chọn (null nếu không có).</summary>
+        private static PackageDef GetUnusedInstalledMmpPackage()
+        {
+            var unused = FindPackageByAssembly(GetMmpFromDefines() == MmpProvider.Adjust ? AppsFlyerAssemblyName : AdjustAssemblyName);
+            return unused != null && unused.IsInstalled ? unused : null;
         }
 
         private void DrawPackageList(bool includeAdMobAdapters, bool allowPerPackageRemove = true)
         {
-            bool drewRequired = false, drewOptional = false;
-            bool? lastRequired = null;
+            var items = OrderedInstallSequence(s_packages)
+                .Where(p => includeAdMobAdapters || !p.IsAdMobMediationAdapter)
+                .Where(p => !_showOnlyMissing || !p.IsInstalled)
+                .ToList();
 
-            foreach (var pkg in OrderedInstallSequence(s_packages))
+            if (items.Count == 0)
             {
-                if (!includeAdMobAdapters && pkg.IsAdMobMediationAdapter)
-                    continue;
+                EditorGUILayout.Space(8);
+                GUILayout.Label("Tất cả package trong danh sách đã được cài.", _mutedStyle);
+                return;
+            }
 
-                if (lastRequired.HasValue && lastRequired.Value != pkg.Required)
-                {
-                    // Đường phân tách rõ giữa nhóm bắt buộc và tùy chọn.
-                    EditorGUILayout.Space(3);
-                    DrawSeparatorLine(new Color(1f, 1f, 1f, 0.32f), 1.2f);
-                    EditorGUILayout.Space(3);
-                }
-
-                // Section headers
+            bool drewRequired = false, drewOptional = false;
+            foreach (var pkg in items)
+            {
                 if (pkg.Required && !drewRequired)
                 {
-                    DrawSectionHeader("BẮT BUỘC");
+                    DrawSectionHeader("BẮT BUỘC", "Không có sẽ không build/chạy được SDK.");
                     drewRequired = true;
                 }
 
                 if (!pkg.Required && !drewOptional)
                 {
-                    EditorGUILayout.Space(8);
-                    DrawSectionHeader("TÙY CHỌN");
+                    DrawSectionHeader("TÙY CHỌN", "Chỉ cài khi game thực sự dùng đến dịch vụ đó.");
                     drewOptional = true;
                 }
 
                 DrawPackageRow(pkg, allowPerPackageRemove);
-                lastRequired = pkg.Required;
             }
         }
 
         private void DrawAdMobMediationTab()
         {
-            EditorGUILayout.BeginVertical("box");
-            EditorGUILayout.LabelField("AdMob Mediation Adapters", EditorStyles.boldLabel);
+            var adapters = OrderedInstallSequence(GetAdMobMediationAdapters()).ToList();
+            int installedAdapterCount = adapters.Count(p => p.IsInstalled);
+
+            EditorGUILayout.BeginHorizontal(_rowStyle);
+            EditorGUILayout.BeginVertical();
+            GUILayout.Label($"AdMob Mediation Adapters — {installedAdapterCount}/{adapters.Count} đã cài", _cardTitleStyle);
+            GUILayout.Label(
+                "Chỉ cần khi project dùng AdMob. Installer tự tải .zip, giải nén và import .unitypackage.",
+                _mutedStyle);
+            EditorGUILayout.EndVertical();
+            GUILayout.FlexibleSpace();
+            _showOnlyMissing = GUILayout.Toggle(_showOnlyMissing, "Chỉ hiện mục chưa cài", EditorStyles.miniButton, GUILayout.Width(150), GUILayout.Height(20));
+            EditorGUILayout.EndHorizontal();
+            DrawSeparatorLine(SeparatorColor, 1f);
+
+            _scroll = EditorGUILayout.BeginScrollView(_scroll);
+
+            if (!GetSelectedNetworks().Contains(MediationProvider.Admob))
+            {
+                EditorGUILayout.HelpBox(
+                    "Project chưa chọn AdMob nên các adapter này chưa được dùng tới. " +
+                    "Vẫn cài trước được, nhưng nhớ tick AdMob ở bước 1 tab Dependencies.",
+                    MessageType.Warning);
+            }
+
             EditorGUILayout.HelpBox(
-                "Danh sách adapter AdMob theo Google. Cài thủ công từng adapter bằng \"Cài pack\" theo network bạn bật trên AdMob console — không có bộ khuyến nghị hay cài hàng loạt.",
+                "Unity Ads và IronSource là bắt buộc với GameUp SDK — đã nằm sẵn trong nút \"Cài tất cả\" ở tab Dependencies. " +
+                "Các adapter còn lại chỉ cài khi bạn bật network tương ứng trên AdMob console.",
                 MessageType.Info);
 
-            EditorGUILayout.EndVertical();
-
             EditorGUILayout.Space(4);
-            _scroll = EditorGUILayout.BeginScrollView(_scroll);
-            var adapters = OrderedInstallSequence(GetAdMobMediationAdapters()).ToList();
-            var installedCount = adapters.Count(p => p.IsInstalled);
-            _foldoutAdMobMediationAdapters = EditorGUILayout.Foldout(
-                _foldoutAdMobMediationAdapters,
-                $"Danh sách adapter ({installedCount}/{adapters.Count} đã cài)",
-                true);
+            var shown = adapters.Where(p => !_showOnlyMissing || !p.IsInstalled).ToList();
+            if (shown.Count == 0)
+                GUILayout.Label("Không còn adapter nào chưa cài.", _mutedStyle);
 
-            if (_foldoutAdMobMediationAdapters)
+            bool drewRequired = false, drewOptional = false;
+            foreach (var adapter in shown)
             {
-                foreach (var adapter in adapters)
-                    DrawPackageRow(adapter, allowPerPackageRemove: true);
+                if (adapter.RequiredForAdMobRuntime && !drewRequired)
+                {
+                    DrawSectionHeader("BẮT BUỘC CHO GAMEUP SDK", "Cần cho waterfall AdMob và forward GDPR consent.");
+                    drewRequired = true;
+                }
+
+                if (!adapter.RequiredForAdMobRuntime && !drewOptional)
+                {
+                    DrawSectionHeader("NETWORK TÙY CHỌN", "Cài đúng network bạn đã bật trên AdMob Mediation.");
+                    drewOptional = true;
+                }
+
+                DrawPackageRow(adapter, allowPerPackageRemove: true);
             }
+
+            EditorGUILayout.Space(8);
             EditorGUILayout.EndScrollView();
         }
 
-        private static void DrawSectionHeader(string title)
+        private void DrawSectionHeader(string title, string hint = null)
         {
-            var style = new GUIStyle(EditorStyles.miniLabel)
+            EditorGUILayout.Space(8);
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label(title, _sectionHeaderStyle);
+            if (!string.IsNullOrEmpty(hint))
             {
-                fontStyle = FontStyle.Bold,
-                padding = new RectOffset(4, 0, 6, 2),
-            };
-            EditorGUILayout.LabelField(title, style);
-            DrawSeparatorLine(new Color(1f, 1f, 1f, 0.2f), 1f);
+                GUILayout.Space(6);
+                GUILayout.Label(hint, _mutedStyle);
+            }
+
+            EditorGUILayout.EndHorizontal();
+            DrawSeparatorLine(SeparatorColor, 1f);
+            EditorGUILayout.Space(2);
         }
 
         private static void DrawSeparatorLine(Color color, float thickness = 1f)
@@ -1325,6 +1971,58 @@ namespace GameUpSDK.Installer
             EditorGUI.DrawRect(rect, color);
         }
 
+        // ─── Style, màu và helper layout ─────────────────────────────────────────
+
+        private static Color InstalledColor => EditorGUIUtility.isProSkin ? new Color(0.40f, 0.78f, 0.45f) : new Color(0.16f, 0.55f, 0.24f);
+        private static Color MissingColor => EditorGUIUtility.isProSkin ? new Color(0.90f, 0.45f, 0.40f) : new Color(0.72f, 0.22f, 0.18f);
+        private static Color BusyColor => EditorGUIUtility.isProSkin ? new Color(0.45f, 0.66f, 0.95f) : new Color(0.18f, 0.42f, 0.78f);
+        private static Color SeparatorColor => EditorGUIUtility.isProSkin ? new Color(1f, 1f, 1f, 0.09f) : new Color(0f, 0f, 0f, 0.12f);
+
+        private static Color Tint(Color color, float alpha) => new Color(color.r, color.g, color.b, alpha);
+
+        private void EnsureStyles()
+        {
+            if (_rowStyle != null) return;
+
+            _rowStyle = new GUIStyle { padding = new RectOffset(12, 10, 8, 8) };
+            _cardStyle = new GUIStyle(EditorStyles.helpBox) { padding = new RectOffset(10, 10, 8, 8) };
+            _cardTitleStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 12 };
+            _stepTitleStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 12 };
+            _descStyle = new GUIStyle(EditorStyles.label) { wordWrap = true, fontSize = 11 };
+            _mutedStyle = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true };
+            _sectionHeaderStyle = new GUIStyle(EditorStyles.miniLabel) { fontStyle = FontStyle.Bold };
+            _badgeStyle = new GUIStyle(EditorStyles.miniLabel) { fontStyle = FontStyle.Bold };
+            _foldoutTitleStyle = new GUIStyle(EditorStyles.foldout) { fontStyle = FontStyle.Bold };
+        }
+
+        private void BeginCard()
+        {
+            EditorGUILayout.Space(6);
+            EditorGUILayout.BeginVertical(_cardStyle);
+        }
+
+        private static void EndCard()
+        {
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>Tiêu đề "① Tên bước" cho các card hướng dẫn bên trái.</summary>
+        private void DrawStepTitle(int step, string title)
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label($"BƯỚC {step}", _sectionHeaderStyle, GUILayout.Width(52));
+            GUILayout.Label(title, _stepTitleStyle);
+            EditorGUILayout.EndHorizontal();
+            DrawSeparatorLine(SeparatorColor, 1f);
+            EditorGUILayout.Space(4);
+        }
+
+        private static void DrawVerticalSeparator()
+        {
+            var rect = GUILayoutUtility.GetRect(1f, 1f, GUILayout.Width(1f), GUILayout.ExpandHeight(true));
+            EditorGUI.DrawRect(rect, SeparatorColor);
+        }
+
         private void DrawPackageRow(PackageDef pkg, bool allowPerPackageRemove)
         {
             bool isDownloading = _parallelTasks?.Any(t => t.Pkg == pkg && !t.IsDone) == true;
@@ -1333,53 +2031,49 @@ namespace GameUpSDK.Installer
                                 || (_isBatchInstalling && _installQueue.Contains(pkg))
                                 || isDownloading
                                 || isResolvingAdMobLatest;
-            Color boxColor = pkg.IsInstalled ? new Color(0.18f, 0.45f, 0.18f, 0.3f)
-                : isInstalling ? new Color(0.3f, 0.3f, 0.6f, 0.3f)
-                : new Color(0.45f, 0.18f, 0.18f, 0.3f);
+            Color statusColor = pkg.IsInstalled ? InstalledColor : isInstalling ? BusyColor : MissingColor;
+            string statusText = pkg.IsInstalled
+                ? "ĐÃ CÀI"
+                : isInstalling
+                    ? "ĐANG XỬ LÝ"
+                    : pkg.Required
+                        ? "CHƯA CÀI · BẮT BUỘC"
+                        : "CHƯA CÀI";
 
-            // Row background
-            var rect = EditorGUILayout.BeginVertical();
-            EditorGUI.DrawRect(new Rect(rect.x, rect.y, rect.width, rect.height + 2), boxColor);
+            const float ActionWidth = 190f;
+
+            // Nền nhạt + vạch màu trạng thái bên trái để quét mắt nhanh theo cột.
+            var rect = EditorGUILayout.BeginVertical(_rowStyle);
+            if (Event.current.type == EventType.Repaint)
+            {
+                EditorGUI.DrawRect(rect, Tint(statusColor, pkg.IsInstalled ? 0.07f : 0.12f));
+                EditorGUI.DrawRect(new Rect(rect.x, rect.y, 3f, rect.height), statusColor);
+            }
 
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Space(8);
 
-            // Status icon
-            string icon = pkg.IsInstalled ? "✓" : isInstalling ? "⟳" : "✗";
-            var iconStyle = new GUIStyle(EditorStyles.boldLabel)
-            {
-                fontSize = 14,
-                normal = { textColor = pkg.IsInstalled ? Color.green : isInstalling ? Color.yellow : Color.red },
-                fixedWidth = 24,
-            };
-            GUILayout.Label(icon, iconStyle, GUILayout.Width(24));
-
-            // Name + description
+            // ── Cột thông tin ──
             EditorGUILayout.BeginVertical();
-            EditorGUILayout.LabelField(pkg.DisplayName, EditorStyles.boldLabel);
-            var descStyle = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true };
-            EditorGUILayout.LabelField(pkg.Description, descStyle);
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label(pkg.DisplayName, EditorStyles.boldLabel);
+            EditorGUILayout.EndHorizontal();
+
+            _badgeStyle.normal.textColor = statusColor;
+            GUILayout.Label(statusText, _badgeStyle);
+            GUILayout.Label(pkg.Description, _descStyle);
             if (!string.IsNullOrEmpty(pkg.InstallError))
                 EditorGUILayout.HelpBox(pkg.InstallError, MessageType.Error);
             EditorGUILayout.EndVertical();
 
-            // Trạng thái / Cài pack (từng dòng, không cài gom)
-            GUILayout.Space(4);
-            EditorGUILayout.BeginVertical(GUILayout.Width(190));
-            if (pkg.IsInstalled)
-            {
-                var greenStyle = new GUIStyle(EditorStyles.miniLabel)
-                { normal = { textColor = Color.green }, fontStyle = FontStyle.Bold };
-                GUILayout.Label("Đã cài", greenStyle, GUILayout.Width(64));
-            }
-            else if (isResolvingAdMobLatest)
+            // ── Cột hành động (cố định bề ngang cho thẳng hàng) ──
+            GUILayout.Space(8);
+            EditorGUILayout.BeginVertical(GUILayout.Width(ActionWidth));
+
+            if (isResolvingAdMobLatest)
             {
                 float anim = Mathf.PingPong((float)EditorApplication.timeSinceStartup * 0.9f, 1f);
-                EditorGUILayout.BeginVertical(GUILayout.Width(190));
-                EditorGUILayout.LabelField("Đang kiểm tra release AdMob mới nhất...", EditorStyles.miniLabel, GUILayout.Width(190));
-                var barRect = EditorGUILayout.GetControlRect(GUILayout.Width(190), GUILayout.Height(6));
-                EditorGUI.ProgressBar(barRect, anim, "");
-                EditorGUILayout.EndVertical();
+                GUILayout.Label("Đang kiểm tra release AdMob mới nhất…", _mutedStyle, GUILayout.Width(ActionWidth));
+                EditorGUI.ProgressBar(EditorGUILayout.GetControlRect(GUILayout.Width(ActionWidth), GUILayout.Height(6)), anim, "");
             }
             else if (isDownloading)
             {
@@ -1390,148 +2084,138 @@ namespace GameUpSDK.Installer
                     ? pkgTasks.Average(t => t.IsDone ? 1f : t.Request?.downloadProgress ?? 0f)
                     : 0f;
 
-                EditorGUILayout.BeginVertical(GUILayout.Width(190));
-                EditorGUILayout.LabelField(
-                    total > 1 ? $"Đang tải... {done}/{total} files" : "Đang tải...",
-                    EditorStyles.miniLabel, GUILayout.Width(190));
-                var barRect = EditorGUILayout.GetControlRect(GUILayout.Width(190), GUILayout.Height(6));
-                EditorGUI.ProgressBar(barRect, prog, "");
-                EditorGUILayout.EndVertical();
+                GUILayout.Label(total > 1 ? $"Đang tải… {done}/{total} file" : "Đang tải…", _mutedStyle, GUILayout.Width(ActionWidth));
+                EditorGUI.ProgressBar(EditorGUILayout.GetControlRect(GUILayout.Width(ActionWidth), GUILayout.Height(6)), prog, $"{Mathf.RoundToInt(prog * 100f)}%");
             }
             else if (isInstalling)
             {
-                EditorGUILayout.LabelField("Đang cài...", GUILayout.Width(100));
+                GUILayout.Label("Đang import / compile…", _mutedStyle, GUILayout.Width(ActionWidth));
             }
-            else
+            else if (!pkg.IsInstalled)
             {
-                bool canAuto = CanAutoInstall(pkg);
-                if (canAuto)
+                if (CanAutoInstall(pkg))
                 {
                     EditorGUI.BeginDisabledGroup(IsInteractionLocked());
-                    if (GUILayout.Button("Cài pack", GUILayout.Width(88), GUILayout.Height(24)))
+                    if (GUILayout.Button("⬇  Cài pack", GUILayout.Width(ActionWidth), GUILayout.Height(24)))
                         StartSinglePackageInstall(pkg);
                     EditorGUI.EndDisabledGroup();
                 }
                 else if (pkg.Method == InstallMethod.OpenUrl)
                 {
-                    if (GUILayout.Button("Mở trang tải", GUILayout.Width(100), GUILayout.Height(24))
+                    if (GUILayout.Button("Mở trang tải", GUILayout.Width(ActionWidth), GUILayout.Height(24))
                         && !string.IsNullOrEmpty(pkg.DownloadUrl))
                         Application.OpenURL(pkg.DownloadUrl);
                 }
                 else
                 {
-                    var manualStyle = new GUIStyle(EditorStyles.miniLabel)
-                    {
-                        wordWrap = true,
-                        normal = { textColor = new Color(0.55f, 0.55f, 0.55f) },
-                    };
-                    GUILayout.Label("Cần file Packages~/URL", manualStyle, GUILayout.Width(118));
+                    GUILayout.Label("Cần tải thủ công (thiếu file trong Packages~ và URL).", _mutedStyle, GUILayout.Width(ActionWidth));
                 }
             }
 
             if (IsAdMobPackage(pkg))
             {
                 EditorGUI.BeginDisabledGroup(IsInstallOrDownloadBusy());
-                if (GUILayout.Button("Update AdMob mới nhất", GUILayout.Width(190), GUILayout.Height(22)))
+                if (GUILayout.Button("Cập nhật bản AdMob mới nhất", GUILayout.Width(ActionWidth), GUILayout.Height(22)))
                     StartAdMobLatestUpdate(pkg);
                 EditorGUI.EndDisabledGroup();
             }
 
-            if (allowPerPackageRemove && pkg.IsAdMobMediationAdapter && pkg.IsInstalled)
+            if (allowPerPackageRemove && pkg.IsInstalled)
             {
-                bool canRemove = HasInstalledAssetPath(pkg);
+                bool isAdapter = pkg.IsAdMobMediationAdapter;
+                bool canRemove = isAdapter ? HasInstalledAssetPath(pkg) : CanRemovePackage(pkg);
                 EditorGUI.BeginDisabledGroup(IsInstallOrDownloadBusy() || !canRemove);
-                if (GUILayout.Button("Gỡ adapter", GUILayout.Width(190), GUILayout.Height(22)))
-                    ConfirmAndRemoveAdMobAdapter(pkg);
-                EditorGUI.EndDisabledGroup();
-            }
-            else if (allowPerPackageRemove && !pkg.IsAdMobMediationAdapter && pkg.IsInstalled)
-            {
-                bool canRemove = CanRemovePackage(pkg);
-                EditorGUI.BeginDisabledGroup(IsInstallOrDownloadBusy() || !canRemove);
-                if (GUILayout.Button("Gỡ package", GUILayout.Width(190), GUILayout.Height(22)))
-                    ConfirmAndRemovePackage(pkg);
+                if (GUILayout.Button(isAdapter ? "Gỡ adapter" : "Gỡ package", GUILayout.Width(ActionWidth), GUILayout.Height(22)))
+                {
+                    if (isAdapter) ConfirmAndRemoveAdMobAdapter(pkg);
+                    else ConfirmAndRemovePackage(pkg);
+                }
+
                 EditorGUI.EndDisabledGroup();
             }
 
+            if (!string.IsNullOrEmpty(pkg.DownloadUrl) && !string.IsNullOrEmpty(pkg.DownloadLabel) && !pkg.IsInstalled && CanAutoInstall(pkg))
+            {
+                if (GUILayout.Button(pkg.DownloadLabel, EditorStyles.miniLabel, GUILayout.Width(ActionWidth)))
+                    Application.OpenURL(pkg.DownloadUrl);
+            }
+
             EditorGUILayout.EndVertical();
-            GUILayout.Space(8);
             EditorGUILayout.EndHorizontal();
-            EditorGUILayout.Space(4);
             EditorGUILayout.EndVertical();
 
-            DrawSeparatorLine(new Color(1f, 1f, 1f, 0.14f), 1f);
-            EditorGUILayout.Space(3);
+            DrawSeparatorLine(SeparatorColor, 1f);
         }
 
+        /// <summary>Thanh dưới cùng: luôn hiện, cho biết bước tiếp theo là gì.</summary>
         private void DrawFooter()
         {
-            EditorGUILayout.Space(8);
-            EditorGUILayout.BeginHorizontal();
+            DrawSeparatorLine(SeparatorColor, 1f);
 
-            // Nút refresh thủ công luôn active.
-            // Nếu đang compile thì delay để refresh sau khi compile/reload xong.
-            if (GUILayout.Button("↻  Làm mới trạng thái", GUILayout.Height(30)))
-                RequestManualRefresh();
+            bool allRequiredDone = AreAllRequiredPackagesInstalled();
+            var rect = EditorGUILayout.BeginHorizontal(_rowStyle);
+            EditorGUI.DrawRect(rect, Tint(allRequiredDone ? InstalledColor : MissingColor, 0.10f));
+
+            EditorGUILayout.BeginVertical();
+            GUILayout.Label(
+                allRequiredDone ? "✓  Đã đủ package bắt buộc" : "Chưa đủ package bắt buộc",
+                EditorStyles.boldLabel);
+            GUILayout.Label(
+                allRequiredDone
+                    ? "Bước cuối: mở cửa sổ cấu hình để nhập key cho từng network."
+                    : "Cài nốt các mục đánh dấu BẮT BUỘC trong danh sách bên phải rồi quay lại đây.",
+                _mutedStyle);
+            EditorGUILayout.EndVertical();
+
+            GUILayout.FlexibleSpace();
+
+            EditorGUI.BeginDisabledGroup(IsInteractionLocked() || !allRequiredDone);
+            if (GUILayout.Button("Mở cấu hình SDK  →", GUILayout.Width(200), GUILayout.Height(32)))
+                RequestOpenSetup();
+            EditorGUI.EndDisabledGroup();
 
             EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.Space(4);
-
-            // Manual install hint
-            bool hasManualUninstalled = s_packages.Any(p => !p.IsInstalled && p.Method == InstallMethod.OpenUrl);
-            if (hasManualUninstalled)
-            {
-                EditorGUILayout.HelpBox(
-                    "Một số package chỉ cài được thủ công: tải .unitypackage từ trang nhà cung cấp, " +
-                    "rồi Assets → Import Package → Custom Package…, sau đó \"Làm mới trạng thái\".",
-                    MessageType.Warning);
-            }
-
-            EditorGUILayout.Space(4);
-
-            // Continue button
-            bool allRequiredDone = AreAllRequiredPackagesInstalled();
-            if (allRequiredDone)
-            {
-                EditorGUILayout.HelpBox(
-                    "Tất cả package bắt buộc đã được cài đặt! " +
-                    "Nhấn bên dưới để mở cửa sổ cấu hình SDK.",
-                    MessageType.None);
-
-                // Khi đang compile/cài, không cho bấm (không trigger delay-call) để đúng luồng UX.
-                EditorGUI.BeginDisabledGroup(IsInteractionLocked());
-                if (GUILayout.Button("→  Mở cấu hình SDK (GameUp SDK Setup)", GUILayout.Height(36)))
-                    RequestOpenSetup();
-                EditorGUI.EndDisabledGroup();
-            }
         }
+
+        /// <summary>
+        /// Asset path/prefix thuộc GameUp Core hoặc dependencies Core — không xóa khi gỡ SDK.
+        /// (vd DOTween nằm dưới Assets/Plugins/Demigiant.)
+        /// </summary>
+        private static readonly string[] s_coreProtectedAssetPathPrefixes =
+        {
+            "Assets/GameUpCore",
+            "Assets/SDK",
+            "Assets/Plugins/Demigiant",
+        };
 
         private void DrawSetupDependenciesBulkRemoveSection()
         {
-            EditorGUILayout.Space(6);
-            EditorGUILayout.BeginVertical("box");
-            EditorGUILayout.LabelField("Gỡ dependencies", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox(
-                "Tab SetupDependencies chỉ hỗ trợ gỡ toàn bộ dependencies một lần để tránh trạng thái define/package bị lệch.",
-                MessageType.Warning);
-
             var removablePkgs = s_packages
                 .Where(p => !p.IsAdMobMediationAdapter && CanRemovePackage(p))
                 .ToList();
 
+            BeginCard();
+            GUILayout.Label("Gỡ toàn bộ dependencies", _cardTitleStyle);
+            GUILayout.Label(
+                "Xóa các SDK bên thứ ba (Facebook, Firebase, AdMob, …) và dọn luôn define tương ứng, để tránh trạng thái nửa vời khi cài lại. " +
+                "GameUp Core và dependencies của Core (vd DOTween) được giữ nguyên.",
+                _descStyle);
+
             EditorGUI.BeginDisabledGroup(IsInstallOrDownloadBusy() || removablePkgs.Count == 0);
             if (GUILayout.Button(
                     removablePkgs.Count > 0
-                        ? $"🗑 Gỡ toàn bộ dependencies trong tab này ({removablePkgs.Count})"
-                        : "✓ Không còn dependencies để gỡ",
-                    GUILayout.Height(28)))
+                        ? $"Gỡ toàn bộ SDK dependencies ({removablePkgs.Count})"
+                        : "Không còn dependency nào để gỡ",
+                    GUILayout.Height(26)))
             {
                 ConfirmAndRemoveSetupDependenciesBulk(removablePkgs);
             }
 
             EditorGUI.EndDisabledGroup();
-            EditorGUILayout.EndVertical();
+            GUILayout.Label(
+                "Sau khi gỡ, bước 2 sẽ lại báo \"còn N mục\" — đó là gợi ý cài lại, không phải file còn sót.",
+                _mutedStyle);
+            EndCard();
         }
 
         private void RequestManualRefresh()
@@ -1565,31 +2249,16 @@ namespace GameUpSDK.Installer
 
             GameUpPackageInstaller.MarkSetupComplete();
             Close();
-            EditorApplication.ExecuteMenuItem("GameUp SDK/Setup");
+            if (!EditorApplication.ExecuteMenuItem(SetupWindowMenuPath))
+                Debug.LogWarning($"[GameUpSDK] Không mở được {SetupWindowMenuPath} — mở thủ công từ menu.");
         }
 
         // ─── Install logic ────────────────────────────────────────────────────────
 
-        private void StartInstall(PackageDef pkg)
-        {
-            if (pkg.IsInstalling) return;
-            pkg.IsInstalling = true;
-            pkg.InstallError = null;
-            Repaint();
-
-            switch (pkg.Method)
-            {
-                case InstallMethod.GitUrl:
-                    EnqueueGitInstall(pkg);
-                    break;
-
-                case InstallMethod.ScopedRegistry:
-                    AddScopedRegistryAndPackage(pkg);
-                    break;
-            }
-        }
-
-        private void StartBatchInstall(IReadOnlyList<PackageDef> scope, bool showGameAnalyticsSetupHintWhenComplete = false)
+        private void StartBatchInstall(
+            IReadOnlyList<PackageDef> scope,
+            bool showGameAnalyticsSetupHintWhenComplete = false,
+            bool isResume = false)
         {
             _gameAnalyticsSetupHintAfterBatch = showGameAnalyticsSetupHintWhenComplete;
             _batchScope = OrderedInstallSequence(
@@ -1599,6 +2268,10 @@ namespace GameUpSDK.Installer
                 .ToList();
             _isBatchInstalling = true;
             _installQueue.Clear();
+
+            // Import .unitypackage sẽ kéo theo compile + domain reload → mọi state trong RAM mất sạch.
+            // Ghi scope xuống SessionState để chạy tiếp sau reload (xem TryResumePendingBatch).
+            SavePendingBatch(_batchScope, showGameAnalyticsSetupHintWhenComplete, isResume);
 
             IEnumerable<PackageDef> InScope() => _batchScope;
 
@@ -1620,11 +2293,21 @@ namespace GameUpSDK.Installer
                     ImportUnityPackage(pkg, localPaths);
             }
 
-            // 2) Cài GitUrl / ScopedRegistry (bất đồng bộ)
+            // 2a) ScopedRegistry: sửa manifest.json rồi để UPM tự resolve.
             foreach (var pkg in InScope())
             {
                 if (pkg.IsInstalled) continue;
-                if (pkg.Method != InstallMethod.GitUrl && pkg.Method != InstallMethod.ScopedRegistry) continue;
+                if (pkg.Method != InstallMethod.ScopedRegistry) continue;
+
+                pkg.InstallError = null;
+                AddScopedRegistryAndPackage(pkg);
+            }
+
+            // 2b) GitUrl: xếp hàng cho Client.Add (bất đồng bộ, chạy tuần tự).
+            foreach (var pkg in InScope())
+            {
+                if (pkg.IsInstalled) continue;
+                if (pkg.Method != InstallMethod.GitUrl) continue;
 
                 pkg.InstallError = null;
                 _installQueue.Enqueue(pkg);
@@ -1641,12 +2324,16 @@ namespace GameUpSDK.Installer
             void FinishBatch()
             {
                 _isBatchInstalling = false;
-                bool hintGa = _gameAnalyticsSetupHintAfterBatch;
-                _gameAnalyticsSetupHintAfterBatch = false;
                 _batchScope = null;
                 RefreshStatus();
-                if (hintGa)
-                    NotifyGameAnalyticsAsmdefHint(fromMediationInstallAllBatch: true);
+
+                // Chưa clear SessionState ở đây: import còn chạy nền và có thể kéo theo domain reload.
+                // TryResumePendingBatch mới là nơi xác nhận đã cài đủ (hoặc chạy tiếp phần còn thiếu).
+                EditorApplication.delayCall += () =>
+                {
+                    if (this == null) return;
+                    TryResumePendingBatch();
+                };
             }
 
             if (_installQueue.Count > 0)
@@ -1696,6 +2383,168 @@ namespace GameUpSDK.Installer
             };
         }
 
+        // ─── Batch install bền vững qua domain reload ────────────────────────────
+
+        private const string SessionKeyBatchScope = "GameUp.Installer.BatchScope";
+        private const string SessionKeyBatchGaHint = "GameUp.Installer.BatchGaHint";
+        private const string SessionKeyBatchRounds = "GameUp.Installer.BatchRounds";
+
+        /// <summary>Số lần được phép chạy tiếp sau reload — chặn vòng lặp cài đi cài lại khi detect sai.</summary>
+        private const int MaxBatchResumeRounds = 3;
+
+        private static void SavePendingBatch(IEnumerable<PackageDef> scope, bool gaHint, bool isResume)
+        {
+            var indices = scope
+                .Select(PackageIndexInCatalog)
+                .Where(i => i >= 0 && i < s_packages.Length)
+                .Distinct()
+                .ToList();
+
+            if (indices.Count == 0)
+            {
+                ClearPendingBatch();
+                return;
+            }
+
+            SessionState.SetString(SessionKeyBatchScope, string.Join(",", indices));
+            SessionState.SetBool(SessionKeyBatchGaHint, gaHint);
+            if (!isResume)
+                SessionState.SetInt(SessionKeyBatchRounds, 0);
+        }
+
+        private static List<PackageDef> LoadPendingBatch()
+        {
+            var result = new List<PackageDef>();
+            string raw = SessionState.GetString(SessionKeyBatchScope, string.Empty);
+            if (string.IsNullOrEmpty(raw))
+                return result;
+
+            foreach (string token in raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (int.TryParse(token, out int index) && index >= 0 && index < s_packages.Length)
+                    result.Add(s_packages[index]);
+            }
+
+            return result;
+        }
+
+        private static void ClearPendingBatch()
+        {
+            SessionState.EraseString(SessionKeyBatchScope);
+            SessionState.EraseBool(SessionKeyBatchGaHint);
+            SessionState.EraseInt(SessionKeyBatchRounds);
+        }
+
+        // ─── Post-import cleanup bền vững qua domain reload ──────────────────────
+
+        private const string SessionKeyPendingCleanup = "GameUp.Installer.PendingCleanup";
+
+        /// <summary>
+        /// Ghi nhận package cần dọn asset sau import (vd Facebook Examples). Nếu Unity reload trước khi
+        /// importPackageCompleted kịp bắn, cleanup vẫn được chạy lại ở lần OnEnable kế tiếp.
+        /// </summary>
+        private static void MarkPendingPostImportCleanup(PackageDef pkg)
+        {
+            if (pkg?.DeleteAssetPathsAfterImport == null || pkg.DeleteAssetPathsAfterImport.Length == 0)
+                return;
+
+            int index = PackageIndexInCatalog(pkg);
+            if (index < 0 || index >= s_packages.Length)
+                return;
+
+            var indices = LoadPendingCleanupIndices();
+            if (indices.Add(index))
+                SessionState.SetString(SessionKeyPendingCleanup, string.Join(",", indices));
+        }
+
+        private static void UnmarkPendingPostImportCleanup(PackageDef pkg)
+        {
+            int index = PackageIndexInCatalog(pkg);
+            var indices = LoadPendingCleanupIndices();
+            if (!indices.Remove(index))
+                return;
+
+            if (indices.Count == 0)
+                SessionState.EraseString(SessionKeyPendingCleanup);
+            else
+                SessionState.SetString(SessionKeyPendingCleanup, string.Join(",", indices));
+        }
+
+        private static HashSet<int> LoadPendingCleanupIndices()
+        {
+            var result = new HashSet<int>();
+            string raw = SessionState.GetString(SessionKeyPendingCleanup, string.Empty);
+            if (string.IsNullOrEmpty(raw))
+                return result;
+
+            foreach (string token in raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (int.TryParse(token, out int index) && index >= 0 && index < s_packages.Length)
+                    result.Add(index);
+            }
+
+            return result;
+        }
+
+        /// <summary>Chạy lại cleanup còn tồn đọng sau khi Unity reload (gọi trong OnEnable).</summary>
+        private static void RunPendingPostImportCleanups()
+        {
+            var indices = LoadPendingCleanupIndices();
+            if (indices.Count == 0)
+                return;
+
+            foreach (int index in indices)
+                ApplyPostImportCleanup(s_packages[index]);
+
+            SessionState.EraseString(SessionKeyPendingCleanup);
+        }
+
+        /// <summary>
+        /// Chạy tiếp batch đang dở: gọi sau domain reload, sau import xong và sau khi một batch kết thúc.
+        /// Không còn gì thiếu → dọn SessionState và báo hoàn tất.
+        /// </summary>
+        private void TryResumePendingBatch()
+        {
+            var pending = LoadPendingBatch();
+            if (pending.Count == 0)
+                return;
+
+            // Còn việc đang chạy (download/import/compile) → để nhịp sau xử lý.
+            if (IsInstallOrDownloadBusy() || EditorApplication.isCompiling || EditorApplication.isUpdating)
+                return;
+
+            bool gaHint = SessionState.GetBool(SessionKeyBatchGaHint, false);
+            var missing = pending.Where(p => !p.IsInstalled && CanAutoInstall(p)).ToList();
+
+            if (missing.Count == 0)
+            {
+                ClearPendingBatch();
+                _gameAnalyticsSetupHintAfterBatch = false;
+                if (gaHint)
+                    NotifyGameAnalyticsAsmdefHint(fromMediationInstallAllBatch: true);
+                Debug.Log("[GameUpSDK] Đã cài xong toàn bộ dependency trong lượt \"Cài tất cả\".");
+                Repaint();
+                return;
+            }
+
+            int rounds = SessionState.GetInt(SessionKeyBatchRounds, 0);
+            if (rounds >= MaxBatchResumeRounds)
+            {
+                ClearPendingBatch();
+                Debug.LogWarning(
+                    "[GameUpSDK] Dừng cài tự động sau " + MaxBatchResumeRounds + " lượt. Vẫn chưa cài được: " +
+                    string.Join(", ", missing.Select(p => p.DisplayName)) +
+                    ". Hãy cài từng pack và xem lỗi trong Console.");
+                ShowNotification(new GUIContent("Còn " + missing.Count + " package chưa cài được — xem Console."));
+                Repaint();
+                return;
+            }
+
+            SessionState.SetInt(SessionKeyBatchRounds, rounds + 1);
+            Debug.Log($"[GameUpSDK] Tiếp tục cài {missing.Count} package còn lại sau khi Unity reload (lượt {rounds + 1}/{MaxBatchResumeRounds}).");
+            StartBatchInstall(missing, gaHint, isResume: true);
+        }
+
         /// <summary>
         /// Cài một package — dùng chung <see cref="StartBatchInstall"/> với scope một phần tử.
         /// </summary>
@@ -1707,13 +2556,6 @@ namespace GameUpSDK.Installer
                 return;
 
             StartBatchInstall(new List<PackageDef> { pkg });
-        }
-
-        private void EnqueueGitInstall(PackageDef pkg)
-        {
-            _installQueue.Clear();
-            _installQueue.Enqueue(pkg);
-            ProcessNextInQueue();
         }
 
         private Action _onQueueDone;
@@ -1815,16 +2657,6 @@ namespace GameUpSDK.Installer
             return found.Count > 0 ? found : null;
         }
 
-        // Backward compat helper dùng nội bộ để check có ít nhất 1 file
-        private static string GetBundledPackagePath(string fileName)
-        {
-            if (string.IsNullOrEmpty(fileName)) return null;
-            string folder = GetPackagesFolder();
-            if (string.IsNullOrEmpty(folder)) return null;
-            string full = Path.Combine(folder, fileName.Replace('/', Path.DirectorySeparatorChar));
-            return File.Exists(full) ? full : null;
-        }
-
         /// <summary>
         /// Tìm thư mục Packages~ của package này.
         /// Hỗ trợ cả cài via UPM Git URL (resolvedPath) và .unitypackage (Assets/GameUpSDK).
@@ -1884,74 +2716,160 @@ namespace GameUpSDK.Installer
         /// <summary>
         /// Import tất cả file .unitypackage của một package.
         /// interactive=false để không hiện dialog xác nhận cho từng file.
+        /// ImportPackage chạy BẤT ĐỒNG BỘ: package chỉ được coi là cài xong khi Unity bắn
+        /// importPackageCompleted (xem <see cref="FinishPendingImport"/>).
         /// </summary>
         private void ImportUnityPackage(PackageDef pkg, List<string> filePaths)
         {
+            // Không xóa InstallError ở đây: caller đã clear khi bắt đầu, và lỗi tải file trước đó
+            // phải được giữ lại để package không bị đánh dấu "đã cài" một cách sai lệch.
             pkg.IsInstalling = true;
-            pkg.InstallError = null;
             Repaint();
 
             var errors = new List<string>();
+            int dispatched = 0;
+
             foreach (string path in filePaths)
             {
+                // Unity trả về tên file không đuôi trong importPackage* callback → dùng làm khóa chờ.
+                string key = Path.GetFileNameWithoutExtension(path);
                 try
                 {
+                    _pendingImports[key] = pkg;
+                    _pendingImportsStartedAt = EditorApplication.timeSinceStartup;
+                    MarkPendingPostImportCleanup(pkg);
                     AssetDatabase.ImportPackage(path, interactive: false);
-                    Debug.Log($"[GameUpSDK] Imported: {Path.GetFileName(path)}");
+                    dispatched++;
+                    Debug.Log($"[GameUpSDK] Bắt đầu import: {Path.GetFileName(path)}");
                 }
                 catch (Exception ex)
                 {
+                    _pendingImports.Remove(key);
                     errors.Add($"{Path.GetFileName(path)}: {ex.Message}");
                     Debug.LogError($"[GameUpSDK] Import {Path.GetFileName(path)} thất bại: {ex.Message}");
                 }
             }
 
-            ApplyPostImportCleanup(pkg);
+            if (errors.Count > 0)
+                pkg.InstallError = "Một số file import thất bại:\n" + string.Join("\n", errors);
 
-            // Ép Unity re-scan assets/dll sau khi import để giảm độ trễ load assemblies.
-            // (ImportPackage chạy async; refresh thêm nhịp sau giúp state ổn định nhanh hơn.)
+            // Không có file nào được dispatch → không có callback nào để chờ.
+            if (dispatched == 0)
+                pkg.IsInstalling = false;
+
             AssetDatabase.Refresh();
-            EditorApplication.delayCall += AssetDatabase.Refresh;
+            Repaint();
+        }
 
-            pkg.IsInstalling = false;
-            if (errors.Count == 0)
+        /// <summary>Còn file .unitypackage nào của package này đang chờ Unity import xong?</summary>
+        private bool HasPendingImport(PackageDef pkg)
+        {
+            if (pkg == null || _pendingImports.Count == 0)
+                return false;
+
+            foreach (var entry in _pendingImports)
             {
-                pkg.IsInstalled = true;
-                pkg.InstallError = null;
+                if (ReferenceEquals(entry.Value, pkg))
+                    return true;
+            }
 
-                // GA .unitypackage không kèm asmdef → pass compile đầu sẽ lỗi thiếu assembly GameAnalyticsSDK.
-                // Tạo asmdef ngay sau import (cần đã có GameAnalytics.cs trên disk — không thể tạo trước khi import).
-                if (IsGameAnalyticsSdkPackage(pkg))
+            return false;
+        }
+
+        /// <summary>
+        /// Xử lý khi Unity báo import xong/thất bại/hủy một file .unitypackage.
+        /// Đây mới là thời điểm asset thực sự nằm trên disk — cleanup (vd xóa Facebook Examples)
+        /// phải chạy ở đây, không phải ngay sau khi gọi ImportPackage.
+        /// </summary>
+        private void FinishPendingImport(string packageName, bool success, string error)
+        {
+            if (string.IsNullOrEmpty(packageName))
+                return;
+            if (!_pendingImports.TryGetValue(packageName, out var pkg) || pkg == null)
+                return;
+
+            _pendingImports.Remove(packageName);
+
+            if (success)
+            {
+                ApplyPostImportCleanup(pkg);
+                // Một số file rơi xuống disk trễ hơn callback một nhịp → dọn lại lần nữa cho chắc.
+                EditorApplication.delayCall += () =>
                 {
-                    if (GameUpDefineSymbolsAutoSync.TryEnsureGameAnalyticsRuntimeAsmdef(
-                            out string asmdefMsg, out bool createdAsmdef))
-                    {
-                        if (createdAsmdef)
-                            Debug.Log("[GameUp] " + asmdefMsg);
-                    }
-                    else
-                    {
-                        Debug.LogWarning("[GameUp] " + asmdefMsg);
-                        if (!_gameAnalyticsSetupHintAfterBatch)
-                            NotifyGameAnalyticsAsmdefHint(fromMediationInstallAllBatch: false);
-                    }
-                }
+                    ApplyPostImportCleanup(pkg);
+                    UnmarkPendingPostImportCleanup(pkg);
+                };
             }
             else
             {
-                pkg.InstallError = "Một số file import thất bại:\n" + string.Join("\n", errors);
+                string detail = string.IsNullOrEmpty(error) ? "Import không hoàn tất." : error;
+                pkg.InstallError = string.IsNullOrEmpty(pkg.InstallError)
+                    ? $"{packageName}: {detail}"
+                    : pkg.InstallError + $"\n{packageName}: {detail}";
+            }
+
+            if (HasPendingImport(pkg))
+                return;
+
+            pkg.IsInstalling = false;
+            if (string.IsNullOrEmpty(pkg.InstallError))
+            {
+                pkg.IsInstalled = true;
+                EnsureGameAnalyticsAsmdefAfterImport(pkg);
             }
 
             Repaint();
         }
 
-        // ─── Parallel Download & Import ───────────────────────────────────────────
-
-        /// <summary>Bắt đầu download song song + import một package đơn lẻ.</summary>
-        private void StartDownloadAndImport(PackageDef pkg)
+        /// <summary>
+        /// GA .unitypackage không kèm asmdef → pass compile đầu sẽ lỗi thiếu assembly GameAnalyticsSDK.
+        /// Chỉ tạo được sau khi GameAnalytics.cs đã nằm trên disk.
+        /// </summary>
+        private void EnsureGameAnalyticsAsmdefAfterImport(PackageDef pkg)
         {
-            StartParallelDownloadAndImport(new List<PackageDef> { pkg }, onAllDone: null);
+            if (!IsGameAnalyticsSdkPackage(pkg))
+                return;
+
+            if (GameUpDefineSymbolsAutoSync.TryEnsureGameAnalyticsRuntimeAsmdef(
+                    out string asmdefMsg, out bool createdAsmdef))
+            {
+                if (createdAsmdef)
+                    Debug.Log("[GameUp] " + asmdefMsg);
+                return;
+            }
+
+            Debug.LogWarning("[GameUp] " + asmdefMsg);
+            if (!_gameAnalyticsSetupHintAfterBatch)
+                NotifyGameAnalyticsAsmdefHint(fromMediationInstallAllBatch: false);
         }
+
+        /// <summary>
+        /// Callback import có thể không bao giờ bắn (import bị Unity bỏ qua) → tránh kẹt cờ IsInstalling.
+        /// </summary>
+        private void DropStalePendingImports()
+        {
+            if (_pendingImports.Count == 0)
+                return;
+            if (EditorApplication.timeSinceStartup - _pendingImportsStartedAt < PendingImportTimeoutSeconds)
+                return;
+
+            var stalePackages = _pendingImports.Values.Distinct().ToList();
+            _pendingImports.Clear();
+
+            foreach (var pkg in stalePackages)
+            {
+                if (pkg == null) continue;
+                pkg.IsInstalling = false;
+                if (string.IsNullOrEmpty(pkg.InstallError))
+                    pkg.InstallError = "Không nhận được thông báo import xong từ Unity. Bấm \"Làm mới\" để kiểm tra lại.";
+            }
+
+            Debug.LogWarning("[GameUpSDK] Quá thời gian chờ import: " +
+                             string.Join(", ", stalePackages.Where(p => p != null).Select(p => p.DisplayName)));
+            Repaint();
+        }
+
+        // ─── Parallel Download & Import ───────────────────────────────────────────
 
         private static bool IsAdMobPackage(PackageDef pkg)
         {
@@ -1977,7 +2895,17 @@ namespace GameUpSDK.Installer
             _admobLatestReleaseRequest = req;
 
             var op = req.SendWebRequest();
-            op.completed += _ => ResolveAndInstallLatestAdMob(pkg, req);
+            op.completed += _ =>
+            {
+                // Window có thể đã bị đóng khi request về → không thao tác trên instance đã destroy.
+                if (this == null)
+                {
+                    req.Dispose();
+                    return;
+                }
+
+                ResolveAndInstallLatestAdMob(pkg, req);
+            };
         }
 
         private void ResolveAndInstallLatestAdMob(PackageDef pkg, UnityWebRequest request)
@@ -2104,7 +3032,13 @@ namespace GameUpSDK.Installer
 
             foreach (var pkg in pkgs)
             {
-                if (pkg.HostedUrls == null || pkg.HostedUrls.Length == 0) continue;
+                if (pkg.HostedUrls == null || pkg.HostedUrls.Length == 0)
+                {
+                    // Không có gì để tải → đừng để cờ IsInstalling treo vĩnh viễn.
+                    pkg.IsInstalling = false;
+                    pkg.InstallError = "Không có URL tải cho package này.";
+                    continue;
+                }
 
                 pkg.IsInstalling = true;
                 pkg.InstallError = null;
@@ -2168,12 +3102,7 @@ namespace GameUpSDK.Installer
                 task.Request = null;
             }
 
-            // Cập nhật overall progress
-            float totalProgress = _parallelTasks.Sum(t =>
-                t.IsDone ? 1f : t.Request?.downloadProgress ?? 0f);
-            _downloadProgress = totalProgress / _parallelTasks.Count;
-            int doneCount = _parallelTasks.Count(t => t.IsDone);
-            _downloadStatus = $"Đang tải: {doneCount}/{_parallelTasks.Count} files";
+            // Progress từng dòng được vẽ trực tiếp từ _parallelTasks trong DrawPackageRow.
             Repaint();
 
             if (anyRunning) return;
@@ -2204,8 +3133,6 @@ namespace GameUpSDK.Installer
             }
 
             _parallelTasks = null;
-            _downloadProgress = 0;
-            _downloadStatus = null;
 
             var cb = _parallelDoneCallback;
             _parallelDoneCallback = null;
@@ -2339,112 +3266,97 @@ namespace GameUpSDK.Installer
         /// </summary>
         internal static void SetDepsReadyDefine(bool enabled)
         {
-            foreach (var group in s_buildTargetGroups)
-            {
-                try
-                {
-                    string current = PlayerSettings.GetScriptingDefineSymbolsForGroup(group);
-                    var list = new List<string>(
-                        current.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
-
-                    bool changed = false;
-                    if (enabled && !list.Contains(GUDefinetion.DepsReadyDefine))
-                    {
-                        list.Add(GUDefinetion.DepsReadyDefine);
-                        changed = true;
-                    }
-                    else if (!enabled && list.Remove(GUDefinetion.DepsReadyDefine))
-                    {
-                        changed = true;
-                    }
-
-                    if (changed)
-                        PlayerSettings.SetScriptingDefineSymbolsForGroup(group, string.Join(";", list));
-                }
-                catch
-                {
-                    /* group không tồn tại trong project này, bỏ qua */
-                }
-            }
+            SetDefine(GUDefinetion.DepsReadyDefine, enabled);
         }
 
-        internal static bool IsDepsReadyDefined()
-        {
-            string current = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Android);
-            return current.Contains(GUDefinetion.DepsReadyDefine);
-        }
+        internal static bool IsDepsReadyDefined() => HasDefine(GUDefinetion.DepsReadyDefine);
 
         // ─── Status refresh ───────────────────────────────────────────────────────
 
         private void RefreshStatus(bool syncDefines = true)
         {
+            // Trong lúc gỡ dependency, define đang được clear có chủ đích — không sync lại giữa luồng.
+            if (syncDefines && IsDependencyRemovalInProgress)
+                syncDefines = false;
+
             if (syncDefines)
-                EnsurePrimaryMediationDefines();
+            {
+                EnsureMmpDefines();
+            }
 
             foreach (var pkg in s_packages)
             {
                 pkg.IsInstalled = IsPackageInstalled(pkg);
-                pkg.IsInstalling = false;
-                pkg.InstallError = null;
+
+                // Còn file đang chờ Unity import xong thì giữ nguyên trạng thái "đang xử lý".
+                if (!HasPendingImport(pkg))
+                    pkg.IsInstalling = false;
+
+                // Chỉ xóa lỗi khi package đã thực sự cài được — trước đây clear vô điều kiện nên
+                // lỗi cài luôn biến mất trước khi người dùng kịp đọc (RefreshStatus chạy rất thường xuyên).
+                if (pkg.IsInstalled)
+                    pkg.InstallError = null;
             }
 
             if (!syncDefines)
             {
+                _staleSdkDefines = GetStaleSdkDefines();
                 Repaint();
                 return;
             }
 
             // Auto set/clear Facebook define (Editor assembly = SDK đã import)
-            bool facebookInstalled = IsAssemblyLoaded("Facebook.Unity.Editor");
+            bool facebookInstalled = IsPackageInstalled(FindPackageByAssembly("Facebook.Unity.Editor"));
             if (facebookInstalled && !HasDefine(FacebookDepsDefine))
                 SetDefine(FacebookDepsDefine, true);
             else if (!facebookInstalled && HasDefine(FacebookDepsDefine))
                 SetDefine(FacebookDepsDefine, false);
 
             // Auto set/clear LevelPlay define theo trạng thái package
-            bool levelPlayInstalled = IsAssemblyLoaded("Unity.LevelPlay");
+            bool levelPlayInstalled = IsPackageInstalled(FindPackageByAssembly("Unity.LevelPlay"));
             if (levelPlayInstalled && !HasDefine(LevelPlayDepsDefine))
                 SetDefine(LevelPlayDepsDefine, true);
             else if (!levelPlayInstalled && HasDefine(LevelPlayDepsDefine))
                 SetDefine(LevelPlayDepsDefine, false);
 
-            // Auto set/clear LevelPlay define theo trạng thái package
-            bool maxInstalled = IsAssemblyLoaded("MaxSdk.Scripts");
+            bool maxInstalled = IsPackageInstalled(FindPackageByAssembly("MaxSdk.Scripts"));
             if (maxInstalled && !HasDefine(MaxSdkDepsDefine))
                 SetDefine(MaxSdkDepsDefine, true);
             else if (!maxInstalled && HasDefine(MaxSdkDepsDefine))
                 SetDefine(MaxSdkDepsDefine, false);
 
             // Auto set/clear AdMob define theo AdMob core package.
-            // Adapter mediation không ảnh hưởng define này.
             bool admobInstalled = IsAdMobCoreInstalled();
             if (admobInstalled && !HasDefine(AdMobDepsDefine))
                 SetDefine(AdMobDepsDefine, true);
             else if (!admobInstalled && HasDefine(AdMobDepsDefine))
                 SetDefine(AdMobDepsDefine, false);
 
-            // Auto set/clear Firebase define theo trạng thái package
-            bool firebaseInstalled = IsAssemblyLoaded("Firebase.App");
+            bool firebaseInstalled = IsPackageInstalled(FindPackageByAssembly("Firebase.App"));
             if (firebaseInstalled && !HasDefine(FirebaseDepsDefine))
                 SetDefine(FirebaseDepsDefine, true);
             else if (!firebaseInstalled && HasDefine(FirebaseDepsDefine))
                 SetDefine(FirebaseDepsDefine, false);
 
-            bool appMetricaInstalled = IsAssemblyLoaded("AppMetrica");
+            bool appMetricaInstalled = IsPackageInstalled(FindPackageByAssembly(AppMetricaAssemblyName));
             if (appMetricaInstalled && !HasDefine(AppmetricaDepsDefine))
                 SetDefine(AppmetricaDepsDefine, true);
             else if (!appMetricaInstalled && HasDefine(AppmetricaDepsDefine))
                 SetDefine(AppmetricaDepsDefine, false);
 
-            // Auto set/clear AppsFlyer define theo trạng thái package
-            bool appsFlyerInstalled = IsAssemblyLoaded("AppsFlyer");
+            bool appsFlyerInstalled = IsPackageInstalled(FindPackageByAssembly(AppsFlyerAssemblyName));
             if (appsFlyerInstalled && !HasDefine(AppsFlyerDepsDefine))
                 SetDefine(AppsFlyerDepsDefine, true);
             else if (!appsFlyerInstalled && HasDefine(AppsFlyerDepsDefine))
                 SetDefine(AppsFlyerDepsDefine, false);
 
-            // GameAnalytics: UPM (assembly GameAnalyticsSDK) hoặc .unitypackage cổ điển (type trong Assembly-CSharp)
-            bool gameAnalyticsInstalled = IsGameAnalyticsSdkPresent();
+            bool adjustInstalled = IsPackageInstalled(FindPackageByAssembly(AdjustAssemblyName));
+            if (adjustInstalled && !HasDefine(AdjustDepsDefine))
+                SetDefine(AdjustDepsDefine, true);
+            else if (!adjustInstalled && HasDefine(AdjustDepsDefine))
+                SetDefine(AdjustDepsDefine, false);
+
+            bool gameAnalyticsInstalled = IsPackageInstalled(FindPackageByAssembly("GameAnalyticsSDK"));
             if (gameAnalyticsInstalled && !HasDefine(GameAnalyticsDepsDefine))
                 SetDefine(GameAnalyticsDepsDefine, true);
             else if (!gameAnalyticsInstalled && HasDefine(GameAnalyticsDepsDefine))
@@ -2452,16 +3364,17 @@ namespace GameUpSDK.Installer
 
             // Tự động set/clear define khi trạng thái thay đổi
             // GAMEUP_SDK_DEPS_READY chỉ còn ý nghĩa "SDK enabled" (backward compat).
-            // Bật khi có (Firebase hoặc AppsFlyer hoặc GameAnalytics) AND (AdMob hoặc LevelPlay).
+            // Bật khi có (Firebase / MMP / GameAnalytics / AppMetrica) AND (AdMob / LevelPlay / MAX).
             // Không dùng define này để include SDK bên thứ 3 nữa.
-            bool hasAnalytics = firebaseInstalled || appsFlyerInstalled || gameAnalyticsInstalled;
-            bool hasMediation = admobInstalled || levelPlayInstalled;
+            bool hasAnalytics = firebaseInstalled || appsFlyerInstalled || adjustInstalled || gameAnalyticsInstalled || appMetricaInstalled;
+            bool hasMediation = admobInstalled || levelPlayInstalled || maxInstalled;
             bool sdkEnabled = hasAnalytics && hasMediation;
             if (sdkEnabled && !IsDepsReadyDefined())
                 SetDepsReadyDefine(true);
             else if (!sdkEnabled && IsDepsReadyDefined())
                 SetDepsReadyDefine(false);
 
+            _staleSdkDefines = GetStaleSdkDefines();
             Repaint();
         }
 
@@ -2487,10 +3400,95 @@ namespace GameUpSDK.Installer
             return false;
         }
 
+        /// <summary>
+        /// Trạng thái cài của dependency theo asset trên disk (không chỉ theo AppDomain).
+        /// Auto-sync define dùng hàm này: sau khi gỡ, assembly cũ còn trong AppDomain tới lần domain reload,
+        /// nên chỉ dựa vào <see cref="IsAssemblyLoaded"/> sẽ hiểu sai là "vẫn còn cài".
+        /// </summary>
+        internal static bool IsDependencyInstalledByAssembly(string assemblyName)
+        {
+            var pkg = FindPackageByAssembly(assemblyName);
+            if (pkg == null)
+                return IsAssemblyLoaded(assemblyName);
+
+            // Asmdef/DLL còn trên disk = SDK vẫn còn, kể cả khi dev import vào path khác mặc định.
+            return IsPackageInstalled(pkg) ||
+                   AssemblyDefinitionAssetExists(assemblyName) ||
+                   IsAssemblyLoadedFromExistingProjectFile(assemblyName);
+        }
+
+        /// <summary>
+        /// Assembly precompiled (DLL nằm trong <c>Assets</c>/<c>Packages</c>, vd Firebase) và file DLL vẫn còn trên disk.
+        /// Kiểm tra file để không nhận nhầm assembly stale: sau khi xóa DLL, AppDomain vẫn giữ nó tới lần domain reload.
+        /// </summary>
+        private static bool IsAssemblyLoadedFromExistingProjectFile(string assemblyName)
+        {
+            if (string.IsNullOrEmpty(assemblyName))
+                return false;
+
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, "..")).Replace('\\', '/');
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!string.Equals(asm.GetName().Name, assemblyName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string location;
+                try
+                {
+                    location = asm.Location;
+                }
+                catch
+                {
+                    continue; // Assembly động không có Location.
+                }
+
+                if (string.IsNullOrEmpty(location))
+                    continue;
+
+                location = Path.GetFullPath(location).Replace('\\', '/');
+                bool insideProjectSources =
+                    location.StartsWith(projectRoot + "/Assets/", StringComparison.OrdinalIgnoreCase) ||
+                    location.StartsWith(projectRoot + "/Packages/", StringComparison.OrdinalIgnoreCase);
+
+                if (insideProjectSources && File.Exists(location))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool AssemblyDefinitionAssetExists(string assemblyName)
+        {
+            if (string.IsNullOrEmpty(assemblyName))
+                return false;
+
+            foreach (string guid in AssetDatabase.FindAssets($"{assemblyName} t:AssemblyDefinitionAsset"))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (string.Equals(
+                        Path.GetFileNameWithoutExtension(path),
+                        assemblyName,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static bool IsPackageInstalled(PackageDef pkg)
         {
             if (pkg == null)
                 return false;
+
+            // Package import bằng .unitypackage: ưu tiên asset trên disk — assembly có thể còn trong AppDomain sau khi gỡ.
+            var removablePaths = GetRemovableAssetPaths(pkg);
+            if (removablePaths.Count > 0)
+            {
+                if (!removablePaths.Any(AssetPathExists))
+                    return false;
+            }
 
             bool byAssembly = !string.IsNullOrEmpty(pkg.AssemblyName) && IsAssemblyLoaded(pkg.AssemblyName);
             bool byAssetPath = HasInstalledAssetPath(pkg);
@@ -2498,7 +3496,6 @@ namespace GameUpSDK.Installer
                           IsTypeInAnyLoadedAssembly(pkg.InstalledTypeFullName);
 
             // AdMob mediation adapters cần phản ánh trạng thái thư mục asset thực tế.
-            // Assembly có thể còn loaded trong AppDomain một lúc sau khi xóa asset.
             if (pkg.IsAdMobMediationAdapter)
                 return byAssetPath;
 
@@ -2563,10 +3560,31 @@ namespace GameUpSDK.Installer
             return paths;
         }
 
+        private static PackageDef FindPackageByAssembly(string assemblyName)
+        {
+            if (string.IsNullOrEmpty(assemblyName))
+                return null;
+
+            return s_packages.FirstOrDefault(p =>
+                !p.IsAdMobMediationAdapter &&
+                string.Equals(p.AssemblyName, assemblyName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool AssetPathExists(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return false;
+
+            path = path.Replace('\\', '/');
+            if (AssetDatabase.IsValidFolder(path))
+                return true;
+
+            return !string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(path));
+        }
+
         private static bool CanRemovePackage(PackageDef pkg)
         {
-            return GetRemovableAssetPaths(pkg)
-                .Any(p => !string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(p)));
+            return GetRemovableAssetPaths(pkg).Any(AssetPathExists);
         }
 
         private void ConfirmAndRemovePackage(PackageDef pkg)
@@ -2574,8 +3592,9 @@ namespace GameUpSDK.Installer
             if (pkg == null)
                 return;
 
-            var existingPaths = GetRemovableAssetPaths(pkg)
-                .Where(p => !string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(p)))
+            var existingPaths = FilterSdkRemovablePaths(
+                    GetRemovableAssetPaths(pkg).Where(AssetPathExists))
+                .OrderByDescending(p => p.Length)
                 .ToList();
 
             if (existingPaths.Count == 0)
@@ -2591,24 +3610,18 @@ namespace GameUpSDK.Installer
             if (!EditorUtility.DisplayDialog(
                     "GameUp SDK — Gỡ package",
                     $"Bạn có chắc muốn gỡ \"{pkg.DisplayName}\"?\n\n" +
-                    $"Sẽ xóa các path:\n• {preview}\n\n" +
+                    "Bước 1: gỡ define symbols của package và đợi Unity compile lại (code GameUp không còn tham chiếu SDK).\n" +
+                    $"Bước 2: tự xóa các path:\n• {preview}\n\n" +
                     "Lưu ý: thao tác này không tự thêm lại package vào project.",
                     "Gỡ package",
                     "Hủy"))
                 return;
 
-            if (!TryDeleteAssets(existingPaths, out string error))
-            {
-                EditorUtility.DisplayDialog(
-                    "GameUp SDK — Gỡ package thất bại",
-                    error,
-                    "OK");
-                return;
-            }
-
-            AssetDatabase.Refresh();
-            RefreshStatus();
-            Debug.Log("[GameUpSDK] Đã gỡ package: " + pkg.DisplayName);
+            ClearPendingBatch();
+            BeginDependencyRemoval();
+            bool definesChanged = ClearDefinesForPackage(pkg);
+            StartTwoPhaseRemoval(pkg.DisplayName, existingPaths, definesChanged);
+            RefreshStatus(syncDefines: false);
         }
 
         private void ConfirmAndRemoveAdMobAdapter(PackageDef pkg)
@@ -2634,6 +3647,8 @@ namespace GameUpSDK.Installer
                     "Hủy"))
                 return;
 
+            ClearPendingBatch();
+
             if (!TryDeleteInstalledAssetPath(pkg, out string error))
             {
                 EditorUtility.DisplayDialog(
@@ -2653,27 +3668,19 @@ namespace GameUpSDK.Installer
             if (packages == null || packages.Count == 0)
                 return;
 
-            var existingPaths = packages
-                .SelectMany(GetRemovableAssetPaths)
-                .Where(p => !string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(p)))
-                .Distinct()
+            var existingPaths = FilterSdkRemovablePaths(
+                    packages
+                        .SelectMany(GetRemovableAssetPaths)
+                        .Where(AssetPathExists)
+                        .Concat(GetSetupDependenciesResidualPaths().Where(AssetPathExists)))
+                .OrderByDescending(p => p.Length)
                 .ToList();
-
-            // Dọn thêm các thư mục phụ trợ/residual thường còn sót sau khi gỡ dependencies.
-            foreach (string residualPath in GetSetupDependenciesResidualPaths())
-            {
-                if (!string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(residualPath)) &&
-                    !existingPaths.Contains(residualPath))
-                {
-                    existingPaths.Add(residualPath);
-                }
-            }
 
             if (existingPaths.Count == 0)
             {
                 EditorUtility.DisplayDialog(
-                    "GameUp SDK — Gỡ toàn bộ dependencies",
-                    "Không tìm thấy asset path để gỡ.",
+                    "GameUp SDK — Gỡ SDK dependencies",
+                    "Không tìm thấy SDK dependency path để gỡ.",
                     "OK");
                 return;
             }
@@ -2683,63 +3690,369 @@ namespace GameUpSDK.Installer
                 preview += $"\n• ... và {existingPaths.Count - 12} path khác";
 
             if (!EditorUtility.DisplayDialog(
-                    "GameUp SDK — Gỡ toàn bộ dependencies",
-                    "Bạn có chắc muốn gỡ toàn bộ dependencies trong tab SetupDependencies?\n\n" +
+                    "GameUp SDK — Gỡ SDK dependencies",
+                    "Bạn có chắc muốn gỡ toàn bộ SDK dependencies trong tab SetupDependencies?\n\n" +
                     $"Sẽ xóa {existingPaths.Count} path:\n• {preview}\n\n" +
-                    "Sẽ clear define symbols liên quan trước khi gỡ pack.",
-                    "Gỡ toàn bộ",
+                    "GameUp Core và DOTween không bị gỡ.\n" +
+                    "Sẽ clear define symbols SDK (kể cả define do SDK third-party tự set) trước khi xóa file.",
+                    "Gỡ SDK dependencies",
                     "Hủy"))
                 return;
 
-            // Clear define trước để tránh conditionals/compile lệch trạng thái trong lúc gỡ.
-            ClearDependencyDefinesAfterBulkRemove();
-
-            if (!TryDeleteAssets(existingPaths, out string error))
-            {
-                EditorUtility.DisplayDialog(
-                    "GameUp SDK — Gỡ dependencies thất bại",
-                    error,
-                    "OK");
-                return;
-            }
-
-            AssetDatabase.Refresh();
-            // Tránh auto-sync define ngay vì assemblies có thể còn loaded trong AppDomain tạm thời.
+            // Hủy batch đang chờ (nếu có) — nếu không, luồng resume sau reload sẽ cài lại thứ vừa gỡ.
+            ClearPendingBatch();
+            BeginDependencyRemoval();
+            bool definesChanged = ClearAllDependencyDefines();
+            StartTwoPhaseRemoval("toàn bộ SDK dependencies (Core/DOTween giữ nguyên)", existingPaths, definesChanged);
             RefreshStatus(syncDefines: false);
-            Debug.Log("[GameUpSDK] Đã gỡ toàn bộ dependencies trong tab SetupDependencies.");
         }
 
-        private static void ClearDependencyDefinesAfterBulkRemove()
+        /// <summary>Clear mọi define SDK. Trả true nếu Scripting Define Symbols thực sự thay đổi (⇒ Unity sẽ compile lại).</summary>
+        private static bool ClearAllDependencyDefines()
         {
+            var before = GetDefinedSymbols();
+
             SetDefine(LevelPlayDepsDefine, false);
             SetDefine(AdMobDepsDefine, false);
             SetDefine(MaxSdkDepsDefine, false);
             SetDefine(FirebaseDepsDefine, false);
             SetDefine(AppmetricaDepsDefine, false);
             SetDefine(AppsFlyerDepsDefine, false);
+            SetDefine(AdjustDepsDefine, false);
             SetDefine(GameAnalyticsDepsDefine, false);
             SetDefine(FacebookDepsDefine, false);
             SetDepsReadyDefine(false);
 
-            // Reset mediation về mặc định an toàn sau khi gỡ toàn bộ dependencies.
-            SetDefine(GUDefinetion.PrimaryMediationAdMob, false);
-            SetDefine(GUDefinetion.PrimaryMediationMax, false);
-            SetDefine(GUDefinetion.PrimaryMediationLevelPlay, true);
+            // Define do chính SDK third-party set (installer không set) — không dọn thì còn lại vĩnh viễn.
+            RemoveDefinesWhere(IsThirdPartyDependencyDefine);
+
+            // Reset về mặc định AdMob + AppsFlyer sau khi gỡ toàn bộ dependencies.
+            ClearLegacyPrimaryMediationDefines();
+            EditorPrefs.DeleteKey(SelectedNetworksPrefKey);
+            SetMmpDefines(MmpProvider.AppsFlyer);
+
+            PersistPlayerSettings();
+            return HaveDefinesChanged(before);
         }
 
+        /// <summary>
+        /// Clear define của riêng một package, gọi trước khi xóa asset của package đó.
+        /// Trả true nếu Scripting Define Symbols thực sự thay đổi (⇒ Unity sẽ compile lại).
+        /// </summary>
+        private static bool ClearDefinesForPackage(PackageDef pkg)
+        {
+            var before = GetDefinedSymbols();
+            string depsDefine = GetDepsDefineForPackage(pkg);
+            if (!string.IsNullOrEmpty(depsDefine))
+                SetDefine(depsDefine, false);
+
+            string thirdPartyPrefix = GetThirdPartyDefinePrefixForPackage(pkg);
+            if (!string.IsNullOrEmpty(thirdPartyPrefix))
+            {
+                RemoveDefinesWhere(symbol =>
+                    symbol.StartsWith(thirdPartyPrefix, StringComparison.OrdinalIgnoreCase));
+            }
+
+            PersistPlayerSettings();
+            return HaveDefinesChanged(before);
+        }
+
+        private static bool HaveDefinesChanged(List<string> before)
+        {
+            var after = GetDefinedSymbols();
+            return after.Count != before.Count || after.Except(before, StringComparer.Ordinal).Any();
+        }
+
+        // ─── Gỡ 2 pha: gỡ define → đợi compile xong → mới xóa asset ─────────────────
+        // Xóa file cùng lúc với đổi define khiến Unity import/compile SDK đang bị xóa dở trong khi
+        // GameUpSDK.Runtime vẫn compile với define cũ ⇒ lỗi compile, domain không reload, define bị sync bật lại.
+        // Pha 2 chạy ở compilationFinished / sau domain reload nên sống sót kể cả khi cửa sổ installer bị đóng.
+
+        private const string SessionKeyPendingDeletePaths = "GameUp.Installer.PendingDeletePaths";
+        private const string SessionKeyPendingDeleteLabel = "GameUp.Installer.PendingDeleteLabel";
+
+        private static bool HasPendingAssetDeletion =>
+            !string.IsNullOrEmpty(SessionState.GetString(SessionKeyPendingDeletePaths, ""));
+
+        /// <summary>Pha 1 (define đã clear): lưu danh sách path rồi đợi compile; không đổi define thì xóa luôn.</summary>
+        private static void StartTwoPhaseRemoval(string label, List<string> paths, bool definesChanged)
+        {
+            SessionState.SetString(SessionKeyPendingDeletePaths, string.Join("\n", paths));
+            SessionState.SetString(SessionKeyPendingDeleteLabel, label);
+
+            if (!definesChanged)
+            {
+                CompletePendingAssetDeletion();
+                return;
+            }
+
+            Debug.Log($"[GameUpSDK] Gỡ {label}: đã gỡ define symbols, đợi Unity compile xong rồi mới xóa file…");
+            CompilationPipeline.RequestScriptCompilation();
+        }
+
+        [InitializeOnLoadMethod]
+        private static void RegisterPendingAssetDeletionHooks()
+        {
+            CompilationPipeline.compilationFinished -= OnCompilationFinishedCompleteDeletion;
+            CompilationPipeline.compilationFinished += OnCompilationFinishedCompleteDeletion;
+            // Domain vừa reload sau compile: chạy bù nếu compilationFinished của domain cũ không kịp xử lý.
+            if (HasPendingAssetDeletion)
+                EditorApplication.delayCall += TryCompletePendingAssetDeletion;
+        }
+
+        private static void OnCompilationFinishedCompleteDeletion(object _)
+        {
+            if (HasPendingAssetDeletion)
+                EditorApplication.delayCall += TryCompletePendingAssetDeletion;
+        }
+
+        private static void TryCompletePendingAssetDeletion()
+        {
+            if (!HasPendingAssetDeletion)
+                return;
+
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                EditorApplication.delayCall += TryCompletePendingAssetDeletion;
+                return;
+            }
+
+            CompletePendingAssetDeletion();
+        }
+
+        /// <summary>Pha 2: xóa asset (gộp một lần refresh), mở lại auto-sync define, báo kết quả.</summary>
+        private static void CompletePendingAssetDeletion()
+        {
+            var paths = SessionState.GetString(SessionKeyPendingDeletePaths, "")
+                .Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .ToList();
+            string label = SessionState.GetString(SessionKeyPendingDeleteLabel, "package");
+            // Xóa key trước khi xóa file: Refresh bên dưới gây compile, không được chạy lại pha 2.
+            SessionState.EraseString(SessionKeyPendingDeletePaths);
+            SessionState.EraseString(SessionKeyPendingDeleteLabel);
+
+            string error = null;
+            var failedPaths = new List<string>();
+            AssetDatabase.StartAssetEditing();
+            try
+            {
+                if (paths.Count > 0)
+                    TryDeleteAssets(paths, out error, out failedPaths);
+            }
+            finally
+            {
+                AssetDatabase.StopAssetEditing();
+                EndDependencyRemoval();
+            }
+
+            AssetDatabase.Refresh();
+            foreach (var window in Resources.FindObjectsOfTypeAll<GameUpDependenciesWindow>())
+                window.RefreshStatus(syncDefines: true);
+
+            if (failedPaths.Count == 0)
+            {
+                Debug.Log($"[GameUpSDK] Đã gỡ {label}.");
+                return;
+            }
+
+            EditorUtility.DisplayDialog(
+                "GameUp SDK — Gỡ chưa hết",
+                $"{error}\n\nPath chưa xóa được:\n• {string.Join("\n• ", failedPaths)}\n\n" +
+                "Define symbols đã được gỡ. Xóa thủ công phần còn sót rồi bấm \"Làm mới\".",
+                "OK");
+            Debug.LogWarning($"[GameUpSDK] Gỡ {label} một phần. Còn sót: {string.Join(", ", failedPaths)}");
+        }
+
+        /// <summary>Define <c>*_DEPENDENCIES_INSTALLED</c> mà installer quản lý cho package này.</summary>
+        private static string GetDepsDefineForPackage(PackageDef pkg)
+        {
+            if (pkg == null || pkg.IsAdMobMediationAdapter || string.IsNullOrEmpty(pkg.AssemblyName))
+                return null;
+
+            switch (pkg.AssemblyName)
+            {
+                case "Facebook.Unity.Editor": return FacebookDepsDefine;
+                case "Firebase.App": return FirebaseDepsDefine;
+                case "GoogleMobileAds": return AdMobDepsDefine;
+                case "Unity.LevelPlay": return LevelPlayDepsDefine;
+                case "MaxSdk.Scripts": return MaxSdkDepsDefine;
+                case AppsFlyerAssemblyName: return AppsFlyerDepsDefine;
+                case AdjustAssemblyName: return AdjustDepsDefine;
+                case "GameAnalyticsSDK": return GameAnalyticsDepsDefine;
+                case "AppMetrica": return AppmetricaDepsDefine;
+                default: return null;
+            }
+        }
+
+        /// <summary>
+        /// Tiền tố define do SDK third-party tự ghi vào Player Settings (editor script của chúng),
+        /// vd GameAnalytics ghi <c>gameanalytics_admob_enabled</c>. Xóa folder không dọn các define này.
+        /// </summary>
+        private static string GetThirdPartyDefinePrefixForPackage(PackageDef pkg)
+        {
+            if (pkg == null || string.IsNullOrEmpty(pkg.AssemblyName))
+                return null;
+
+            switch (pkg.AssemblyName)
+            {
+                case "GameAnalyticsSDK": return GameAnalyticsThirdPartyDefinePrefix;
+                case "AppMetrica": return AppmetricaThirdPartyDefinePrefix;
+                default: return null;
+            }
+        }
+
+        private static bool IsThirdPartyDependencyDefine(string symbol)
+        {
+            if (string.IsNullOrEmpty(symbol))
+                return false;
+
+            return symbol.StartsWith(GameAnalyticsThirdPartyDefinePrefix, StringComparison.OrdinalIgnoreCase) ||
+                   symbol.StartsWith(AppmetricaThirdPartyDefinePrefix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Ghi ProjectSettings.asset ngay: nếu Unity domain reload / crash trước khi save,
+        /// define vừa clear sẽ quay lại và SDK compile với SDK third-party đã bị xóa.
+        /// </summary>
+        private static void PersistPlayerSettings()
+        {
+            try
+            {
+                AssetDatabase.SaveAssets();
+            }
+            catch
+            {
+                /* Không chặn luồng gỡ nếu Unity từ chối save ở thời điểm này. */
+            }
+        }
+
+        // ─── Removal guard ────────────────────────────────────────────────────────
+
+        private const string SessionKeyRemovalInProgress = "GameUp.Installer.RemovalInProgress";
+
+        /// <summary>
+        /// True trong lúc installer đang gỡ dependency. Auto-sync define phải đứng ngoài giai đoạn này:
+        /// assembly của SDK vẫn còn trong AppDomain tới khi domain reload, nên sync giữa luồng sẽ
+        /// set lại đúng những define vừa clear (và code trong <c>#if</c> sẽ compile lỗi vì file đã bị xóa).
+        /// </summary>
+        internal static bool IsDependencyRemovalInProgress =>
+            SessionState.GetBool(SessionKeyRemovalInProgress, false);
+
+        private static void BeginDependencyRemoval()
+        {
+            SessionState.SetBool(SessionKeyRemovalInProgress, true);
+        }
+
+        private static void EndDependencyRemoval()
+        {
+            SessionState.SetBool(SessionKeyRemovalInProgress, false);
+        }
+
+        /// <summary>
+        /// Nếu domain reload cắt ngang luồng gỡ (khối finally không kịp chạy), SessionState sẽ giữ guard
+        /// bật tới hết session và auto-sync define ngừng hoạt động. Reload xong thì luôn mở lại.
+        /// </summary>
+        [InitializeOnLoadMethod]
+        private static void ReleaseDependencyRemovalGuardOnLoad()
+        {
+            // Đang ở giữa gỡ 2 pha thì giữ guard — pha 2 sẽ tự mở lại sau khi xóa file.
+            if (!HasPendingAssetDeletion)
+                EndDependencyRemoval();
+        }
+
+        /// <summary>
+        /// Residual do SDK third-party để lại (EDM4U, native plugins…).
+        /// QUY TẮC: chỉ liệt kê path chắc chắn thuộc về dependency. Không bao giờ liệt kê thư mục dùng chung
+        /// (Assets/Plugins, Assets/Plugins/Android, Assets/Editor, Assets/Resources, Assets/StreamingAssets)
+        /// vì chúng chứa file build của game — vd mainTemplate.gradle, settingsTemplate.gradle.
+        /// </summary>
         private static IEnumerable<string> GetSetupDependenciesResidualPaths()
         {
             return new[]
             {
-                "Assets/Editor Default Resources",
+                // EDM4U: dùng chung nhiều SDK nên chỉ dọn khi gỡ TOÀN BỘ dependencies.
                 "Assets/ExternalDependencyManager",
-                "Assets/Editor",
-                "Assets/GeneratedLocalRepo",
-                "Assets/StreamingAssets",
-                "Assets/SDK",
-                "Assets/Plugins",
+                "Assets/Editor Default Resources/Firebase",
+                "Assets/GeneratedLocalRepo/Firebase",
+                "Assets/Plugins/iOS/Firebase",
+                "Assets/tvOS/Firebase",
+                "Assets/Plugins/tvOS/Firebase",
+                "Assets/Plugins/iOS/GADUAdNetworkExtras.h",
                 "Assets/Resources/GameAnalytics",
+
+                // File .aar/androidlib cụ thể trong Assets/Plugins/Android — KHÔNG xóa cả thư mục.
+                "Assets/Plugins/Android/GoogleMobileAdsPlugin.androidlib",
+                "Assets/Plugins/Android/googlemobileads-unity.aar",
             };
+        }
+
+        /// <summary>
+        /// Thư mục dùng chung của project — cấm xóa chính nó (vẫn cho phép xóa file/thư mục con cụ thể).
+        /// Chặn cứng ở tầng xóa để một entry sai trong danh sách path không thể thổi bay cấu hình build của game.
+        /// </summary>
+        private static readonly string[] s_neverDeleteExactPaths =
+        {
+            "Assets",
+            "Assets/Plugins",
+            "Assets/Plugins/Android",
+            "Assets/Plugins/iOS",
+            "Assets/Plugins/tvOS",
+            "Assets/Editor",
+            "Assets/Editor Default Resources",
+            "Assets/Resources",
+            "Assets/StreamingAssets",
+            "Assets/Scenes",
+            "Assets/Scripts",
+        };
+
+        private static bool IsSharedProjectFolder(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return false;
+
+            string normalized = path.Replace('\\', '/').TrimEnd('/');
+            foreach (string shared in s_neverDeleteExactPaths)
+            {
+                if (normalized.Equals(shared, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsCoreProtectedAssetPath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return false;
+
+            if (IsSharedProjectFolder(path))
+                return true;
+
+            foreach (string prefix in s_coreProtectedAssetPathPrefixes)
+            {
+                if (path.Equals(prefix, StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static IEnumerable<string> FilterSdkRemovablePaths(IEnumerable<string> paths)
+        {
+            if (paths == null)
+                yield break;
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in paths)
+            {
+                if (string.IsNullOrEmpty(path) || IsCoreProtectedAssetPath(path) || !seen.Add(path))
+                    continue;
+
+                yield return path;
+            }
         }
 
         private static bool TryDeleteInstalledAssetPath(PackageDef pkg, out string error)
@@ -2770,36 +4083,93 @@ namespace GameUpSDK.Installer
 
         private static bool TryDeleteAssets(List<string> assetPaths, out string error)
         {
+            return TryDeleteAssets(assetPaths, out error, out _);
+        }
+
+        private static bool TryDeleteAssets(List<string> assetPaths, out string error, out List<string> failedPaths)
+        {
             error = null;
+            failedPaths = new List<string>();
             if (assetPaths == null || assetPaths.Count == 0)
             {
                 error = "Không có asset path để xóa.";
                 return false;
             }
 
-            foreach (string path in assetPaths.Distinct())
+            foreach (string path in FilterSdkRemovablePaths(assetPaths).OrderByDescending(p => p.Length))
             {
-                if (string.IsNullOrEmpty(path))
-                    continue;
-
-                if (string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(path)))
-                    continue;
-
-                if (!AssetDatabase.DeleteAsset(path))
+                if (!TryDeleteSingleAssetPath(path, out string pathError))
                 {
-                    error = "AssetDatabase.DeleteAsset trả về false: " + path;
-                    return false;
+                    failedPaths.Add(path);
+                    if (string.IsNullOrEmpty(error))
+                        error = pathError;
                 }
             }
 
-            return true;
+            return failedPaths.Count == 0;
         }
 
-        /// <summary>UPM có .asmdef GameAnalyticsSDK; .unitypackage chuẩn GA nằm trong Assembly-CSharp.</summary>
-        internal static bool IsGameAnalyticsSdkPresent()
+        private static bool TryDeleteSingleAssetPath(string assetPath, out string error)
         {
-            return IsAssemblyLoaded("GameAnalyticsSDK") ||
-                   IsTypeInAnyLoadedAssembly("GameAnalyticsSDK.GameAnalytics");
+            error = null;
+            if (string.IsNullOrEmpty(assetPath) || IsCoreProtectedAssetPath(assetPath))
+                return true;
+
+            assetPath = assetPath.Replace('\\', '/');
+            if (!AssetPathExists(assetPath))
+                return true;
+
+            if (AssetDatabase.IsValidFolder(assetPath))
+            {
+                string[] guids = AssetDatabase.FindAssets(string.Empty, new[] { assetPath });
+                foreach (string childPath in guids
+                             .Select(AssetDatabase.GUIDToAssetPath)
+                             .Where(p => !string.Equals(p, assetPath, StringComparison.OrdinalIgnoreCase))
+                             .Distinct(StringComparer.OrdinalIgnoreCase)
+                             .OrderByDescending(p => p.Length))
+                {
+                    if (!TryDeleteSingleAssetPath(childPath, out error))
+                        return false;
+                }
+            }
+
+            if (AssetDatabase.DeleteAsset(assetPath))
+                return true;
+
+            return TryDeleteAssetPathViaFileSystem(assetPath, out error);
+        }
+
+        private static bool TryDeleteAssetPathViaFileSystem(string assetPath, out string error)
+        {
+            error = null;
+            try
+            {
+                string projectRoot = Path.GetDirectoryName(Application.dataPath);
+                string fullPath = Path.GetFullPath(Path.Combine(projectRoot, assetPath));
+                string metaPath = fullPath + ".meta";
+
+                if (Directory.Exists(fullPath))
+                    Directory.Delete(fullPath, recursive: true);
+                else if (File.Exists(fullPath))
+                    File.Delete(fullPath);
+                else if (!AssetPathExists(assetPath))
+                    return true;
+
+                if (File.Exists(metaPath))
+                    File.Delete(metaPath);
+
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                if (!AssetPathExists(assetPath))
+                    return true;
+            }
+            catch (Exception ex)
+            {
+                error = $"Không xóa được {assetPath}: {ex.Message}";
+                return false;
+            }
+
+            error = "AssetDatabase.DeleteAsset trả về false: " + assetPath;
+            return false;
         }
 
         private static bool IsTypeInAnyLoadedAssembly(string fullTypeName)
